@@ -1,6 +1,10 @@
 """
 👑 admin_dashboard.py — لوحة الإمبراطور النهائية
-كل الصفحات في ملف واحد
+الإصلاحات:
+  ✅ إصلاح خطأ duplicate headers في Master DB
+  ✅ الواجهة الأولى = QR للصفحة | الواجهة الثانية = QR WiFi
+  ✅ زر PDF يعمل بدون إعادة إنشاء (session_state)
+  ✅ تحميل QR/WiFi بدون إعادة إنشاء (session_state)
 """
 import streamlit as st
 import gspread, io, os, json, time, requests
@@ -101,26 +105,74 @@ def gs():
     except Exception as e: st.error(f"Google: {e}"); return None
 
 def fetch_all():
+    """
+    ✅ إصلاح: استخدام get_all_values() بدلاً من get_all_records()
+    لتفادي خطأ duplicate headers
+    """
     c=gs()
     if not c or not MASTER_SHEET_ID: return []
-    try: return c.open_by_key(MASTER_SHEET_ID).sheet1.get_all_records()
-    except Exception as e: st.error(f"Master DB: {e}"); return []
+    try:
+        ws = c.open_by_key(MASTER_SHEET_ID).sheet1
+        all_values = ws.get_all_values()
+        if not all_values or len(all_values) < 2:
+            return []
+        # أول صف = headers
+        headers = all_values[0]
+        # إزالة الأعمدة المكررة بإضافة suffix
+        seen = {}
+        clean_headers = []
+        for h in headers:
+            if h in seen:
+                seen[h] += 1
+                clean_headers.append(f"{h}_{seen[h]}")
+            else:
+                seen[h] = 0
+                clean_headers.append(h)
+        # تحويل لـ list of dicts
+        records = []
+        for row in all_values[1:]:
+            # تجاهل الصفوف الفارغة
+            if not any(cell.strip() for cell in row):
+                continue
+            # تمديد الصف إذا كان أقصر من الـ headers
+            padded = row + [''] * (len(clean_headers) - len(row))
+            records.append(dict(zip(clean_headers, padded)))
+        return records
+    except Exception as e:
+        st.error(f"Master DB: {e}")
+        return []
 
 def del_r(rid):
     c=gs()
     if not c: return False
     try:
         ws=c.open_by_key(MASTER_SHEET_ID).sheet1
-        for i,r in enumerate(ws.get_all_records()):
-            if str(r.get("restaurant_id"))==str(rid):
-                ws.delete_rows(i+2); return True
-    except: pass
+        all_values = ws.get_all_values()
+        if not all_values: return False
+        headers = all_values[0]
+        rid_col = headers.index("restaurant_id") if "restaurant_id" in headers else 0
+        for i, row in enumerate(all_values[1:], start=2):
+            if len(row) > rid_col and str(row[rid_col]) == str(rid):
+                ws.delete_rows(i)
+                return True
+    except Exception as e:
+        st.error(f"حذف: {e}")
     return False
 
 def nxt(rs):
     if not rs: return "1"
     ids=[int(r.get("restaurant_id",0)) for r in rs if str(r.get("restaurant_id","")).isdigit()]
     return str(max(ids)+1) if ids else "1"
+
+# ══ HELPERS لـ session_state ══════════════════════════════
+def _store_cards(key_prefix, menu_bytes, wifi_bytes):
+    """حفظ البطاقتين في session_state"""
+    st.session_state[f"{key_prefix}_menu_bytes"] = menu_bytes
+    st.session_state[f"{key_prefix}_wifi_bytes"]  = wifi_bytes
+
+def _store_pdf(key, pdf_bytes):
+    """حفظ PDF في session_state"""
+    st.session_state[f"pdf_{key}"] = pdf_bytes
 
 # ══ DASHBOARD ═════════════════════════════════════════════
 def pg_dashboard(rs):
@@ -180,7 +232,7 @@ def pg_add(rs):
         with c1:
             rid      =st.text_input("🔢 رقم المطعم",value=nxt(rs))
             rname    =st.text_input("🏪 اسم المطعم *",placeholder="مطعم النخيل الذهبي")
-            rsheetid =st.text_input("📊 Sheet ID *",placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",help="ID من رابط الـ Spreadsheet الذي أنشأه صاحب المطعم وشاركه مع SA")
+            rsheetid =st.text_input("📊 Sheet ID *",placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",help="ID من رابط الـ Spreadsheet")
             remail   =st.text_input("📧 بريد صاحب المطعم (اختياري)",placeholder="owner@gmail.com")
         with c2:
             rtables=st.number_input("🪑 عدد الطاولات",1,100,10)
@@ -201,9 +253,13 @@ def pg_add(rs):
             st.markdown(f'<div style="background:{rprimary};border:2px solid {raccent};border-radius:12px;padding:1.2rem;text-align:center"><div style="color:{raccent};font-size:1.1rem;font-weight:900">{rname or "اسم المطعم"}</div><div style="color:{raccent};opacity:.4;font-size:.8rem;margin-top:.2rem">{rstyle}</div></div>',unsafe_allow_html=True)
             if st.button("🖼️ معاينة بطاقة طاولة") and rname:
                 with st.spinner("🎨..."):
-                    w,m=generate_table_card(rname,"WiFi","pass",1,f"{FRONTEND_URL}?rest_id={rid}&table=1",rstyle,rprimary,raccent)
-                st.image(card_to_bytes(w),use_column_width=True)
-                st.image(card_to_bytes(m),use_column_width=True)
+                    menu_img, wifi_img = generate_table_card(
+                        rname,"WiFi","pass",1,
+                        f"{FRONTEND_URL}?rest_id={rid}&table=1",
+                        rstyle,rprimary,raccent
+                    )
+                st.image(card_to_bytes(menu_img),use_column_width=True,caption="📱 QR المينيو")
+                st.image(card_to_bytes(wifi_img),use_column_width=True,caption="📶 QR WiFi")
 
     with t3:
         c1,c2=st.columns(2)
@@ -215,7 +271,7 @@ def pg_add(rs):
     if st.button("🚀 إنشاء المطعم — كل شيء أوتوماتيكي!",use_container_width=True):
         errs=[]
         if not rname.strip(): errs.append("اسم المطعم مطلوب")
-        if not rsheetid.strip(): errs.append("Sheet ID مطلوب — صاحب المطعم يجب أن ينشئ Sheet ويشاركه مع SA أولاً")
+        if not rsheetid.strip(): errs.append("Sheet ID مطلوب")
         if not rssid.strip(): errs.append("SSID مطلوب")
         if errs:
             for e in errs: st.error(f"❌ {e}")
@@ -251,6 +307,7 @@ def pg_add(rs):
             c1.markdown(f'<div class="iblk"><div class="il">📱 رابط المينيو</div><div class="iv"><a href="{mu}" target="_blank" style="color:#C9A84C">{mu}</a></div></div>',unsafe_allow_html=True)
             c2.markdown(f'<div class="iblk"><div class="il">📊 Google Sheet</div><div class="iv"><a href="{su}" target="_blank" style="color:#C9A84C">افتح الشيت</a></div></div>',unsafe_allow_html=True)
             c3.markdown(f'<div class="iblk"><div class="il">🔢 رقم المطعم</div><div class="iv">{rid}</div></div>',unsafe_allow_html=True)
+
             if result.reg_link:
                 st.markdown(f"""<div class="tgbox">
                   <b style="color:#29b6f6">📨 رابط Telegram — أرسله لصاحب المطعم:</b><br>
@@ -261,26 +318,125 @@ def pg_add(rs):
                   <small style="color:#555">صاحب المطعم يضغطه مرة واحدة فقط → يتفعل تلقائياً</small>
                 </div>""",unsafe_allow_html=True)
                 st.code(result.reg_link,language=None)
+
             st.markdown('<div class="gdiv"></div>',unsafe_allow_html=True)
             st.markdown("### 🔲 بطاقات الطاولات")
-            with st.spinner("🎨..."):
-                w,m=generate_table_card(rname,rssid,rwpass,1,f"{mu}&table=1",rstyle,rprimary,raccent)
-            qc1,qc2=st.columns(2)
-            with qc1:
-                wb=io.BytesIO(); w.save(wb,"PNG"); wb.seek(0)
-                st.image(wb,caption="WiFi",use_column_width=True); wb.seek(0)
-                st.download_button("⬇️ WiFi Card",wb,f"WiFi_{rname}.png","image/png",use_container_width=True)
-            with qc2:
-                mb=io.BytesIO(); m.save(mb,"PNG"); mb.seek(0)
-                st.image(mb,caption="Menu QR",use_column_width=True); mb.seek(0)
-                st.download_button("⬇️ QR Card",mb,f"QR_{rname}.png","image/png",use_container_width=True)
-            if st.button("📄 PDF كامل لجميع الطاولات"):
-                with st.spinner(f"⏳ {rtables*2} صفحة..."):
-                    pdf=generate_table_tents_pdf(rname,rssid,rwpass,FRONTEND_URL,rid,rtables,rstyle,rprimary,raccent)
-                st.download_button("⬇️ تحميل PDF",pdf,f"Tents_{rname}.pdf","application/pdf",use_container_width=True)
+
+            with st.spinner("🎨 توليد البطاقات..."):
+                # ✅ الواجهة الأولى = QR المينيو | الواجهة الثانية = QR WiFi
+                menu_img, wifi_img = generate_table_card(
+                    rname, rssid, rwpass, 1,
+                    f"{mu}&table=1", rstyle, rprimary, raccent
+                )
+                # تحويل لـ bytes وحفظ في session_state
+                mb = io.BytesIO(); menu_img.save(mb,"PNG"); mb.seek(0)
+                wb = io.BytesIO(); wifi_img.save(wb,"PNG"); wb.seek(0)
+                menu_bytes = mb.getvalue()
+                wifi_bytes = wb.getvalue()
+
+            # ✅ حفظ في session_state لتجنب إعادة التوليد عند الضغط
+            st.session_state["last_menu_bytes"] = menu_bytes
+            st.session_state["last_wifi_bytes"]  = wifi_bytes
+            st.session_state["last_rname"]       = rname
+            st.session_state["last_rssid"]       = rssid
+            st.session_state["last_rwpass"]       = rwpass
+            st.session_state["last_mu"]           = mu
+            st.session_state["last_rstyle"]       = rstyle
+            st.session_state["last_rprimary"]     = rprimary
+            st.session_state["last_raccent"]      = raccent
+            st.session_state["last_rtables"]      = rtables
+            st.session_state["last_rid"]          = rid
+
+            _show_cards_and_pdf()
             st.cache_resource.clear()
         else:
             st.markdown(f'<div class="res err"><b>❌ {result.error}</b><br>{"<br>".join(result.steps)}</div>',unsafe_allow_html=True)
+
+    # ✅ إذا كانت البطاقات محفوظة مسبقاً — اعرضها مباشرة
+    elif st.session_state.get("last_menu_bytes"):
+        st.markdown('<div class="gdiv"></div>',unsafe_allow_html=True)
+        st.markdown("### 🔲 بطاقات الطاولات (آخر إنشاء)")
+        _show_cards_and_pdf()
+
+
+def _show_cards_and_pdf():
+    """
+    ✅ عرض البطاقتين وأزرار التحميل والـ PDF
+    يستخدم session_state — لا يحتاج إعادة إنشاء
+    """
+    menu_bytes = st.session_state.get("last_menu_bytes")
+    wifi_bytes  = st.session_state.get("last_wifi_bytes")
+    rname       = st.session_state.get("last_rname","المطعم")
+    rssid       = st.session_state.get("last_rssid","WiFi")
+    rwpass      = st.session_state.get("last_rwpass","")
+    mu          = st.session_state.get("last_mu","")
+    rstyle      = st.session_state.get("last_rstyle","luxury")
+    rprimary    = st.session_state.get("last_rprimary","#0a0804")
+    raccent     = st.session_state.get("last_raccent","#C9A84C")
+    rtables     = st.session_state.get("last_rtables",10)
+    rid         = st.session_state.get("last_rid","1")
+
+    if not menu_bytes or not wifi_bytes:
+        return
+
+    qc1, qc2 = st.columns(2)
+    with qc1:
+        # ✅ الواجهة الأولى = QR المينيو (صفحة الطلب)
+        st.image(menu_bytes, caption="📱 QR المينيو — يفتح صفحة الطلب", use_column_width=True)
+        st.download_button(
+            "⬇️ تحميل QR المينيو",
+            menu_bytes,
+            f"Menu_QR_{rname}.png",
+            "image/png",
+            use_container_width=True,
+            key="dl_menu_qr"
+        )
+    with qc2:
+        # ✅ الواجهة الثانية = QR WiFi
+        st.image(wifi_bytes, caption="📶 QR WiFi — يتصل بالشبكة مباشرة", use_column_width=True)
+        st.download_button(
+            "⬇️ تحميل QR WiFi",
+            wifi_bytes,
+            f"WiFi_QR_{rname}.png",
+            "image/png",
+            use_container_width=True,
+            key="dl_wifi_qr"
+        )
+
+    st.markdown('<div class="gdiv"></div>',unsafe_allow_html=True)
+
+    # ✅ زر PDF — يعمل مع session_state
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        generate_pdf = st.button(
+            f"📄 PDF كامل لجميع الطاولات ({rtables} طاولة)",
+            use_container_width=True,
+            key="btn_gen_pdf"
+        )
+
+    if generate_pdf:
+        with st.spinner(f"⏳ جاري إنشاء {rtables * 2} صفحة..."):
+            pdf_bytes = generate_table_tents_pdf(
+                rname, rssid, rwpass,
+                FRONTEND_URL, rid, rtables,
+                rstyle, rprimary, raccent
+            )
+        st.session_state["last_pdf_bytes"] = pdf_bytes
+        st.session_state["last_pdf_name"]  = rname
+
+    # ✅ زر التحميل يبقى ظاهراً حتى بعد الضغط
+    if st.session_state.get("last_pdf_bytes"):
+        pdf_name = st.session_state.get("last_pdf_name", rname)
+        st.success(f"✅ PDF جاهز — {rtables} طاولة | {rtables*2} صفحة")
+        st.download_button(
+            f"⬇️ تحميل PDF ({rtables*2} صفحة)",
+            st.session_state["last_pdf_bytes"],
+            f"Tents_{pdf_name}.pdf",
+            "application/pdf",
+            use_container_width=True,
+            key="dl_pdf_final"
+        )
+
 
 # ══ PDF ═══════════════════════════════════════════════════
 def pg_pdf(rs):
@@ -296,18 +452,48 @@ def pg_pdf(rs):
     with pc1:
         if st.button("👁️ معاينة",use_container_width=True):
             with st.spinner("🎨..."):
-                w,m=generate_single_table_preview(r["name"],r.get("wifi_ssid","WiFi"),r.get("wifi_password",""),
-                    FRONTEND_URL,r["restaurant_id"],pv,r.get("style","luxury"),r.get("primary_color","#0a0804"),r.get("accent_color","#C9A84C"))
-            ca,cb=st.columns(2)
-            ca.image(card_to_bytes(w),caption=f"WiFi T{pv}",use_column_width=True)
-            cb.image(card_to_bytes(m),caption=f"QR T{pv}",use_column_width=True)
+                # ✅ swap: menu first, wifi second
+                menu_img, wifi_img = generate_single_table_preview(
+                    r["name"],r.get("wifi_ssid","WiFi"),r.get("wifi_password",""),
+                    FRONTEND_URL,r["restaurant_id"],pv,
+                    r.get("style","luxury"),r.get("primary_color","#0a0804"),r.get("accent_color","#C9A84C")
+                )
+                m_bytes = card_to_bytes(menu_img)
+                w_bytes = card_to_bytes(wifi_img)
+                st.session_state["preview_menu"] = m_bytes
+                st.session_state["preview_wifi"]  = w_bytes
+
+    if st.session_state.get("preview_menu"):
+        ca,cb=st.columns(2)
+        ca.image(st.session_state["preview_menu"],caption=f"📱 QR المينيو T{pv}",use_column_width=True)
+        cb.image(st.session_state["preview_wifi"],caption=f"📶 QR WiFi T{pv}",use_column_width=True)
+
     with pc2:
-        if st.button("📄 توليد PDF",use_container_width=True):
-            with st.spinner(f"⏳ {n*2} صفحة..."):
-                pdf=generate_table_tents_pdf(r["name"],r.get("wifi_ssid","WiFi"),r.get("wifi_password",""),
-                    FRONTEND_URL,r["restaurant_id"],n,r.get("style","luxury"),r.get("primary_color","#0a0804"),r.get("accent_color","#C9A84C"))
-            st.download_button("⬇️ PDF",pdf,f"Tents_{r['name']}.pdf","application/pdf",use_container_width=True)
-            st.success(f"✅ {n} طاولة | {n*2} صفحة")
+        gen_pdf = st.button("📄 توليد PDF",use_container_width=True)
+
+    if gen_pdf:
+        with st.spinner(f"⏳ {n*2} صفحة..."):
+            pdf = generate_table_tents_pdf(
+                r["name"],r.get("wifi_ssid","WiFi"),r.get("wifi_password",""),
+                FRONTEND_URL,r["restaurant_id"],n,
+                r.get("style","luxury"),r.get("primary_color","#0a0804"),r.get("accent_color","#C9A84C")
+            )
+        st.session_state["pg_pdf_bytes"] = pdf
+        st.session_state["pg_pdf_name"]  = r["name"]
+        st.session_state["pg_pdf_n"]     = n
+
+    # ✅ زر التحميل مستقل عن التوليد
+    if st.session_state.get("pg_pdf_bytes"):
+        _n = st.session_state.get("pg_pdf_n", n)
+        st.success(f"✅ {_n} طاولة | {_n*2} صفحة جاهزة")
+        st.download_button(
+            "⬇️ تحميل PDF",
+            st.session_state["pg_pdf_bytes"],
+            f"Tents_{st.session_state.get('pg_pdf_name','')}.pdf",
+            "application/pdf",
+            use_container_width=True,
+            key="dl_pg_pdf"
+        )
 
 # ══ MANAGE ════════════════════════════════════════════════
 def pg_manage(rs):
@@ -350,13 +536,7 @@ def main():
         st.markdown('<div style="color:#C9A84C;font-size:1.1rem;font-weight:900;text-align:center;padding:.3rem">👑 الإمبراطور</div>',unsafe_allow_html=True)
         st.markdown(f'<div style="text-align:center;color:#222;font-size:.7rem">{len(rs)} مطعم</div>',unsafe_allow_html=True)
         st.markdown("---")
-        page=st.radio("",[
-            "🏠 Dashboard",
-            "🚀 إضافة مطعم",
-            "🖼️ صور الأكلات",
-            "🖨️ بطاقات PDF",
-            "⚙️ إدارة",
-        ],label_visibility="hidden")
+        page=st.radio("",["🏠 Dashboard","🚀 إضافة مطعم","🖼️ صور الأكلات","🖨️ بطاقات PDF","⚙️ إدارة"],label_visibility="hidden")
         st.markdown("---")
         if st.button("🚪 خروج",use_container_width=True):
             st.session_state.ok=False; st.rerun()
