@@ -165,19 +165,23 @@ def pg_dashboard(rs):
 
 # ══ ADD RESTAURANT ════════════════════════════════════════
 def pg_add(rs):
-    st.markdown("## 🚀 إضافة مطعم جديد — أوتوماتيكي 100%")
-    st.markdown("""<div class="res warn">
-    ✅ إنشاء Google Sheet كامل &nbsp;|&nbsp; ✅ مشاركة تلقائية &nbsp;|&nbsp;
-    ✅ حفظ في Master_DB &nbsp;|&nbsp; ✅ رابط Telegram جاهز &nbsp;|&nbsp; ✅ QR Code
-    </div>""",unsafe_allow_html=True)
+    st.markdown("## 🚀 إضافة مطعم جديد")
+    SA_EMAIL = "restaurant-bot@gen-lang-client-0967477901.iam.gserviceaccount.com"
+    st.markdown(f'''<div class="res warn">
+    📋 <b>الخطوات لصاحب المطعم قبل الإضافة:</b><br>
+    1️⃣ يفتح <a href="https://sheets.google.com" target="_blank" style="color:#C9A84C">sheets.google.com</a> → ينشئ Spreadsheet جديد<br>
+    2️⃣ يشاركه مع <b style="color:#C9A84C">{SA_EMAIL}</b> كـ <b>Editor</b><br>
+    3️⃣ ينسخ الـ ID من الرابط ويلصقه أسفل
+    </div>''',unsafe_allow_html=True)
 
     t1,t2,t3=st.tabs(["📋 المعلومات","🎨 الهوية البصرية","📶 WiFi"])
     with t1:
         c1,c2=st.columns(2)
         with c1:
-            rid   =st.text_input("🔢 رقم المطعم",value=nxt(rs))
-            rname =st.text_input("🏪 اسم المطعم *",placeholder="مطعم النخيل الذهبي")
-            remail=st.text_input("📧 بريد صاحب المطعم (اختياري)",placeholder="owner@gmail.com")
+            rid      =st.text_input("🔢 رقم المطعم",value=nxt(rs))
+            rname    =st.text_input("🏪 اسم المطعم *",placeholder="مطعم النخيل الذهبي")
+            rsheetid =st.text_input("📊 Sheet ID *",placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",help="ID من رابط الـ Spreadsheet الذي أنشأه صاحب المطعم وشاركه مع SA")
+            remail   =st.text_input("📧 بريد صاحب المطعم (اختياري)",placeholder="owner@gmail.com")
         with c2:
             rtables=st.number_input("🪑 عدد الطاولات",1,100,10)
             rlogo  =st.text_input("🖼️ رابط اللوجو (اختياري)",placeholder="https://...")
@@ -211,6 +215,7 @@ def pg_add(rs):
     if st.button("🚀 إنشاء المطعم — كل شيء أوتوماتيكي!",use_container_width=True):
         errs=[]
         if not rname.strip(): errs.append("اسم المطعم مطلوب")
+        if not rsheetid.strip(): errs.append("Sheet ID مطلوب — صاحب المطعم يجب أن ينشئ Sheet ويشاركه مع SA أولاً")
         if not rssid.strip(): errs.append("SSID مطلوب")
         if errs:
             for e in errs: st.error(f"❌ {e}")
@@ -228,6 +233,7 @@ def pg_add(rs):
         show(0,["⏳ جارٍ الإنشاء..."])
         result:ProvisionResult=provision_restaurant(
             restaurant_id=rid.strip(),name=rname.strip(),
+            sheet_id=rsheetid.strip(),
             wifi_ssid=rssid.strip(),wifi_password=rwpass.strip(),
             style=rstyle,primary_color=rprimary,accent_color=raccent,
             num_tables=rtables,logo_url=rlogo.strip(),owner_email=remail.strip())
