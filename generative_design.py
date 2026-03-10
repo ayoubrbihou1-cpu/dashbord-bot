@@ -195,7 +195,7 @@ def round_rectangle(draw, xy, radius, fill, outline=None, width=2):
 # 🎨 STYLE ENGINES
 # ─────────────────────────────────────────────────────────────────
 
-def render_modern_wifi(name, ssid, password, table_num, primary_color, accent_color) -> Image.Image:
+def render_modern_wifi(name, ssid, password, table_num, primary_color, accent_color, wifi_qr_data=None) -> Image.Image:
     """بطاقة WiFi — طابع عصري"""
     bg = primary_color
     fg = auto_fg(bg)
@@ -230,11 +230,18 @@ def render_modern_wifi(name, ssid, password, table_num, primary_color, accent_co
     sep_x = CARD_W//2
     draw.line([sep_x, MARGIN, sep_x, CARD_H-MARGIN], fill=acc, width=2)
 
-    # WiFi icon (دوائر)
+    # WiFi QR أو icon
     cx, cy = CARD_W//4 + bar_w//2, CARD_H//2 + 20
-    for r in [80, 55, 30]:
-        draw.arc([cx-r, cy-r, cx+r, cy+r], 210, 330, fill=acc, width=4)
-    draw.ellipse([cx-8, cy-8, cx+8, cy+8], fill=acc)
+    if wifi_qr_data:
+        qr_size = 200
+        qr_img = make_qr(wifi_qr_data, fg=bg, bg=acc, size=qr_size)
+        padded = Image.new("RGB", (qr_size+12, qr_size+12), acc)
+        padded.paste(qr_img, (6,6))
+        img.paste(padded, (cx - (qr_size+12)//2, cy - (qr_size+12)//2 - 20))
+    else:
+        for r in [80, 55, 30]:
+            draw.arc([cx-r, cy-r, cx+r, cy+r], 210, 330, fill=acc, width=4)
+        draw.ellipse([cx-8, cy-8, cx+8, cy+8], fill=acc)
 
     # WiFi label
     wifi_font = get_font(28, bold=True)
@@ -273,7 +280,7 @@ def render_modern_wifi(name, ssid, password, table_num, primary_color, accent_co
     return img
 
 
-def render_luxury_wifi(name, ssid, password, table_num, primary_color, accent_color) -> Image.Image:
+def render_luxury_wifi(name, ssid, password, table_num, primary_color, accent_color, wifi_qr_data=None) -> Image.Image:
     """بطاقة WiFi — طابع فاخر"""
     GOLD = accent_color
     DARK = primary_color
@@ -304,11 +311,19 @@ def render_luxury_wifi(name, ssid, password, table_num, primary_color, accent_co
     draw.line([center_x-line_len//2, 210, center_x+line_len//2, 210], fill=GOLD, width=1)
     draw.text((center_x - 12, 198), "✦", font=get_font(20), fill=GOLD)
 
-    # WiFi دوائر
+    # WiFi QR أو دوائر
     qcx, qcy = CARD_W//4, CARD_H//2 + 10
-    for r, w in [(90, 2), (60, 2), (32, 3)]:
-        draw.arc([qcx-r, qcy-r, qcx+r, qcy+r], 210, 330, fill=GOLD, width=w)
-    draw.ellipse([qcx-7, qcy-7, qcx+7, qcy+7], fill=GOLD)
+    if wifi_qr_data:
+        qr_size = 190
+        qr_img = make_qr(wifi_qr_data, fg=DARK, bg=GOLD, size=qr_size)
+        border = 10
+        framed = Image.new("RGB", (qr_size+border*2, qr_size+border*2), GOLD)
+        framed.paste(qr_img, (border, border))
+        img.paste(framed, (qcx-(qr_size+border*2)//2, qcy-(qr_size+border*2)//2 - 15))
+    else:
+        for r, w in [(90, 2), (60, 2), (32, 3)]:
+            draw.arc([qcx-r, qcy-r, qcx+r, qcy+r], 210, 330, fill=GOLD, width=w)
+        draw.ellipse([qcx-7, qcy-7, qcx+7, qcy+7], fill=GOLD)
 
     # فاصل عمودي
     mid = CARD_W//2
@@ -344,7 +359,7 @@ def render_luxury_wifi(name, ssid, password, table_num, primary_color, accent_co
     return img
 
 
-def render_classic_wifi(name, ssid, password, table_num, primary_color, accent_color) -> Image.Image:
+def render_classic_wifi(name, ssid, password, table_num, primary_color, accent_color, wifi_qr_data=None) -> Image.Image:
     """بطاقة WiFi — طابع كلاسيكي"""
     CREAM = primary_color
     BROWN = accent_color
@@ -380,11 +395,19 @@ def render_classic_wifi(name, ssid, password, table_num, primary_color, accent_c
     left_cx = CARD_W // 4
     right_cx = 3 * CARD_W // 4
 
-    # WiFi دوائر
+    # WiFi QR أو دوائر
     wcy = CARD_H // 2 + 30
-    for r, w in [(75, 3), (50, 3), (27, 3)]:
-        draw.arc([left_cx-r, wcy-r, left_cx+r, wcy+r], 210, 330, fill=BROWN, width=w)
-    draw.ellipse([left_cx-7, wcy-7, left_cx+7, wcy+7], fill=BROWN)
+    if wifi_qr_data:
+        qr_size = 180
+        qr_img = make_qr(wifi_qr_data, fg=BROWN, bg=CREAM, size=qr_size)
+        border = 8
+        framed = Image.new("RGB", (qr_size+border*2, qr_size+border*2), BROWN)
+        framed.paste(qr_img, (border, border))
+        img.paste(framed, (left_cx-(qr_size+border*2)//2, wcy-(qr_size+border*2)//2 - 10))
+    else:
+        for r, w in [(75, 3), (50, 3), (27, 3)]:
+            draw.arc([left_cx-r, wcy-r, left_cx+r, wcy+r], 210, 330, fill=BROWN, width=w)
+        draw.ellipse([left_cx-7, wcy-7, left_cx+7, wcy+7], fill=BROWN)
     wifi_label = get_font(22, bold=True)
     draw_text_centered(draw, "WiFi", left_cx, wcy+90, wifi_label, BROWN)
 
@@ -573,18 +596,22 @@ def generate_table_card(
     accent  = hex_to_rgb(accent_color_hex)
     style   = style.lower()
 
-    # ── Wifi Card (Side A)
-    if style == "modern":
-        wifi_card = render_modern_wifi(restaurant_name, ssid, wifi_password, table_number, primary, accent)
-    elif style == "luxury":
-        wifi_card = render_luxury_wifi(restaurant_name, ssid, wifi_password, table_number, primary, accent)
-    else:
-        wifi_card = render_classic_wifi(restaurant_name, ssid, wifi_password, table_number, primary, accent)
-
-    # ── Menu QR Card (Side B)
+    # ── Menu QR Card (الواجهة الأولى — QR للصفحة)
     menu_card = render_menu_qr_card(restaurant_name, menu_url, table_number, style, primary, accent)
 
-    return wifi_card, menu_card
+    # ── WiFi QR Card (الواجهة الثانية — QR للـ WiFi)
+    # بناء WiFi QR string (يفتح إعدادات WiFi مباشرة)
+    wifi_qr_data = f"WIFI:T:WPA;S:{ssid};P:{wifi_password};;"
+
+    if style == "modern":
+        wifi_card = render_modern_wifi(restaurant_name, ssid, wifi_password, table_number, primary, accent, wifi_qr_data)
+    elif style == "luxury":
+        wifi_card = render_luxury_wifi(restaurant_name, ssid, wifi_password, table_number, primary, accent, wifi_qr_data)
+    else:
+        wifi_card = render_classic_wifi(restaurant_name, ssid, wifi_password, table_number, primary, accent, wifi_qr_data)
+
+    # ✅ الواجهة الأولى = QR المينيو | الواجهة الثانية = QR WiFi
+    return menu_card, wifi_card
 
 
 def card_to_bytes(img: Image.Image) -> bytes:
