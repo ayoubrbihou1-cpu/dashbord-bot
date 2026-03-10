@@ -1,8 +1,10 @@
 """
 🏭 auto_provisioner.py — ينشئ كل شيء تلقائياً
+🔧 FIX v2: Drive API + DRIVE_FOLDER_ID لحل مشكلة storage quota
 """
 import gspread, json, os, logging, requests
 from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 from datetime import datetime
 from dataclasses import dataclass, field
 
@@ -15,6 +17,7 @@ TG_TOKEN        = os.getenv("TELEGRAM_BOT_TOKEN","")
 SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
 FRONTEND_URL    = os.getenv("FRONTEND_URL","https://your-menu.netlify.app")
+DRIVE_FOLDER_ID = os.getenv("DRIVE_FOLDER_ID","")  # ← الجديد: Folder في Drive تاعك
 
 @dataclass
 class ProvisionResult:
@@ -86,14 +89,54 @@ def _freeze(spread, ws):
         }}]})
     except: pass
 
-def create_restaurant_sheet(name):
-    client = _gs()
-    spread = client.create(f"🍽️ Menu — {name}")
-    sid    = spread.id
+# ══════════════════════════════════════════════════════════
+# 🔧 الدالة المُصلَحة — Drive API + Parent Folder
+# ══════════════════════════════════════════════════════════
+def create_restaurant_sheet(name: str) -> tuple[str, str]:
+    """
+    ينشئ Google Sheet للمطعم داخل DRIVE_FOLDER_ID
+    هذا يحل مشكلة: APIError [403] Drive storage quota exceeded
+    
+    الشرط: الـ Folder مشارك مع Service Account كـ Editor
+    """
+    creds = _creds()
+
+    if DRIVE_FOLDER_ID:
+        # ✅ الطريقة الصحيحة: Drive API يخلق الملف في Folder تاعك
+        drive = build('drive', 'v3', credentials=creds)
+        file_meta = {
+            'name':     f'🍽️ Menu — {name}',
+            'mimeType': 'application/vnd.google-apps.spreadsheet',
+            'parents':  [DRIVE_FOLDER_ID],
+        }
+        created = drive.files().create(
+            body=file_meta,
+            fields='id',
+            supportsAllDrives=True
+        ).execute()
+        sid = created['id']
+        log.info(f"✅ Created in folder {DRIVE_FOLDER_ID}: {sid}")
+    else:
+        # ⚠️ الطريقة القديمة — تسبب خطأ quota
+        # ستظهر هذه الرسالة إذا نسي المستخدم إضافة DRIVE_FOLDER_ID
+        raise Exception(
+            "DRIVE_FOLDER_ID غير محدد في Secrets!\n"
+            "أضفه في Streamlit Secrets → DRIVE_FOLDER_ID = \"your_folder_id\"\n"
+            "شوف التعليمات أسفل."
+        )
+
     url    = f"https://docs.google.com/spreadsheets/d/{sid}/edit"
+    client = _gs()
+    spread = client.open_by_key(sid)
+
+    # إعادة تسمية الورقة الأولى
     spread.sheet1.update_title(list(MENU_TABS.keys())[0])
+
+    # إضافة باقي الـ tabs
     for tab in list(MENU_TABS.keys())[1:]:
         spread.add_worksheet(title=tab, rows=500, cols=15)
+
+    # ملء البيانات + تنسيق
     colors = [
         {"red":.10,"green":.15,"blue":.10},{"red":.12,"green":.10,"blue":.18},
         {"red":.20,"green":.10,"blue":.10},{"red":.08,"green":.15,"blue":.22},
@@ -105,7 +148,10 @@ def create_restaurant_sheet(name):
             ws.update(rows,"A1")
             _fmt_header(spread, ws, colors[i])
             _freeze(spread, ws)
-        except Exception as e: log.warning(f"Tab {tab}: {e}")
+        except Exception as e:
+            log.warning(f"Tab {tab}: {e}")
+
+    log.info(f"✅ Sheet ready: {url}")
     return sid, url
 
 def share_sheet(sid, email, role="writer", notify=False):
@@ -187,7 +233,7 @@ def provision_restaurant(restaurant_id, name, wifi_ssid, wifi_password,
         res.sheet_id=sid; res.sheet_url=url
         steps.append("✅ Google Sheet مصاوب مع كل الأطواب")
     except Exception as e:
-        res.error=f"فشل الشيت: {e}"; res.steps=steps; return res
+        res.error=f"فشل الشيت: {str(e)}"; res.steps=steps; return res
 
     sa=_sa_email()
     if sa: steps.append("✅ مشارك مع SA" if share_sheet(sid,sa) else "⚠️ فشلت مشاركة SA")
