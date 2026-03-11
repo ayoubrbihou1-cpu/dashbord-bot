@@ -16,6 +16,8 @@ log = logging.getLogger("img_engine")
 
 UNSPLASH_KEY  = os.getenv("UNSPLASH_ACCESS_KEY", "")
 OPENAI_KEY    = os.getenv("OPENAI_API_KEY", "")
+PEXELS_KEY    = os.getenv("PEXELS_API_KEY", "")
+PIXABAY_KEY   = os.getenv("PIXABAY_API_KEY", "")
 
 # ─── cache لتفادي طلبات مكررة ───────────────────────────
 _cache: dict[str, str] = {}
@@ -331,4 +333,95 @@ def available_methods() -> dict:
         "unsplash": bool(UNSPLASH_KEY),
         "dalle":    bool(OPENAI_KEY),
         "manual":   True,   # دائماً متاح
+    }
+
+# ══════════════════════════════════════════════════════════
+# 🆕 PEXELS + PIXABAY — جلب صور متعددة للاختيار
+# ══════════════════════════════════════════════════════════
+
+def fetch_multi_source_photos(search_query: str, per_source: int = 4) -> list:
+    """
+    يجلب صور من Pexels + Pixabay + Unsplash في نفس الوقت
+    يرجع قائمة من الصور مع المصدر لكل واحدة
+    """
+    results = []
+
+    # ── 1. Pexels ──────────────────────────────────────
+    if PEXELS_KEY:
+        try:
+            r = requests.get(
+                "https://api.pexels.com/v1/search",
+                headers={"Authorization": PEXELS_KEY},
+                params={"query": search_query, "per_page": per_source, "orientation": "square"},
+                timeout=8
+            )
+            if r.status_code == 200:
+                for photo in r.json().get("photos", []):
+                    results.append({
+                        "url":    photo["src"]["medium"],
+                        "thumb":  photo["src"]["small"],
+                        "source": "Pexels",
+                        "credit": f"Photo by {photo['photographer']} on Pexels",
+                        "id":     str(photo["id"])
+                    })
+        except Exception as e:
+            log.warning(f"Pexels: {e}")
+
+    # ── 2. Pixabay ─────────────────────────────────────
+    if PIXABAY_KEY:
+        try:
+            r = requests.get(
+                "https://pixabay.com/api/",
+                params={
+                    "key": PIXABAY_KEY,
+                    "q": search_query,
+                    "per_page": per_source,
+                    "image_type": "photo",
+                    "category": "food",
+                    "safesearch": "true"
+                },
+                timeout=8
+            )
+            if r.status_code == 200:
+                for hit in r.json().get("hits", []):
+                    results.append({
+                        "url":    hit["webformatURL"],
+                        "thumb":  hit["previewURL"],
+                        "source": "Pixabay",
+                        "credit": f"Image from Pixabay",
+                        "id":     str(hit["id"])
+                    })
+        except Exception as e:
+            log.warning(f"Pixabay: {e}")
+
+    # ── 3. Unsplash ────────────────────────────────────
+    if UNSPLASH_KEY:
+        try:
+            r = requests.get(
+                "https://api.unsplash.com/search/photos",
+                headers={"Authorization": f"Client-ID {UNSPLASH_KEY}"},
+                params={"query": search_query, "per_page": per_source, "orientation": "squarish"},
+                timeout=8
+            )
+            if r.status_code == 200:
+                for photo in r.json().get("results", []):
+                    results.append({
+                        "url":    photo["urls"]["regular"],
+                        "thumb":  photo["urls"]["small"],
+                        "source": "Unsplash",
+                        "credit": f"Photo by {photo['user']['name']} on Unsplash",
+                        "id":     photo["id"]
+                    })
+        except Exception as e:
+            log.warning(f"Unsplash: {e}")
+
+    return results
+
+
+def available_sources() -> dict:
+    """يرجع المصادر المتاحة"""
+    return {
+        "pexels":   bool(PEXELS_KEY),
+        "pixabay":  bool(PIXABAY_KEY),
+        "unsplash": bool(UNSPLASH_KEY),
     }
