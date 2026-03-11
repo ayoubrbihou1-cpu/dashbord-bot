@@ -37,6 +37,7 @@ FRONTEND_URL    = os.getenv("FRONTEND_URL","https://your-menu.netlify.app")
 SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
 TG_TOKEN        = os.getenv("TELEGRAM_BOT_TOKEN","")
+KITCHEN_URL     = os.getenv("KITCHEN_URL","https://kitchen-qr.netlify.app")
 
 # ══════════════════════════════════════════════════════════
 # CSS
@@ -388,6 +389,18 @@ def pg_add(rs):
                 </div>""", unsafe_allow_html=True)
                 st.code(result.reg_link, language=None)
 
+            # ✅ رابط شاشة الكوزينة
+            kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid}"
+            st.markdown(f"""<div style="background:rgba(255,152,0,.07);border:1px solid rgba(255,152,0,.2);
+              border-radius:12px;padding:1rem 1.2rem;margin:.5rem 0">
+              <b style="color:#ff9800">🍳 رابط شاشة الكوزينة — ضعه على التابليت:</b><br>
+              <div style="background:#0a0800;border:1px solid rgba(255,152,0,.2);border-radius:8px;
+                   padding:.6rem 1rem;font-family:monospace;font-size:.78rem;color:#ff9800;
+                   word-break:break-all;margin:.5rem 0">{kitchen_link}</div>
+              <small style="color:#555">📌 Bookmark على التابليت في الكوزينة</small>
+            </div>""", unsafe_allow_html=True)
+            st.code(kitchen_link, language=None)
+
             # توليد البطاقات
             st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
             st.markdown("### 🔲 بطاقات الطاولات")
@@ -613,6 +626,9 @@ def pg_manage(rs):
                     st.code(reg)
                 if r.get("owner_email"):
                     st.markdown(f"**📧** {r.get('owner_email')}")
+                kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid}"
+                st.markdown("**🍳 شاشة الكوزينة:**")
+                st.code(kitchen_link)
             with c3:
                 if st.button("🗑️ حذف", key=f"del_{uid}"):
                     if del_r(rid):
