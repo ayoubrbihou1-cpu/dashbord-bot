@@ -1,24 +1,14 @@
 """
 📄 مولد PDF التلقائي — Table Tents
-يولد PDF متعدد الصفحات (وجهان لكل طاولة)
+✅ إصلاح: استخدام ImageReader بدل BytesIO مباشرة مع reportlab
 """
 
 import io
 from PIL import Image
-from reportlab.lib.pagesizes import A5, landscape
 from reportlab.lib.units import mm
-from reportlab.platypus import SimpleDocTemplate, Image as RLImage, Spacer, PageBreak
-from reportlab.lib import colors
 from reportlab.pdfgen import canvas
-from generative_design import generate_table_card, card_to_bytes
-
-
-def pil_to_rl_image(pil_img: Image.Image, width_mm: float, height_mm: float):
-    """تحويل Pillow Image لـ ReportLab Image"""
-    buf = io.BytesIO()
-    pil_img.save(buf, format="PNG", dpi=(150,150))
-    buf.seek(0)
-    return RLImage(buf, width=width_mm*mm, height=height_mm*mm)
+from reportlab.lib.utils import ImageReader   # ✅ الإصلاح الرئيسي
+from generative_design import generate_table_card
 
 
 def generate_table_tents_pdf(
@@ -34,37 +24,20 @@ def generate_table_tents_pdf(
 ) -> bytes:
     """
     🏭 توليد PDF كامل — صفحتان لكل طاولة
-
-    Args:
-        restaurant_name: اسم المطعم
-        ssid: اسم شبكة WiFi
-        wifi_password: كلمة مرور WiFi
-        menu_base_url: رابط الفرونتاند (بدون بارامترات)
-        restaurant_id: رقم المطعم
-        num_tables: عدد الطاولات
-        style: modern | luxury | classic
-        primary_color: اللون الأساسي hex
-        accent_color: لون التمييز hex
-
-    Returns:
-        bytes — محتوى PDF جاهز للطباعة
+    الصفحة 1: QR المينيو | الصفحة 2: QR WiFi
     """
-
     # A5 landscape
-    PAGE_W = 210 * mm   # عرض A5 بالـ landscape
+    PAGE_W = 210 * mm
     PAGE_H = 148 * mm
 
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=(PAGE_W, PAGE_H))
-
-    total_pages = num_tables * 2
+    pdf_buf = io.BytesIO()
+    c = canvas.Canvas(pdf_buf, pagesize=(PAGE_W, PAGE_H))
 
     for table_num in range(1, num_tables + 1):
-        # رابط ديناميكي فريد لكل طاولة
         menu_url = f"{menu_base_url}?rest_id={restaurant_id}&table={table_num}"
 
-        # توليد الوجهين
-        wifi_img, menu_img = generate_table_card(
+        # توليد الوجهين (menu_img أولاً، wifi_img ثانياً)
+        menu_img, wifi_img = generate_table_card(
             restaurant_name=restaurant_name,
             ssid=ssid,
             wifi_password=wifi_password,
@@ -75,49 +48,47 @@ def generate_table_tents_pdf(
             accent_color_hex=accent_color
         )
 
-        # ── الصفحة A: WiFi ──
-        wifi_buf = io.BytesIO()
-        wifi_img.save(wifi_buf, format="PNG", dpi=(150,150))
-        wifi_buf.seek(0)
-
-        c.drawImage(
-            wifi_buf,
-            x=0, y=0,
-            width=PAGE_W, height=PAGE_H,
-            preserveAspectRatio=True,
-            anchor='c'
-        )
-
-        # رقم صفحة صغير
-        c.setFont("Helvetica", 7)
-        c.setFillColorRGB(0.5, 0.5, 0.5)
-        c.drawString(5*mm, 4*mm, f"T{table_num} | WiFi | {restaurant_name}")
-
-        c.showPage()  # صفحة جديدة
-
-        # ── الصفحة B: Menu QR ──
+        # ── الصفحة 1: QR المينيو ──────────────────────────────
         menu_buf = io.BytesIO()
-        menu_img.save(menu_buf, format="PNG", dpi=(150,150))
+        menu_img.save(menu_buf, format="PNG")
         menu_buf.seek(0)
+        menu_reader = ImageReader(menu_buf)   # ✅ ImageReader يحل المشكلة
 
         c.drawImage(
-            menu_buf,
+            menu_reader,
             x=0, y=0,
             width=PAGE_W, height=PAGE_H,
             preserveAspectRatio=True,
             anchor='c'
         )
-
         c.setFont("Helvetica", 7)
         c.setFillColorRGB(0.5, 0.5, 0.5)
-        c.drawString(5*mm, 4*mm, f"T{table_num} | Menu QR | {restaurant_name} | {menu_url}")
+        c.drawString(5*mm, 4*mm, f"T{table_num} | Menu QR | {restaurant_name}")
+        c.showPage()
+
+        # ── الصفحة 2: QR WiFi ────────────────────────────────
+        wifi_buf = io.BytesIO()
+        wifi_img.save(wifi_buf, format="PNG")
+        wifi_buf.seek(0)
+        wifi_reader = ImageReader(wifi_buf)   # ✅
+
+        c.drawImage(
+            wifi_reader,
+            x=0, y=0,
+            width=PAGE_W, height=PAGE_H,
+            preserveAspectRatio=True,
+            anchor='c'
+        )
+        c.setFont("Helvetica", 7)
+        c.setFillColorRGB(0.5, 0.5, 0.5)
+        c.drawString(5*mm, 4*mm, f"T{table_num} | WiFi QR | {restaurant_name}")
 
         if table_num < num_tables:
             c.showPage()
 
     c.save()
-    buf.seek(0)
-    return buf.read()
+    pdf_buf.seek(0)
+    return pdf_buf.read()
 
 
 def generate_single_table_preview(
