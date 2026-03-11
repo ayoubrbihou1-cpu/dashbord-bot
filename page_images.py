@@ -183,7 +183,7 @@ def page_images(restaurants: list):
     # ── اختيار المطعم والـ Tab
     c1, c2 = st.columns(2)
     with c1:
-        opts     = {f"#{r['restaurant_id']} — {r['name']}": r for r in restaurants}
+        opts     = {f"#{r.get('restaurant_id','?')} — {r.get('name','مطعم')}": r for r in restaurants}
         sel      = st.selectbox("🏪 المطعم", list(opts.keys()))
         r        = opts[sel]
         sheet_id = r.get("sheet_id","")
