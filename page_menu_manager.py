@@ -9,6 +9,7 @@ import json
 import os
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
+from gemini_helper import gemini_text, gemini_vision, gemini_available
 
 load_dotenv()
 
@@ -83,26 +84,15 @@ def auto_translate(arabic_name: str) -> tuple:
     for ar, (fr, en) in FOOD_DICT.items():
         if ar in name or name == ar:
             return fr, en
-    # ✅ Gemini (مجاني) للترجمة
-    GEMINI_KEY = os.getenv("GEMINI_API_KEY","")
-    if GEMINI_KEY:
-        try:
-            import requests as _req
-            r = _req.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}",
-                headers={"Content-Type": "application/json"},
-                json={"contents":[{"parts":[{"text":
-                    f"Translate this Moroccan/Arabic food name to French and English.\nReply ONLY in this format: French | English\nFood: {name}"}]}],
-                    "generationConfig":{"maxOutputTokens":40,"temperature":0}},
-                timeout=8
-            )
-            if r.status_code == 200:
-                txt = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-                parts = [p.strip() for p in txt.split("|")]
-                if len(parts) == 2:
-                    return parts[0], parts[1]
-        except:
-            pass
+    # ✅ Gemini مع دوران تلقائي على 4 مفاتيح
+    try:
+        prompt = f"Translate this Moroccan/Arabic food name to French and English.\nReply ONLY in this format: French | English\nFood: {name}"
+        txt = gemini_text(prompt, max_tokens=40, temperature=0)
+        parts = [p.strip() for p in txt.split("|")]
+        if len(parts) == 2:
+            return parts[0], parts[1]
+    except Exception as e:
+        pass
     return "", ""
 
 HEADERS = ["name","name_fr","name_en","price","description","available","image_url","image_credit"]
@@ -374,9 +364,9 @@ def page_menu_manager(restaurants: list):
 
 def _render_image_import_tab(sheet_id, tab_sel, rest):
     """تبويب استيراد المينيو من صورة باستخدام Gemini"""
-    import base64, requests as _req
+    import base64
 
-    GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
+    ok, msg = gemini_available()
 
     st.markdown("### 📸 استيراد المينيو من صورة")
     st.markdown("""
@@ -389,9 +379,10 @@ def _render_image_import_tab(sheet_id, tab_sel, rest):
     </div>
     """, unsafe_allow_html=True)
 
-    if not GEMINI_KEY:
-        st.error("❌ GEMINI_API_KEY غير محدد في المتغيرات البيئية")
+    if not ok:
+        st.error(f"❌ {msg} — أضف GEMINI_API_KEY في Secrets")
         return
+    st.markdown(f'<div style="color:#69f0ae;font-size:.8rem">🤖 Gemini: {msg} — دوران تلقائي عند نفاذ الحصة</div>', unsafe_allow_html=True)
 
     uploaded = st.file_uploader(
         "📷 ارفع صورة المينيو",
@@ -444,37 +435,21 @@ def _render_image_import_tab(sheet_id, tab_sel, rest):
 السعر يجب أن يكون رقم فقط بدون درهم
 إذا لم يكن هناك سعر واضح ضع 0"""
 
-                        resp = _req.post(
-                            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}",
-                            headers={"Content-Type": "application/json"},
-                            json={
-                                "contents": [{
-                                    "parts": [
-                                        {"text": prompt},
-                                        {"inline_data": {"mime_type": mime, "data": img_b64}}
-                                    ]
-                                }],
-                                "generationConfig": {"maxOutputTokens": 2000, "temperature": 0}
-                            },
-                            timeout=30
-                        )
-
-                        if resp.status_code == 200:
-                            raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-                            if "```json" in raw:
-                                raw = raw.split("```json")[1].split("```")[0].strip()
-                            elif "```" in raw:
-                                raw = raw.split("```")[1].split("```")[0].strip()
-                            parsed = json.loads(raw)
-                            items_found = parsed.get("items", [])
-                            st.session_state["_analyzed_items"] = items_found
-                            st.session_state["_analyzed_edits"] = {i: dict(item) for i, item in enumerate(items_found)}
-                            st.success(f"✅ تم استخراج {len(items_found)} أكلة!")
-                        else:
-                            st.error(f"❌ خطأ في Gemini: {resp.status_code} — {resp.text[:200]}")
-                            return
+                        raw = gemini_vision(prompt, img_b64, mime, max_tokens=2000, temperature=0)
+                        if "```json" in raw:
+                            raw = raw.split("```json")[1].split("```")[0].strip()
+                        elif "```" in raw:
+                            raw = raw.split("```")[1].split("```")[0].strip()
+                        parsed = json.loads(raw)
+                        items_found = parsed.get("items", [])
+                        st.session_state["_analyzed_items"] = items_found
+                        st.session_state["_analyzed_edits"] = {i: dict(item) for i, item in enumerate(items_found)}
+                        st.success(f"✅ تم استخراج {len(items_found)} أكلة!")
                     except json.JSONDecodeError:
-                        st.error("❌ لم يتمكن الذكاء الاصطناعي من قراءة الصورة — جرب صورة أوضح")
+                        st.error("❌ الذكاء الاصطناعي لم يتمكن من قراءة الصورة — جرب صورة أوضح")
+                        return
+                    except RuntimeError as e:
+                        st.error(f"❌ {e}")
                         return
                     except Exception as e:
                         st.error(f"❌ خطأ: {e}")
