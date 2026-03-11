@@ -557,10 +557,36 @@ def pg_pdf(rs):
 def pg_manage(rs):
     st.markdown("## ⚙️ إدارة المطاعم")
 
-    # Telegram Webhook
+    # ── Telegram Webhook ──
     st.markdown("### 🤖 Telegram Webhook")
     wh_url = f"{ROUTER_URL}/webhook/telegram"
     st.code(f"Webhook URL: {wh_url}")
+
+    # فحص حالة التوكن تلقائياً
+    if not TG_TOKEN:
+        st.error("❌ **TELEGRAM_BOT_TOKEN** غير محدد في متغيرات البيئة!\n\n"
+                 "أضفه في Streamlit Cloud → Settings → Secrets:\n"
+                 "```\nTELEGRAM_BOT_TOKEN = \"توكنك هنا\"\n```")
+    else:
+        try:
+            r_me = requests.get(f"https://api.telegram.org/bot{TG_TOKEN}/getMe", timeout=5)
+            me = r_me.json()
+            if me.get("ok"):
+                b = me["result"]
+                st.success(f"✅ البوت متصل: **@{b.get('username')}** — {b.get('first_name')}")
+                r_wh = requests.get(f"https://api.telegram.org/bot{TG_TOKEN}/getWebhookInfo", timeout=5)
+                wh_info = r_wh.json().get("result", {})
+                current_wh = wh_info.get("url", "")
+                if current_wh == wh_url:
+                    st.success("✅ Webhook مسجل بالفعل ومطابق")
+                elif current_wh:
+                    st.warning(f"⚠️ Webhook حالي مختلف: `{current_wh}` — اضغط تسجيل لتحديثه")
+                else:
+                    st.warning("⚠️ لا يوجد Webhook مسجل — اضغط **تسجيل Webhook** أدناه")
+            else:
+                st.error(f"❌ توكن خاطئ: {me.get('description','')}")
+        except Exception as e:
+            st.warning(f"⚠️ لم نتمكن من التحقق: {e}")
 
     c1,c2 = st.columns(2)
     with c1:
@@ -571,10 +597,10 @@ def pg_manage(rs):
                 try:
                     resp = requests.post(
                         f"https://api.telegram.org/bot{TG_TOKEN}/setWebhook",
-                        json={"url": wh_url}, timeout=10)
+                        json={"url": wh_url, "allowed_updates": ["message"]}, timeout=10)
                     d = resp.json()
                     if d.get("ok"):
-                        st.success(f"✅ مسجل: {wh_url}")
+                        st.success(f"✅ مسجل بنجاح: {wh_url}")
                     else:
                         st.error(f"❌ {d.get('description')}")
                 except Exception as e:
@@ -593,6 +619,19 @@ def pg_manage(rs):
                 except Exception as e:
                     st.error(str(e))
 
+    # ── Gmail Status ──
+    st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
+    st.markdown("### 📧 Gmail")
+    gmail_user = os.getenv("GMAIL_USER","")
+    gmail_pass = os.getenv("GMAIL_APP_PASSWORD","")
+    if not gmail_user or not gmail_pass:
+        st.warning("⚠️ Gmail غير مفعّل — لإرسال إيميلات تلقائية أضف في متغيرات البيئة:\n"
+                   "```\nGMAIL_USER = \"بريدك@gmail.com\"\nGMAIL_APP_PASSWORD = \"كلمة مرور التطبيق\"\n```\n"
+                   "🔑 احصل على App Password من: myaccount.google.com → Security → App Passwords")
+    else:
+        st.success(f"✅ Gmail مفعّل: **{gmail_user}**")
+
+    # ── قائمة المطاعم ──
     st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
     st.markdown("### 🍽️ قائمة المطاعم")
     if not rs: st.info("لا توجد مطاعم"); return
