@@ -13,7 +13,9 @@ from image_engine import (
     fetch_unsplash_batch, generate_dalle_batch,
     process_manual_upload, fetch_image,
     get_food_emoji, available_methods,
-    UNSPLASH_KEY, OPENAI_KEY
+    fetch_multi_source_photos, available_sources,
+    _arabic_to_search,
+    UNSPLASH_KEY, OPENAI_KEY, PEXELS_KEY, PIXABAY_KEY
 )
 
 load_dotenv()
@@ -214,21 +216,20 @@ def page_images(restaurants: list):
 
     # الطريقة المحددة حالياً
     if "img_method" not in st.session_state:
-        # الافتراضي: أول طريقة متاحة
-        if avail["unsplash"]:  st.session_state.img_method = "unsplash"
-        elif avail["dalle"]:   st.session_state.img_method = "dalle"
-        else:                  st.session_state.img_method = "manual"
+        st.session_state.img_method = "multi"  # الافتراضي: اختيار من 3 مصادر
 
     cur = st.session_state.img_method
 
     # Streamlit radio مخفي لتتبع الاختيار
     method_labels = {
+        "multi":    "🎯 اختر من 3 مصادر — الأفضل",
         "unsplash": "🆓 Unsplash — مجاني",
         "dalle":    "🤖 AI توليدي — DALL-E",
         "manual":   "📸 رفع يدوي — صورك الخاصة",
     }
-    # فلتر الطرق المتاحة فقط
-    available_keys = [k for k,v in avail.items() if v]
+    # إضافة multi كخيار دائم
+    all_methods = {"multi": True, **avail}
+    available_keys = [k for k,v in all_methods.items() if v]
     display_labels = [method_labels[k] for k in available_keys]
 
     chosen_label = st.radio(
@@ -243,6 +244,14 @@ def page_images(restaurants: list):
 
     # بطاقة شرح الطريقة المحددة
     method_info = {
+        "multi": {
+            "icon": "🎯",
+            "color": "#C9A84C",
+            "title": "اختر من Pexels + Pixabay + Unsplash",
+            "details": "يجلب صور من 3 مصادر في نفس الوقت — أنت تختار الأنسب لكل أكلة",
+            "warning": "",
+            "cost": "مجاني 100%",
+        },
         "unsplash": {
             "icon": "🆓",
             "color": "#69f0ae",
@@ -297,9 +306,100 @@ def page_images(restaurants: list):
         st.warning(f"📭 لا توجد أكلات في Tab '{final_tab}' — أضف الأكلات أولاً أو اختر tab آخر")
 
     # ─────────────────────────────────────────────────────
+    # PANEL 0: MULTI SOURCE — اختيار من 3 مصادر
+    # ─────────────────────────────────────────────────────
+    if selected_method == "multi":
+        srcs = available_sources()
+        active_sources = [s for s,v in srcs.items() if v]
+
+        # إظهار حالة المصادر
+        src_cols = st.columns(3)
+        src_info = {
+            "pexels":   ("Pexels",   "🟢" if srcs["pexels"]   else "🔴", "#69f0ae" if srcs["pexels"]   else "#ef9a9a"),
+            "pixabay":  ("Pixabay",  "🟢" if srcs["pixabay"]  else "🔴", "#69f0ae" if srcs["pixabay"]  else "#ef9a9a"),
+            "unsplash": ("Unsplash", "🟢" if srcs["unsplash"] else "🔴", "#69f0ae" if srcs["unsplash"] else "#ef9a9a"),
+        }
+        for i, (src, (name, icon, color)) in enumerate(src_info.items()):
+            with src_cols[i]:
+                status = "متصل ✅" if srcs[src] else "Key غير محدد ⚠️"
+                st.markdown(f"""
+                <div style="background:#101010;border:1px solid {color}33;border-radius:10px;
+                     padding:.7rem;text-align:center">
+                  <div style="font-size:1.5rem">{icon}</div>
+                  <div style="color:{color};font-weight:700;font-size:.85rem">{name}</div>
+                  <div style="color:#444;font-size:.7rem">{status}</div>
+                </div>""", unsafe_allow_html=True)
+
+        if not active_sources:
+            st.error("❌ لا يوجد أي API Key محدد — أضف PEXELS_API_KEY أو PIXABAY_API_KEY في Secrets")
+        else:
+            st.markdown(f"✅ **{len(active_sources)} مصادر متاحة:** {', '.join(active_sources)}")
+
+        # اختيار الأكلة
+        if items_from_sheet:
+            st.markdown("---")
+            st.markdown("### 🍽️ اختر أكلة وابحث عن صورها")
+
+            item_names = [i.get("name","") for i in items_from_sheet if i.get("name")]
+            sel_item_multi = st.selectbox("اختر الأكلة", item_names, key="multi_item_sel")
+
+            # البحث
+            sel_item_obj = next((i for i in items_from_sheet if i.get("name") == sel_item_multi), {})
+            default_query = _arabic_to_search(sel_item_multi)
+
+            col_q, col_btn = st.columns([3, 1])
+            with col_q:
+                search_q = st.text_input("🔍 كلمة البحث (بالإنجليزي)",
+                                          value=default_query,
+                                          key="multi_search_q",
+                                          help="يمكنك تعديلها لنتائج أدق")
+            with col_btn:
+                st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
+                search_btn = st.button("🔍 بحث", use_container_width=True, key="multi_search_btn")
+
+            if search_btn or st.session_state.get("_multi_photos"):
+                if search_btn:
+                    with st.spinner(f"🔍 جاري البحث في {len(active_sources)} مصادر..."):
+                        photos = fetch_multi_source_photos(search_q, per_source=4)
+                        st.session_state["_multi_photos"] = photos
+                        st.session_state["_multi_item"] = sel_item_multi
+
+                photos = st.session_state.get("_multi_photos", [])
+                current_item = st.session_state.get("_multi_item", sel_item_multi)
+
+                if photos:
+                    st.markdown(f"### 📸 {len(photos)} صورة — اختر الأنسب لـ **{current_item}**")
+
+                    # عرض الصور في شبكة 4 أعمدة
+                    cols_per_row = 4
+                    for row_start in range(0, len(photos), cols_per_row):
+                        row_photos = photos[row_start:row_start+cols_per_row]
+                        cols = st.columns(cols_per_row)
+                        for j, photo in enumerate(row_photos):
+                            with cols[j]:
+                                src_color = {"Pexels":"#69f0ae","Pixabay":"#80d8ff","Unsplash":"#C9A84C"}.get(photo["source"],"#888")
+                                st.image(photo["thumb"], use_container_width=True)
+                                st.markdown(f'<div style="font-size:.65rem;color:{src_color};text-align:center;margin-top:.2rem">{photo["source"]}</div>', unsafe_allow_html=True)
+                                if st.button(f"✅ اختر", key=f"pick_photo_{row_start+j}", use_container_width=True):
+                                    # حفظ الصورة في الشيت
+                                    target = {"name": current_item, "image_url": photo["url"], "image_credit": photo["credit"]}
+                                    updated = update_images_in_sheet(sheet_id, final_tab, [target])
+                                    if updated:
+                                        st.success(f"✅ تم حفظ صورة '{current_item}' من {photo['source']} في الشيت!")
+                                        st.session_state.pop("_multi_photos", None)
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ لم يتم الحفظ — تأكد من اسم الأكلة")
+                else:
+                    st.warning("⚠️ لم تُجلب أي صور — جرب كلمة بحث أخرى")
+
+        else:
+            st.warning("📭 لا توجد أكلات في هذا الصنف — أضف الأكلات أولاً")
+
+    # ─────────────────────────────────────────────────────
     # PANEL A: UNSPLASH
     # ─────────────────────────────────────────────────────
-    if selected_method == "unsplash":
+    elif selected_method == "unsplash":
         st.markdown("#### 🆓 إعدادات Unsplash")
 
         col1, col2 = st.columns(2)
