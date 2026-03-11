@@ -415,44 +415,54 @@ def _render_image_import_tab(sheet_id, tab_sel, rest):
                         img_b64 = base64.b64encode(img_bytes).decode()
                         mime = uploaded.type or "image/jpeg"
 
-                        prompt = """أنت خبير في قراءة قوائم طعام المطاعم المغربية.
-انظر لهذه الصورة واستخرج كل الأكلات والأسعار.
+                        prompt = """You are an expert at reading restaurant menus. This menu may be in Arabic, French, or both.
 
-أجب فقط بـ JSON بهذا الشكل بدون أي كلام آخر:
-{
-  "items": [
-    {
-      "name": "اسم الأكلة بالعربية",
-      "price": 85,
-      "description": "وصف مختصر إن وجد",
-      "category": "الأطباق الرئيسية"
-    }
-  ]
-}
+Extract ALL dishes and their prices from this image.
 
-الأصناف المتاحة فقط: الأطباق الرئيسية, المقبلات, الحلويات, المشروبات
-إذا لم تجد صنف واضح ضعه في الأطباق الرئيسية
-السعر يجب أن يكون رقم فقط بدون درهم
-إذا لم يكن هناك سعر واضح ضع 0"""
+Rules:
+- Keep the dish name exactly as written in the menu (French or Arabic)
+- price must be a number only (no currency symbol). If two numbers like "40,15" take the first: 40
+- If no price found use 0
+- category must be one of exactly: الأطباق الرئيسية, المقبلات, الحلويات, المشروبات
+- Guess category from section headers (ENTREES=المقبلات, PLATS=الأطباق الرئيسية, DESSERTS=الحلويات, BOISSONS=المشروبات)
+- description can be empty string
 
-                        raw = gemini_vision(prompt, img_b64, mime, max_tokens=2000, temperature=0)
+Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
+{"items":[{"name":"dish name","price":40,"description":"","category":"الأطباق الرئيسية"}]}"""
+
+                        raw = gemini_vision(prompt, img_b64, mime, max_tokens=4000, temperature=0)
+
+                        # تنظيف JSON من أي نص زائد
+                        raw = raw.strip()
                         if "```json" in raw:
                             raw = raw.split("```json")[1].split("```")[0].strip()
                         elif "```" in raw:
                             raw = raw.split("```")[1].split("```")[0].strip()
+                        # أحياناً Gemini يضيف نصاً قبل الـ JSON
+                        if not raw.startswith("{"):
+                            start = raw.find("{")
+                            if start != -1:
+                                raw = raw[start:]
+                        # أحياناً يضيف نصاً بعد الـ JSON
+                        if not raw.endswith("}"):
+                            end = raw.rfind("}")
+                            if end != -1:
+                                raw = raw[:end+1]
+
                         parsed = json.loads(raw)
                         items_found = parsed.get("items", [])
                         st.session_state["_analyzed_items"] = items_found
                         st.session_state["_analyzed_edits"] = {i: dict(item) for i, item in enumerate(items_found)}
                         st.success(f"✅ تم استخراج {len(items_found)} أكلة!")
-                    except json.JSONDecodeError:
-                        st.error("❌ الذكاء الاصطناعي لم يتمكن من قراءة الصورة — جرب صورة أوضح")
+                    except json.JSONDecodeError as e:
+                        st.error(f"❌ خطأ في قراءة JSON: {e}")
+                        st.code(raw[:500] if 'raw' in dir() else "لا يوجد رد")
                         return
                     except RuntimeError as e:
                         st.error(f"❌ {e}")
                         return
                     except Exception as e:
-                        st.error(f"❌ خطأ: {e}")
+                        st.error(f"❌ خطأ غير متوقع: {type(e).__name__}: {e}")
                         return
 
             items_found = st.session_state.get("_analyzed_items", [])
