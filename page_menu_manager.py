@@ -17,6 +17,94 @@ SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
 
 TABS = ["الأطباق الرئيسية","المقبلات","الحلويات","المشروبات"]
+
+# ══════════════════════════════════════════════════════════
+# 🌍 ترجمة تلقائية للأسماء
+# ══════════════════════════════════════════════════════════
+# Gemini key is read inside auto_translate()
+FOOD_DICT = {
+    # أكلات مغربية شائعة
+    "طاجين دجاج":  ("Tajine Poulet",       "Chicken Tagine"),
+    "طاجين لحم":   ("Tajine Viande",        "Beef Tagine"),
+    "طاجين":       ("Tajine",               "Tagine"),
+    "كسكس مغربي":  ("Couscous Marocain",    "Moroccan Couscous"),
+    "كسكس":        ("Couscous",             "Couscous"),
+    "حريرة":       ("Harira",               "Harira Soup"),
+    "بسطيلة":      ("Pastilla",             "Pastilla"),
+    "بريوات":      ("Briouats",             "Briouats"),
+    "مشوي مختلط":  ("Grillade Mixte",       "Mixed Grill"),
+    "دجاج مشوي":   ("Poulet Grillé",        "Grilled Chicken"),
+    "سمك مشوي":    ("Poisson Grillé",       "Grilled Fish"),
+    "سمك":         ("Poisson",              "Fish"),
+    "سلطة مغربية": ("Salade Marocaine",     "Moroccan Salad"),
+    "سلطة":        ("Salade",               "Salad"),
+    "شوربة":       ("Soupe",                "Soup"),
+    "مرق":         ("Bouillon",             "Broth"),
+    "أرز":         ("Riz",                  "Rice"),
+    "بيتزا":       ("Pizza",                "Pizza"),
+    "برغر":        ("Burger",               "Burger"),
+    "ساندويش":     ("Sandwich",             "Sandwich"),
+    "باستا":       ("Pâtes",               "Pasta"),
+    "بسطيلة حلوة": ("Pastilla Sucrée",      "Sweet Pastilla"),
+    "شباكية":      ("Chebakia",             "Chebakia"),
+    "حلوى مغربية": ("Pâtisserie Marocaine", "Moroccan Pastry"),
+    "كعب الغزال":  ("Cornes de Gazelle",    "Gazelle Horns"),
+    "آيس كريم":    ("Glace",               "Ice Cream"),
+    "تارت":        ("Tarte",                "Tart"),
+    "كيك":         ("Gâteau",              "Cake"),
+    "أتاي بالنعناع":("Thé à la Menthe",    "Mint Tea"),
+    "أتاي":        ("Thé Marocain",         "Moroccan Tea"),
+    "شاي":         ("Thé",                 "Tea"),
+    "قهوة":        ("Café",                "Coffee"),
+    "عصير برتقال": ("Jus d'Orange",        "Orange Juice"),
+    "عصير":        ("Jus",                 "Juice"),
+    "ماء":         ("Eau",                 "Water"),
+    "كوكا":        ("Coca-Cola",           "Coca-Cola"),
+    "سودا":        ("Soda",                "Soda"),
+    "لبن":         ("Lait",                "Milk"),
+    "لبن رائب":    ("Lben",                "Buttermilk"),
+    "دجاج":        ("Poulet",              "Chicken"),
+    "لحم":         ("Viande",              "Meat"),
+    "لحم مفروم":   ("Viande Hachée",       "Minced Meat"),
+    "كفتة":        ("Kefta",               "Kefta"),
+    "مقبلات":      ("Entrées",             "Starters"),
+    "فطائر":       ("Feuilletés",          "Pastries"),
+}
+
+def auto_translate(arabic_name: str) -> tuple:
+    """
+    يترجم اسم الأكلة للفرنسية والإنجليزية
+    1. قاموس محلي أولاً (سريع)
+    2. OpenAI إذا متوفر
+    3. إرجاع فارغ كـ fallback
+    """
+    name = arabic_name.strip()
+    # قاموس محلي
+    for ar, (fr, en) in FOOD_DICT.items():
+        if ar in name or name == ar:
+            return fr, en
+    # ✅ Gemini (مجاني) للترجمة
+    GEMINI_KEY = os.getenv("GEMINI_API_KEY","")
+    if GEMINI_KEY:
+        try:
+            import requests as _req
+            r = _req.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}",
+                headers={"Content-Type": "application/json"},
+                json={"contents":[{"parts":[{"text":
+                    f"Translate this Moroccan/Arabic food name to French and English.\nReply ONLY in this format: French | English\nFood: {name}"}]}],
+                    "generationConfig":{"maxOutputTokens":40,"temperature":0}},
+                timeout=8
+            )
+            if r.status_code == 200:
+                txt = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                parts = [p.strip() for p in txt.split("|")]
+                if len(parts) == 2:
+                    return parts[0], parts[1]
+        except:
+            pass
+    return "", ""
+
 HEADERS = ["name","name_fr","name_en","price","description","available","image_url","image_credit"]
 
 def _gs():
@@ -223,13 +311,30 @@ def page_menu_manager(restaurants: list):
         st.markdown(f"### ➕ إضافة أكلة جديدة في **{tab_sel}**")
         st.markdown(f'<div style="background:#0a0a0a;border:1px solid #C9A84C33;border-radius:10px;padding:1rem;margin-bottom:1rem"><b style="color:#C9A84C">المطعم:</b> {rest.get("name","")} &nbsp;|&nbsp; <b style="color:#C9A84C">الصنف:</b> {tab_sel}</div>', unsafe_allow_html=True)
 
+        # ── إدخال الاسم + ترجمة تلقائية ──────────────────
+        c0 = st.columns([3, 1])
+        with c0[0]:
+            n_name = st.text_input("🍽️ الاسم بالعربية *", key="add_name",
+                                    placeholder="طاجين دجاج")
+        with c0[1]:
+            st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
+            if st.button("🌍 ترجم تلقائياً", key="btn_translate", use_container_width=True):
+                if n_name.strip():
+                    fr, en = auto_translate(n_name.strip())
+                    st.session_state["_auto_fr"] = fr
+                    st.session_state["_auto_en"] = en
+                    if fr or en:
+                        st.success(f"🇫🇷 {fr or '?'} | 🇬🇧 {en or '?'}")
+                    else:
+                        st.warning("⚠️ أضف اسم الأكلة أولاً أو أدخل الترجمة يدوياً")
+
         c1, c2 = st.columns(2)
         with c1:
-            n_name    = st.text_input("🍽️ الاسم بالعربية *", key="add_name",
-                                       placeholder="طاجين دجاج")
             n_name_fr = st.text_input("🇫🇷 بالفرنسية", key="add_fr",
+                                       value=st.session_state.get("_auto_fr",""),
                                        placeholder="Tajine Poulet")
             n_name_en = st.text_input("🇬🇧 بالإنجليزية", key="add_en",
+                                       value=st.session_state.get("_auto_en",""),
                                        placeholder="Chicken Tagine")
             n_desc    = st.text_area("📝 الوصف", key="add_desc",
                                       placeholder="وصف مختصر للأكلة", height=80)
