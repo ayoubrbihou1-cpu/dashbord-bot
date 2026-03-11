@@ -129,18 +129,35 @@ def load_items(sheet_id: str, tab: str) -> list:
         return []
 
 def add_item(sheet_id: str, tab: str, data: dict) -> bool:
+    """إضافة أكلة واحدة"""
+    return add_items_batch(sheet_id, tab, [data]) == 1
+
+
+def add_items_batch(sheet_id: str, tab: str, items: list) -> int:
+    """
+    إضافة عدة أكلات دفعة واحدة — طلب واحد فقط لـ Google Sheets
+    يرجع عدد الأكلات المضافة بنجاح
+    """
+    if not items:
+        return 0
     try:
         ws = _get_ws(sheet_id, tab)
         headers = ws.row_values(1)
         if not headers:
             ws.append_row(HEADERS)
             headers = HEADERS
-        row = [data.get(h, "") for h in headers]
-        ws.append_row(row)
-        return True
+
+        rows = []
+        for data in items:
+            row = [data.get(h, "") for h in headers]
+            rows.append(row)
+
+        # كتابة كل الصفوف في طلب واحد بدل طلب لكل أكلة
+        ws.append_rows(rows, value_input_option="USER_ENTERED")
+        return len(rows)
     except Exception as e:
-        st.error(f"❌ إضافة أكلة: {e}")
-        return False
+        st.error(f"❌ إضافة الأكلات: {e}")
+        return 0
 
 def update_item(sheet_id: str, tab: str, row_num: int, data: dict) -> bool:
     try:
@@ -497,25 +514,35 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
                 with col_save:
                     if st.button("💾 حفظ كل الأكلات في Google Sheet ✅",
                                   use_container_width=True, key="btn_save_ai_items"):
-                        added = 0
-                        for i, item_data in edits.items():
-                            if not item_data.get("name","").strip():
-                                continue
-                            fr, en = auto_translate(item_data["name"])
-                            save_tab = item_data.get("category","الأطباق الرئيسية")
-                            if target_tab != "كل الأصناف تلقائياً":
-                                save_tab = target_tab
-                            ok = add_item(sheet_id, save_tab, {
-                                "name":         item_data["name"].strip(),
-                                "name_fr":      fr,
-                                "name_en":      en,
-                                "price":        str(int(item_data.get("price",0) or 0)),
-                                "description":  item_data.get("description","").strip(),
-                                "available":    "TRUE",
-                                "image_url":    "",
-                                "image_credit": ""
-                            })
-                            if ok: added += 1
+                        with st.spinner("⏳ جاري الحفظ..."):
+                            # تجميع الأكلات حسب الصنف لـ batch write
+                            from collections import defaultdict
+                            by_tab = defaultdict(list)
+
+                            for i, item_data in edits.items():
+                                if not item_data.get("name","").strip():
+                                    continue
+                                fr, en = auto_translate(item_data["name"])
+                                save_tab = item_data.get("category","الأطباق الرئيسية")
+                                if target_tab != "كل الأصناف تلقائياً":
+                                    save_tab = target_tab
+                                by_tab[save_tab].append({
+                                    "name":         item_data["name"].strip(),
+                                    "name_fr":      fr,
+                                    "name_en":      en,
+                                    "price":        str(int(item_data.get("price",0) or 0)),
+                                    "description":  item_data.get("description","").strip(),
+                                    "available":    "TRUE",
+                                    "image_url":    "",
+                                    "image_credit": ""
+                                })
+
+                            # حفظ كل صنف في طلب واحد فقط
+                            added = 0
+                            for tab_name, tab_items in by_tab.items():
+                                n = add_items_batch(sheet_id, tab_name, tab_items)
+                                added += n
+
                         if added > 0:
                             st.success(f"✅ تم حفظ {added} أكلة في Google Sheet! تظهر في المينيو فوراً 🎉")
                             st.session_state.pop("_analyzed_items", None)
