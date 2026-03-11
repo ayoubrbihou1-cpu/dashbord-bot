@@ -233,7 +233,7 @@ def page_menu_manager(restaurants: list):
     st.markdown("---")
 
     # ── تبويبان: عرض + إضافة ────────────────────────────
-    view_tab, add_tab, import_tab = st.tabs(["📋 عرض وتعديل", "➕ إضافة أكلة جديدة", "📤 استيراد سريع"])
+    view_tab, add_tab, import_tab = st.tabs(["📋 عرض وتعديل", "➕ إضافة أكلة جديدة", "📸 استيراد من صورة"])
 
     # ══ عرض وتعديل ════════════════════════════════════════
     with view_tab:
@@ -368,50 +368,213 @@ def page_menu_manager(restaurants: list):
                     st.success(f"✅ تمت إضافة '{n_name}' بسعر {n_price} درهم")
                     st.rerun()
 
-    # ══ استيراد سريع ══════════════════════════════════════
+    # ══ استيراد من صورة ══════════════════════════════════
     with import_tab:
-        st.markdown("### 📤 استيراد سريع — الصق قائمتك")
-        st.markdown("""
-        <div style="background:#0a1a0a;border:1px solid #C9A84C22;border-radius:8px;padding:.8rem;font-size:.8rem;color:#888;margin-bottom:.8rem">
-        الصيغة المقبولة — سطر لكل أكلة:<br>
-        <code style="color:#C9A84C">اسم الأكلة | السعر | الوصف (اختياري)</code><br><br>
-        مثال:<br>
-        <code style="color:#69f0ae">طاجين دجاج | 85 | تقليدي بالزيتون</code><br>
-        <code style="color:#69f0ae">كسكس مغربي | 70</code><br>
-        <code style="color:#69f0ae">سلطة مغربية | 30 | طازج يومياً</code>
-        </div>
-        """, unsafe_allow_html=True)
+        _render_image_import_tab(sheet_id, tab_sel, rest)
 
-        bulk_text = st.text_area("📝 الصق هنا", height=200, key="bulk_import",
-                                  placeholder="طاجين دجاج | 85 | بالزيتون\nكسكس مغربي | 70\n...")
+def _render_image_import_tab(sheet_id, tab_sel, rest):
+    """تبويب استيراد المينيو من صورة باستخدام Gemini"""
+    import base64, requests as _req
 
-        if st.button("📤 استيراد", use_container_width=True, key="btn_bulk"):
-            if not bulk_text.strip():
-                st.warning("الحقل فارغ")
-            else:
-                lines = [l.strip() for l in bulk_text.split("\n") if l.strip()]
-                added = 0; errors = []
-                for line in lines:
-                    parts = [p.strip() for p in line.split("|")]
-                    if len(parts) < 2:
-                        errors.append(f"⚠️ تجاهلت: {line[:40]}")
-                        continue
-                    name_  = parts[0]
-                    price_ = parts[1].replace("درهم","").replace("دراهم","").strip()
-                    desc_  = parts[2] if len(parts) > 2 else ""
-                    if not price_.replace(".","").isdigit():
-                        errors.append(f"⚠️ سعر غير صحيح: {line[:40]}")
-                        continue
-                    ok = add_item(sheet_id, tab_sel, {
-                        "name": name_, "name_fr": "", "name_en": "",
-                        "price": price_, "description": desc_,
-                        "available": "TRUE", "image_url": "", "image_credit": ""
-                    })
-                    if ok: added += 1
+    GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 
-                if added > 0:
-                    st.success(f"✅ تمت إضافة {added} أكلة إلى '{tab_sel}'")
-                for e in errors:
-                    st.warning(e)
-                if added > 0:
-                    st.rerun()
+    st.markdown("### 📸 استيراد المينيو من صورة")
+    st.markdown("""
+    <div style="background:#0a1a0a;border:1px solid #C9A84C33;border-radius:10px;padding:1rem;margin-bottom:1rem;font-size:.85rem;color:#888;line-height:1.8">
+    📌 <b style="color:#C9A84C">كيف يعمل؟</b><br>
+    1. ارفع صورة المينيو (ورقي أو صورة هاتف)<br>
+    2. الذكاء الاصطناعي يستخرج الأكلات والأسعار تلقائياً<br>
+    3. راجع النتائج وعدّل إذا لزم<br>
+    4. اضغط <b style="color:#69f0ae">حفظ في Google Sheet</b> ← تظهر فوراً في المينيو
+    </div>
+    """, unsafe_allow_html=True)
+
+    if not GEMINI_KEY:
+        st.error("❌ GEMINI_API_KEY غير محدد في المتغيرات البيئية")
+        return
+
+    uploaded = st.file_uploader(
+        "📷 ارفع صورة المينيو",
+        type=["jpg", "jpeg", "png", "webp"],
+        key="menu_img_upload",
+        help="صورة واضحة للمينيو الورقي أو صورة من الهاتف"
+    )
+
+    target_tab = st.selectbox(
+        "📂 أضف الأكلات إلى صنف:",
+        ["كل الأصناف تلقائياً", "الأطباق الرئيسية", "المقبلات", "الحلويات", "المشروبات"],
+        key="img_target_tab"
+    )
+
+    if uploaded:
+        col_img, col_btn = st.columns([2, 1])
+        with col_img:
+            st.image(uploaded, caption="الصورة المرفوعة", use_container_width=True)
+        with col_btn:
+            st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
+            analyze_btn = st.button("🤖 تحليل بالذكاء الاصطناعي",
+                                     use_container_width=True,
+                                     key="btn_analyze_menu")
+
+        if analyze_btn or st.session_state.get("_analyzed_items"):
+            if analyze_btn:
+                with st.spinner("🤖 جاري تحليل الصورة... قد يستغرق 10-20 ثانية"):
+                    try:
+                        img_bytes = uploaded.read()
+                        img_b64 = base64.b64encode(img_bytes).decode()
+                        mime = uploaded.type or "image/jpeg"
+
+                        prompt = """أنت خبير في قراءة قوائم طعام المطاعم المغربية.
+انظر لهذه الصورة واستخرج كل الأكلات والأسعار.
+
+أجب فقط بـ JSON بهذا الشكل بدون أي كلام آخر:
+{
+  "items": [
+    {
+      "name": "اسم الأكلة بالعربية",
+      "price": 85,
+      "description": "وصف مختصر إن وجد",
+      "category": "الأطباق الرئيسية"
+    }
+  ]
+}
+
+الأصناف المتاحة فقط: الأطباق الرئيسية, المقبلات, الحلويات, المشروبات
+إذا لم تجد صنف واضح ضعه في الأطباق الرئيسية
+السعر يجب أن يكون رقم فقط بدون درهم
+إذا لم يكن هناك سعر واضح ضع 0"""
+
+                        resp = _req.post(
+                            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}",
+                            headers={"Content-Type": "application/json"},
+                            json={
+                                "contents": [{
+                                    "parts": [
+                                        {"text": prompt},
+                                        {"inline_data": {"mime_type": mime, "data": img_b64}}
+                                    ]
+                                }],
+                                "generationConfig": {"maxOutputTokens": 2000, "temperature": 0}
+                            },
+                            timeout=30
+                        )
+
+                        if resp.status_code == 200:
+                            raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                            if "```json" in raw:
+                                raw = raw.split("```json")[1].split("```")[0].strip()
+                            elif "```" in raw:
+                                raw = raw.split("```")[1].split("```")[0].strip()
+                            parsed = json.loads(raw)
+                            items_found = parsed.get("items", [])
+                            st.session_state["_analyzed_items"] = items_found
+                            st.session_state["_analyzed_edits"] = {i: dict(item) for i, item in enumerate(items_found)}
+                            st.success(f"✅ تم استخراج {len(items_found)} أكلة!")
+                        else:
+                            st.error(f"❌ خطأ في Gemini: {resp.status_code} — {resp.text[:200]}")
+                            return
+                    except json.JSONDecodeError:
+                        st.error("❌ لم يتمكن الذكاء الاصطناعي من قراءة الصورة — جرب صورة أوضح")
+                        return
+                    except Exception as e:
+                        st.error(f"❌ خطأ: {e}")
+                        return
+
+            items_found = st.session_state.get("_analyzed_items", [])
+            edits = st.session_state.get("_analyzed_edits", {})
+
+            if items_found:
+                st.markdown(f"### ✏️ راجع وعدّل ({len(items_found)} أكلة مستخرجة)")
+
+                for i, item in enumerate(items_found):
+                    with st.expander(f"🍽️ {item.get('name','؟')} — {item.get('price',0)} درهم", expanded=False):
+                        c1, c2, c3 = st.columns([2, 1, 1])
+                        with c1:
+                            new_name = st.text_input("الاسم", value=edits[i].get("name",""), key=f"ai_name_{i}")
+                            edits[i]["name"] = new_name
+                            new_desc = st.text_input("الوصف", value=edits[i].get("description",""), key=f"ai_desc_{i}")
+                            edits[i]["description"] = new_desc
+                        with c2:
+                            new_price = st.number_input("السعر", value=float(edits[i].get("price",0) or 0),
+                                                         min_value=0.0, step=5.0, key=f"ai_price_{i}")
+                            edits[i]["price"] = new_price
+                        with c3:
+                            cats = ["الأطباق الرئيسية","المقبلات","الحلويات","المشروبات"]
+                            cur_cat = edits[i].get("category","الأطباق الرئيسية")
+                            if cur_cat not in cats: cur_cat = "الأطباق الرئيسية"
+                            new_cat = st.selectbox("الصنف", cats, index=cats.index(cur_cat), key=f"ai_cat_{i}")
+                            edits[i]["category"] = new_cat
+
+                st.session_state["_analyzed_edits"] = edits
+                st.markdown("---")
+
+                col_save, col_clear = st.columns([3, 1])
+                with col_save:
+                    if st.button("💾 حفظ كل الأكلات في Google Sheet ✅",
+                                  use_container_width=True, key="btn_save_ai_items"):
+                        added = 0
+                        for i, item_data in edits.items():
+                            if not item_data.get("name","").strip():
+                                continue
+                            fr, en = auto_translate(item_data["name"])
+                            save_tab = item_data.get("category","الأطباق الرئيسية")
+                            if target_tab != "كل الأصناف تلقائياً":
+                                save_tab = target_tab
+                            ok = add_item(sheet_id, save_tab, {
+                                "name":         item_data["name"].strip(),
+                                "name_fr":      fr,
+                                "name_en":      en,
+                                "price":        str(int(item_data.get("price",0) or 0)),
+                                "description":  item_data.get("description","").strip(),
+                                "available":    "TRUE",
+                                "image_url":    "",
+                                "image_credit": ""
+                            })
+                            if ok: added += 1
+                        if added > 0:
+                            st.success(f"✅ تم حفظ {added} أكلة في Google Sheet! تظهر في المينيو فوراً 🎉")
+                            st.session_state.pop("_analyzed_items", None)
+                            st.session_state.pop("_analyzed_edits", None)
+                            st.rerun()
+                with col_clear:
+                    if st.button("🗑️ مسح", key="btn_clear_ai"):
+                        st.session_state.pop("_analyzed_items", None)
+                        st.session_state.pop("_analyzed_edits", None)
+                        st.rerun()
+
+    st.markdown("---")
+    st.markdown("### 📤 أو استيراد نصي سريع — الصق قائمتك")
+
+    bulk_text = st.text_area("📝 الصق هنا", height=200, key="bulk_import",
+                              placeholder="طاجين دجاج | 85 | بالزيتون\nكسكس مغربي | 70\n...")
+
+    if st.button("📤 استيراد", use_container_width=True, key="btn_bulk"):
+        if not bulk_text.strip():
+            st.warning("الحقل فارغ")
+        else:
+            lines = [l.strip() for l in bulk_text.split("\n") if l.strip()]
+            added = 0; errors = []
+            for line in lines:
+                parts = [p.strip() for p in line.split("|")]
+                if len(parts) < 2:
+                    errors.append(f"⚠️ تجاهلت: {line[:40]}")
+                    continue
+                name_  = parts[0]
+                price_ = parts[1].replace("درهم","").replace("دراهم","").strip()
+                desc_  = parts[2] if len(parts) > 2 else ""
+                if not price_.replace(".","").isdigit():
+                    errors.append(f"⚠️ سعر غير صحيح: {line[:40]}")
+                    continue
+                ok = add_item(sheet_id, tab_sel, {
+                    "name": name_, "name_fr": "", "name_en": "",
+                    "price": price_, "description": desc_,
+                    "available": "TRUE", "image_url": "", "image_credit": ""
+                })
+                if ok: added += 1
+
+            if added > 0:
+                st.success(f"✅ تمت إضافة {added} أكلة إلى '{tab_sel}'")
+            for e in errors:
+                st.warning(e)
+            if added > 0:
+                st.rerun()
