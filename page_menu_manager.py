@@ -402,10 +402,10 @@ def _render_image_import_tab(sheet_id, tab_sel, rest):
     st.markdown(f'<div style="color:#69f0ae;font-size:.8rem">🤖 Gemini: {msg} — دوران تلقائي عند نفاذ الحصة</div>', unsafe_allow_html=True)
 
     uploaded = st.file_uploader(
-        "📷 ارفع صورة المينيو",
-        type=["jpg", "jpeg", "png", "webp"],
+        "📷 ارفع ملف المينيو",
+        type=["jpg", "jpeg", "png", "webp", "pdf"],
         key="menu_img_upload",
-        help="صورة واضحة للمينيو الورقي أو صورة من الهاتف"
+        help="صورة JPG/PNG أو ملف PDF للمينيو"
     )
 
     target_tab = st.selectbox(
@@ -417,7 +417,18 @@ def _render_image_import_tab(sheet_id, tab_sel, rest):
     if uploaded:
         col_img, col_btn = st.columns([2, 1])
         with col_img:
-            st.image(uploaded, caption="الصورة المرفوعة", use_container_width=True)
+            # عرض معاينة حسب نوع الملف
+            if uploaded.type == "application/pdf":
+                st.markdown(f"""
+                <div style="background:#0a1a0a;border:1px solid #C9A84C33;border-radius:10px;
+                     padding:1.5rem;text-align:center">
+                  <div style="font-size:3rem">📄</div>
+                  <div style="color:#C9A84C;font-weight:700;margin-top:.5rem">{uploaded.name}</div>
+                  <div style="color:#555;font-size:.8rem;margin-top:.3rem">PDF — سيتم تحليل الصفحة الأولى</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.image(uploaded, caption="الصورة المرفوعة", use_container_width=True)
         with col_btn:
             st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
             analyze_btn = st.button("🤖 تحليل بالذكاء الاصطناعي",
@@ -426,11 +437,34 @@ def _render_image_import_tab(sheet_id, tab_sel, rest):
 
         if analyze_btn or st.session_state.get("_analyzed_items"):
             if analyze_btn:
-                with st.spinner("🤖 جاري تحليل الصورة... قد يستغرق 10-20 ثانية"):
+                with st.spinner("🤖 جاري تحليل الملف... قد يستغرق 10-30 ثانية"):
                     try:
-                        img_bytes = uploaded.read()
-                        img_b64 = base64.b64encode(img_bytes).decode()
+                        file_bytes = uploaded.read()
                         mime = uploaded.type or "image/jpeg"
+
+                        # تحويل PDF لصورة إذا لزم
+                        if uploaded.type == "application/pdf" or uploaded.name.lower().endswith(".pdf"):
+                            try:
+                                import fitz  # PyMuPDF
+                                pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                                # تحليل كل الصفحات ودمجها في صورة واحدة طويلة
+                                images_b64 = []
+                                for page_num in range(min(pdf_doc.page_count, 4)):  # max 4 صفحات
+                                    page = pdf_doc[page_num]
+                                    mat = fitz.Matrix(2, 2)  # دقة عالية x2
+                                    pix = page.get_pixmap(matrix=mat)
+                                    images_b64.append(base64.b64encode(pix.tobytes("jpeg")).decode())
+                                img_b64 = images_b64[0]  # الصفحة الأولى للتحليل الأساسي
+                                mime = "image/jpeg"
+                                st.info(f"📄 تم تحويل PDF ({pdf_doc.page_count} صفحة) — يتم تحليل الصفحة الأولى")
+                            except ImportError:
+                                st.error("❌ مكتبة PyMuPDF غير مثبتة — أضف 'pymupdf' في requirements.txt")
+                                return
+                            except Exception as e:
+                                st.error(f"❌ خطأ في تحويل PDF: {e}")
+                                return
+                        else:
+                            img_b64 = base64.b64encode(file_bytes).decode()
 
                         prompt = """You are an expert at reading restaurant menus. This menu may be in Arabic, French, or both.
 
