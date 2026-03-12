@@ -345,9 +345,12 @@ def page_images(restaurants: list):
 
             # البحث — تحويل الاسم لكلمة بحث إنجليزية
             sel_item_obj = next((i for i in items_from_sheet if i.get("name") == sel_item_multi), {})
-            # إذا كان الاسم بالفرنسية أو الإنجليزية نستخدمه مباشرة
-            _ar_result = _arabic_to_search(sel_item_multi)
-            default_query = _ar_result if _ar_result and _ar_result != sel_item_multi else sel_item_multi
+            # تحويل اسم الأكلة لكلمة بحث — يدعم العربي والفرنسي والإنجليزي
+            try:
+                _ar_result = _arabic_to_search(sel_item_multi or "")
+                default_query = _ar_result if _ar_result else (sel_item_multi or "food")
+            except Exception:
+                default_query = sel_item_multi or "moroccan food"
 
             col_q, col_btn = st.columns([3, 1])
             with col_q:
