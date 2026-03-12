@@ -72,28 +72,96 @@ FOOD_DICT = {
     "فطائر":       ("Feuilletés",          "Pastries"),
 }
 
+def _detect_language(name: str) -> str:
+    """يكتشف لغة الاسم: arabic / french / english"""
+    arabic_chars = sum(1 for c in name if '؀' <= c <= 'ۿ')
+    if arabic_chars > 1:
+        return "arabic"
+    # كلمات فرنسية شائعة في المينيو
+    fr_words = ["tajine","couscous","poulet","viande","salade","soupe","tarte","mousse",
+                "sorbet","creme","gateau","briouats","pastilla","sardine","filet","plat",
+                "omelette","aubergine","courgette","brochette","merguez","harira","seffa",
+                "tanjia","rafissa","bastilla","de","du","au","aux","les","avec","sans"]
+    name_l = name.lower()
+    if any(w in name_l for w in fr_words):
+        return "french"
+    return "english"
+
+
 def auto_translate(arabic_name: str) -> tuple:
     """
     يترجم اسم الأكلة للفرنسية والإنجليزية
-    1. قاموس محلي أولاً (سريع)
-    2. OpenAI إذا متوفر
-    3. إرجاع فارغ كـ fallback
+    يدعم العربية والفرنسية والإنجليزية
     """
     name = arabic_name.strip()
-    # قاموس محلي
+    # قاموس محلي للعربية
     for ar, (fr, en) in FOOD_DICT.items():
         if ar in name or name == ar:
             return fr, en
-    # ✅ Gemini مع دوران تلقائي على 4 مفاتيح
+    # Gemini للترجمة مع دوران تلقائي
     try:
-        prompt = f"Translate this Moroccan/Arabic food name to French and English.\nReply ONLY in this format: French | English\nFood: {name}"
-        txt = gemini_text(prompt, max_tokens=40, temperature=0)
+        lang = _detect_language(name)
+        if lang == "arabic":
+            prompt = f"Translate this Moroccan Arabic food name to French and English.\nReply ONLY: French | English\nFood: {name}"
+        elif lang == "french":
+            prompt = f"Translate this French food name to English. Also give the original French back.\nReply ONLY: French | English\nFood: {name}"
+        else:
+            prompt = f"This is an English food name. Translate it to French.\nReply ONLY: French | English\nFood: {name}"
+        txt = gemini_text(prompt, max_tokens=60, temperature=0)
         parts = [p.strip() for p in txt.split("|")]
         if len(parts) == 2:
             return parts[0], parts[1]
-    except Exception as e:
+    except Exception:
         pass
     return "", ""
+
+
+def translate_three_languages(name: str) -> tuple:
+    """
+    يترجم اسم الأكلة للغات الثلاث: عربي | فرنسي | إنجليزي
+    يكتشف لغة الاسم تلقائياً ويترجم للباقيتين
+    يرجع: (name_ar, name_fr, name_en)
+    """
+    name = name.strip()
+    if not name:
+        return "", "", ""
+    try:
+        lang = _detect_language(name)
+        prompt = (
+            f'This is a Moroccan restaurant dish name: "{name}"\n'
+            f'Detected language: {lang}\n\n'
+            "Translate it to all 3 languages. Reply ONLY in this exact format:\n"
+            "Arabic | French | English\n\n"
+            "Rules:\n"
+            "- Arabic: use Modern Standard Arabic or Moroccan Arabic\n"
+            "- French: standard French used in Moroccan restaurants\n"
+            "- English: clear English description\n"
+            "- No extra text, just: Arabic | French | English"
+        )
+
+        txt = gemini_text(prompt, max_tokens=80, temperature=0)
+        parts = [p.strip() for p in txt.split("|")]
+        if len(parts) == 3:
+            ar, fr, en = parts[0], parts[1], parts[2]
+            # إذا كان الاسم الأصلي عربي — استخدمه مباشرة
+            if lang == "arabic":
+                ar = name
+            elif lang == "french":
+                fr = name
+            elif lang == "english":
+                en = name
+            return ar, fr, en
+    except Exception:
+        pass
+    # fallback — إذا فشل Gemini
+    fr, en = auto_translate(name)
+    lang = _detect_language(name)
+    if lang == "arabic":
+        return name, fr, en
+    elif lang == "french":
+        return "", name, en
+    else:
+        return "", fr, name
 
 HEADERS = ["name","name_fr","name_en","price","description","available","image_url","image_credit"]
 
@@ -361,10 +429,15 @@ def page_menu_manager(restaurants: list):
             elif n_price <= 0:
                 st.error("❌ أدخل سعراً صحيحاً")
             else:
+                # إذا لم يدخل المستخدم الترجمة يدوياً — يترجم تلقائياً
+                _ar3, _fr3, _en3 = translate_three_languages(n_name.strip())
+                final_fr = n_name_fr.strip() or _fr3
+                final_en = n_name_en.strip() or _en3
+                final_ar = _ar3 if _ar3 else n_name.strip()
                 ok = add_item(sheet_id, tab_sel, {
-                    "name":        n_name.strip(),
-                    "name_fr":     n_name_fr.strip(),
-                    "name_en":     n_name_en.strip(),
+                    "name":        final_ar,
+                    "name_fr":     final_fr,
+                    "name_en":     final_en,
                     "price":       str(n_price),
                     "description": n_desc.strip(),
                     "available":   n_avail,
@@ -556,12 +629,14 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
                             for i, item_data in edits.items():
                                 if not item_data.get("name","").strip():
                                     continue
-                                fr, en = auto_translate(item_data["name"])
+                                ar, fr, en = translate_three_languages(item_data["name"])
                                 save_tab = item_data.get("category","الأطباق الرئيسية")
                                 if target_tab != "كل الأصناف تلقائياً":
                                     save_tab = target_tab
+                                # الاسم الرئيسي = العربي إذا توفر وإلا الأصلي
+                                main_name = ar if ar else item_data["name"].strip()
                                 by_tab[save_tab].append({
-                                    "name":         item_data["name"].strip(),
+                                    "name":         main_name,
                                     "name_fr":      fr,
                                     "name_en":      en,
                                     "price":        str(int(item_data.get("price",0) or 0)),
@@ -611,8 +686,10 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
                 if not price_.replace(".","").isdigit():
                     errors.append(f"⚠️ سعر غير صحيح: {line[:40]}")
                     continue
+                _ar, _fr, _en = translate_three_languages(name_)
+                _main = _ar if _ar else name_
                 ok = add_item(sheet_id, tab_sel, {
-                    "name": name_, "name_fr": "", "name_en": "",
+                    "name": _main, "name_fr": _fr, "name_en": _en,
                     "price": price_, "description": desc_,
                     "available": "TRUE", "image_url": "", "image_credit": ""
                 })
