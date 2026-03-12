@@ -1,3 +1,4 @@
+import json
 """
 🏭 auto_provisioner.py — الإصدار المُصلح
 ✅ إصلاح: حفظ Master DB في tab مستقل "Master_DB" وليس sheet1
@@ -357,7 +358,8 @@ def provision_restaurant(
     restaurant_id, name, wifi_ssid, wifi_password,
     sheet_id="",
     style="luxury", primary_color="#0a0804", accent_color="#C9A84C",
-    num_tables=10, logo_url="", owner_email="", telegram_chat_id=""
+    num_tables=10, logo_url="", owner_email="", telegram_chat_id="",
+    bg_type="minimal", socials=None
 ):
     res = ProvisionResult()
     steps = []
@@ -398,6 +400,8 @@ def provision_restaurant(
         "primary_color":    primary_color,
         "accent_color":     accent_color,
         "style":            style,
+        "bg_type":          bg_type,
+        "socials":          json.dumps(socials or {}, ensure_ascii=False),
         "num_tables":       num_tables,
         "logo_url":         logo_url,
         "owner_email":      owner_email,
