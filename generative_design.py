@@ -333,53 +333,77 @@ SOCIAL_CONFIG = {
 }
 
 def _icon_instagram(draw, cx, cy, r, col):
-    draw.rounded_rectangle([cx-r,cy-r,cx+r,cy+r], radius=r//3, outline=col, width=3)
-    draw.ellipse([cx-r//2, cy-r//2, cx+r//2, cy+r//2], outline=col, width=2)
-    draw.ellipse([cx+r//3-5, cy-r//2-5, cx+r//3+5, cy-r//2+5], fill=col)
+    """Instagram: مربع مستدير + دائرة + نقطة - أوضح وأكبر"""
+    s = int(r * 0.85)
+    # الإطار الخارجي (مربع مستدير)
+    draw.rounded_rectangle([cx-s, cy-s, cx+s, cy+s], radius=s//3, outline=col, width=3)
+    # الدائرة الداخلية
+    cr = int(s * 0.52)
+    draw.ellipse([cx-cr, cy-cr, cx+cr, cy+cr], outline=col, width=2)
+    # نقطة الكاميرا
+    dot = max(3, s//5)
+    draw.ellipse([cx+s//2-dot, cy-s//2-dot, cx+s//2+dot, cy-s//2+dot], fill=col)
 
 def _icon_facebook(draw, cx, cy, r, col):
-    draw.ellipse([cx-r, cy-r, cx+r, cy+r], outline=col, width=3)
-    f = get_font(int(r*1.2), bold=True)
-    w,h = text_wh(draw, "f", f)
-    draw.text((cx-w//2+3, cy-h//2), "f", font=f, fill=col)
+    """Facebook: f أبيض على خلفية زرقاء (الخلفية تُرسم في draw_social_bar)"""
+    f_font = get_font(int(r * 1.35), bold=True)
+    fw, fh = text_wh(draw, "f", f_font)
+    draw.text((cx - fw//2 + r//8, cy - fh//2), "f", font=f_font, fill=col)
 
 def _icon_whatsapp(draw, cx, cy, r, col):
-    draw.ellipse([cx-r, cy-r, cx+r, cy+r], outline=col, width=3)
-    # هاتف مبسط
-    pw, ph = r//2, int(r*0.75)
-    draw.rounded_rectangle([cx-pw//2, cy-ph//2, cx+pw//2, cy+ph//2], radius=4, outline=col, width=2)
-    draw.line([cx-pw//4, cy+ph//2-6, cx+pw//4, cy+ph//2-6], fill=col, width=2)
+    """WhatsApp: W أبيض على خلفية خضراء"""
+    wf = get_font(int(r * 1.1), bold=True)
+    ww, wh = text_wh(draw, "W", wf)
+    draw.text((cx - ww//2, cy - wh//2), "W", font=wf, fill=col)
 
 def _icon_tiktok(draw, cx, cy, r, col):
-    # حرف T مع نقطة
-    f = get_font(int(r*1.1), bold=True)
-    w,h = text_wh(draw, "Tt", f)
-    draw.text((cx-w//2, cy-h//2), "Tt", font=f, fill=col)
+    """TikTok: مستطيل داكن + TT"""
+    draw.rounded_rectangle([cx-r, cy-r, cx+r, cy+r], radius=r//4, fill=col)
+    f = get_font(int(r * 0.9), bold=True)
+    w, h = text_wh(draw, "TT", f)
+    draw.text((cx - w//2, cy - h//2), "TT", font=f, fill=(255, 255, 255))
 
 def _icon_website(draw, cx, cy, r, col):
+    """Website: كرة أرضية"""
     draw.ellipse([cx-r, cy-r, cx+r, cy+r], outline=col, width=3)
     draw.line([cx, cy-r, cx, cy+r], fill=col, width=2)
     draw.line([cx-r, cy, cx+r, cy], fill=col, width=2)
-    draw.arc([cx-r//2, cy-r, cx+r//2, cy+r], 0, 360, fill=col, width=2)
+    # قوس أفقي
+    draw.arc([cx-r//2, cy-r, cx+r//2, cy+r], 0, 180, fill=col, width=2)
+    draw.arc([cx-r//2, cy-r, cx+r//2, cy+r], 180, 360, fill=col, width=2)
 
 def _icon_phone(draw, cx, cy, r, col):
-    draw.ellipse([cx-r, cy-r, cx+r, cy+r], outline=col, width=3)
-    pw, ph = r//2, int(r*0.75)
-    draw.rounded_rectangle([cx-pw//2, cy-ph//2, cx+pw//2, cy+ph//2], radius=4, outline=col, width=2)
-    draw.line([cx-pw//4, cy-ph//2+5, cx+pw//4, cy-ph//2+5], fill=col, width=2)
+    """Phone: دائرة + هاتف"""
+    draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=col)
+    pw, ph = r//2, int(r * 0.85)
+    draw.rounded_rectangle([cx-pw//2, cy-ph//2, cx+pw//2, cy+ph//2],
+                            radius=pw//3, outline=(255,255,255), width=2)
+    draw.line([cx-pw//4, cy-ph//2+4, cx+pw//4, cy-ph//2+4], fill=(255,255,255), width=2)
 
 def _icon_snapchat(draw, cx, cy, r, col):
-    # شبح مبسط
-    draw.ellipse([cx-r//2, cy-r, cx+r//2, cy], outline=col, width=3)
-    draw.line([cx-r//2, cy, cx-r, cy+r//2], fill=col, width=3)
-    draw.line([cx+r//2, cy, cx+r, cy+r//2], fill=col, width=3)
-    draw.line([cx-r, cy+r//2, cx+r, cy+r//2], fill=col, width=3)
+    """Snapchat: شبح"""
+    draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=col)
+    f = get_font(int(r * 1.1), bold=True)
+    w, h = text_wh(draw, "SC", f)
+    draw.text((cx - w//2, cy - h//2), "SC", font=f, fill=(255, 255, 255))
 
 def _icon_youtube(draw, cx, cy, r, col):
+    """YouTube: مستطيل أحمر + مثلث"""
     draw.rounded_rectangle([cx-r, cy-r//2, cx+r, cy+r//2], radius=r//4, fill=col)
-    # مثلث أبيض
-    pts = [(cx-r//3, cy-r//3), (cx-r//3, cy+r//3), (cx+r//2, cy)]
-    draw.polygon(pts, fill=(255,255,255))
+    pts = [(cx - r//3, cy - r//3), (cx - r//3, cy + r//3), (cx + r//2, cy)]
+    draw.polygon(pts, fill=(255, 255, 255))
+
+
+def _draw_star(draw, cx, cy, r, col, points=4):
+    """يرسم نجمة هندسية بدون unicode"""
+    import math
+    pts = []
+    for i in range(points * 2):
+        angle = math.pi / points * i - math.pi / 2
+        radius = r if i % 2 == 0 else r // 3
+        pts.append((cx + int(radius * math.cos(angle)),
+                    cy + int(radius * math.sin(angle))))
+    draw.polygon(pts, fill=col)
 
 _ICON_FUNCS = {
     "instagram": _icon_instagram,
@@ -425,9 +449,10 @@ def draw_social_bar(img: Image.Image, y_start: int,
         cx   = x_start + i * item_w + item_w // 2
         cy   = y_start + 30
 
-        # دائرة خلفية
-        icon_bg = blend(cfg["color"], bg_color, 0.55)
-        draw.ellipse([cx-icon_r-2, cy-icon_r-2, cx+icon_r+2, cy+icon_r+2], fill=icon_bg)
+        # دائرة خلفية — لون العلامة التجارية مباشرة (أوضح)
+        brand_color = cfg["color"]
+        draw.ellipse([cx-icon_r-2, cy-icon_r-2, cx+icon_r+2, cy+icon_r+2],
+                     fill=brand_color, outline=blend(brand_color, (255,255,255), 0.2), width=1)
 
         # أيقونة
         if fn:
@@ -1030,11 +1055,10 @@ def _render_food_photo_card(
     is_arabic = any('\u0600' <= c <= '\u06FF' for c in name)
     name_fixed = fix_arabic(name)
 
-    # نجوم زخرفية
-    star_f = get_font(22, bold=True)
+    # نجوم زخرفية مرسومة (بدون unicode)
     star_y = 32
-    for sx in [CARD_W//2 - 220, CARD_W//2 + 200]:
-        draw.text((sx, star_y), "✦", font=star_f, fill=accent)
+    for sx in [CARD_W//2 - 220, CARD_W//2 + 210]:
+        _draw_star(draw, sx, star_y + 10, 8, accent, points=4)
 
     # CTA line 1 (VIEW OUR / امسح لرؤية)
     if is_arabic:
@@ -1063,9 +1087,9 @@ def _render_food_photo_card(
         draw_center(draw, name_fixed, CARD_W//2, HEADER_H - 28,
                     sub_font, blend(fg, accent, 0.5))
 
-    # نجوم أسفل الهيدر
+    # نجوم أسفل الهيدر (مرسومة)
     for sx in [CARD_W//2 - 130, CARD_W//2, CARD_W//2 + 120]:
-        draw.text((sx - 8, HEADER_H - 52), "✦", font=star_f, fill=accent)
+        _draw_star(draw, sx, HEADER_H - 42, 6, accent, points=4)
 
     # ── QR ────────────────────────────────────────────────
     has_social = bool(socials and any(v.strip() for v in socials.values()))
