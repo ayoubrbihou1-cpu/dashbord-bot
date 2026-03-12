@@ -58,6 +58,63 @@ def get_food_emoji(name: str, category: str = "") -> str:
     return "🍽️"
 
 
+
+# ══════════════════════════════════════════════════════════════════
+# 🎨 METHOD 4 — POLLINATIONS AI (توليد صور بالذكاء الاصطناعي)
+# ══════════════════════════════════════════════════════════════════
+
+POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY", "")
+POLLINATIONS_URL = "https://image.pollinations.ai/prompt"
+
+def fetch_pollinations(name: str, count: int = 5) -> list:
+    """
+    يولد صور AI لأكلة معينة باستخدام Pollinations
+    يرجع قائمة من روابط الصور
+    count: عدد الصور المطلوبة (افتراضي 5)
+    """
+    results = []
+    
+    # بناء prompt احترافي للأكلة المغربية
+    base_prompt = f"professional food photography of {name}, moroccan cuisine, restaurant quality, appetizing, high resolution, natural lighting, close up"
+    
+    headers = {}
+    if POLLINATIONS_KEY:
+        headers["Authorization"] = f"Bearer {POLLINATIONS_KEY}"
+    
+    for i in range(count):
+        try:
+            # seed مختلف لكل صورة للحصول على تنوع
+            seed = 100 + (i * 37)
+            url = f"{POLLINATIONS_URL}/{requests.utils.quote(base_prompt)}?width=512&height=512&seed={seed}&model=flux&nologo=true"
+            
+            # تأخير بسيط بين الطلبات
+            if i > 0:
+                time.sleep(2)
+            
+            resp = requests.get(url, headers=headers, timeout=30)
+            if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image"):
+                results.append({
+                    "url": url,
+                    "thumb": url,
+                    "credit": f"AI Generated — Pollinations ({name})",
+                    "method": "pollinations",
+                    "seed": seed
+                })
+        except Exception as e:
+            log.warning(f"Pollinations error for {name}: {e}")
+            continue
+    
+    return results
+
+
+def pollinations_available() -> tuple:
+    """يتحقق من إمكانية استخدام Pollinations"""
+    if POLLINATIONS_KEY:
+        return True, "✅ متصل بمفتاح"
+    # يعمل بدون مفتاح أيضاً لكن أبطأ
+    return True, "✅ يعمل بدون مفتاح (أبطأ)"
+
+
 def _arabic_to_search(name: str) -> str:
     """
     تحويل اسم الأكلة لكلمة بحث إنجليزية
