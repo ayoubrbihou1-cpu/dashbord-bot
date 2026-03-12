@@ -66,44 +66,46 @@ def get_food_emoji(name: str, category: str = "") -> str:
 POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY", "")
 POLLINATIONS_URL = "https://image.pollinations.ai/prompt"
 
-def fetch_pollinations(name: str, count: int = 5) -> list:
+def fetch_pollinations(name: str, count: int = 1) -> list:
     """
-    يولد صور AI لأكلة معينة باستخدام Pollinations
-    يرجع قائمة من روابط الصور
-    count: عدد الصور المطلوبة (افتراضي 5)
+    يولد صورة AI واحدة لأكلة معينة باستخدام Pollinations
+    count: عدد الصور (افتراضي 1 لتوفير الـ pollen)
     """
     results = []
-    
-    # بناء prompt احترافي للأكلة المغربية
-    base_prompt = f"professional food photography of {name}, moroccan cuisine, restaurant quality, appetizing, high resolution, natural lighting, close up"
-    
+
+    # prompt احترافي للأكلة المغربية
+    base_prompt = f"professional food photography of {name}, moroccan restaurant dish, appetizing, high resolution, natural lighting, top view"
+    encoded = requests.utils.quote(base_prompt)
+
     headers = {}
     if POLLINATIONS_KEY:
         headers["Authorization"] = f"Bearer {POLLINATIONS_KEY}"
-    
+
     for i in range(count):
         try:
-            # seed مختلف لكل صورة للحصول على تنوع
-            seed = 100 + (i * 37)
-            url = f"{POLLINATIONS_URL}/{requests.utils.quote(base_prompt)}?width=512&height=512&seed={seed}&model=flux&nologo=true"
-            
-            # تأخير بسيط بين الطلبات
+            seed = 42 + (i * 13)
+            # نستخدم nologo=true لإزالة الووترمارك مع المفتاح
+            extra = "&nologo=true" if POLLINATIONS_KEY else ""
+            url = f"{POLLINATIONS_URL}/{encoded}?width=768&height=768&seed={seed}&model=flux{extra}"
+
             if i > 0:
-                time.sleep(2)
-            
-            resp = requests.get(url, headers=headers, timeout=30)
-            if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image"):
+                time.sleep(3)
+
+            resp = requests.get(url, headers=headers, timeout=90)  # timeout أطول
+            if resp.status_code == 200 and resp.headers.get("content-type","").startswith("image"):
                 results.append({
                     "url": url,
                     "thumb": url,
-                    "credit": f"AI Generated — Pollinations ({name})",
+                    "credit": f"AI Generated — Pollinations",
                     "method": "pollinations",
                     "seed": seed
                 })
+            else:
+                log.warning(f"Pollinations bad response {resp.status_code} for {name}")
         except Exception as e:
             log.warning(f"Pollinations error for {name}: {e}")
             continue
-    
+
     return results
 
 
