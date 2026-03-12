@@ -575,6 +575,24 @@ def pg_pdf(rs):
     with c1:
         n  = st.number_input("عدد الطاولات",1,100,int(r.get("num_tables",10) or 10))
         pv = st.number_input("معاينة طاولة رقم",1,n,1)
+    with c2:
+        # bg_type — يقرأ من الشيت أو يسمح بالتغيير
+        saved_bg  = r.get("bg_type","") or "minimal"
+        bg_opts   = list(BG_LABELS.keys())
+        bg_def    = bg_opts.index(saved_bg) if saved_bg in bg_opts else 0
+        pdf_bg    = st.selectbox("🖼️ خلفية البطاقة", bg_opts,
+                                 index=bg_def,
+                                 format_func=lambda x: BG_LABELS.get(x,x),
+                                 key="pdf_bg_sel")
+        saved_style = r.get("style","luxury") or "luxury"
+        style_opts  = list(STYLE_LABELS.keys())
+        style_def   = style_opts.index(saved_style) if saved_style in style_opts else 0
+        pdf_style   = st.selectbox("🎭 الطابع", style_opts,
+                                   index=style_def,
+                                   format_func=lambda x: STYLE_LABELS.get(x,x),
+                                   key="pdf_style_sel")
+
+    socials = r.get("socials", {}) or {}
 
     if st.button("👁️ معاينة", use_container_width=True, key="btn_preview"):
         with st.spinner("🎨..."):
@@ -583,9 +601,9 @@ def pg_pdf(rs):
                     r.get("name","مطعم"), r.get("wifi_ssid","WiFi"),
                     r.get("wifi_password",""), FRONTEND_URL,
                     r.get("restaurant_id","1"), pv,
-                    r.get("style","luxury"), r.get("primary_color","#0a0804"),
+                    pdf_style, r.get("primary_color","#0a0804"),
                     r.get("accent_color","#C9A84C"),
-                    r.get("bg_type","minimal"), r.get("socials",{}),
+                    pdf_bg, socials,
                     pexels_key=PEXELS_KEY, unsplash_key=UNSPLASH_KEY,
                     pixabay_key=PIXABAY_KEY, photo_query=r.get("name",""))
                 st.session_state["prev_m"] = card_to_bytes(mi)
@@ -606,11 +624,15 @@ def pg_pdf(rs):
                     r.get("name","مطعم"), r.get("wifi_ssid","WiFi"),
                     r.get("wifi_password",""), FRONTEND_URL,
                     r.get("restaurant_id","1"), n,
-                    r.get("style","luxury"), r.get("primary_color","#0a0804"),
+                    pdf_style,                          # ← الطابع المختار
+                    r.get("primary_color","#0a0804"),
                     r.get("accent_color","#C9A84C"),
-                    r.get("bg_type","minimal"), r.get("socials",{}),
-                    pexels_key=PEXELS_KEY, unsplash_key=UNSPLASH_KEY,
-                    pixabay_key=PIXABAY_KEY, photo_query=r.get("name",""))
+                    pdf_bg,                             # ← الخلفية المختارة
+                    socials,
+                    pexels_key=PEXELS_KEY,
+                    unsplash_key=UNSPLASH_KEY,
+                    pixabay_key=PIXABAY_KEY,
+                    photo_query=r.get("name",""))
                 st.session_state["pg_pdf"] = pdf
                 st.session_state["pg_pdf_nm"] = r.get("name","")
                 st.session_state["pg_pdf_n"]  = n
