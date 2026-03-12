@@ -157,6 +157,19 @@ def fetch_all():
             padded = row + [''] * (len(headers) - len(row))
             rec = dict(zip(headers, padded))
             if rec.get("restaurant_id","").strip():
+                # فك تشفير socials من JSON
+                raw_soc = rec.get("socials","")
+                if raw_soc and raw_soc.strip().startswith("{"):
+                    try:
+                        import json as _json
+                        rec["socials"] = _json.loads(raw_soc)
+                    except:
+                        rec["socials"] = {}
+                else:
+                    rec["socials"] = {}
+                # قيمة افتراضية لـ bg_type
+                if not rec.get("bg_type","").strip():
+                    rec["bg_type"] = "minimal"
                 records.append(rec)
         return records
     except Exception as e:
