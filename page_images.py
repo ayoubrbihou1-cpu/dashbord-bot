@@ -14,6 +14,7 @@ from image_engine import (
     process_manual_upload, fetch_image,
     get_food_emoji, available_methods,
     fetch_multi_source_photos, available_sources,
+    fetch_pollinations, pollinations_available,
     _arabic_to_search,
     UNSPLASH_KEY, OPENAI_KEY, PEXELS_KEY, PIXABAY_KEY
 )
@@ -222,13 +223,15 @@ def page_images(restaurants: list):
 
     # Streamlit radio مخفي لتتبع الاختيار
     method_labels = {
-        "multi":    "🎯 اختر من 3 مصادر — الأفضل",
-        "unsplash": "🆓 Unsplash — مجاني",
-        "dalle":    "🤖 AI توليدي — DALL-E",
-        "manual":   "📸 رفع يدوي — صورك الخاصة",
+        "multi":         "🎯 اختر من 3 مصادر — الأفضل",
+        "pollinations":  "🎨 AI يولد صورة — الأفضل",
+        "unsplash":      "🆓 Unsplash — مجاني",
+        "dalle":         "🤖 AI توليدي — DALL-E",
+        "manual":        "📸 رفع يدوي — صورك الخاصة",
     }
     # إضافة multi كخيار دائم
-    all_methods = {"multi": True, **avail}
+    poll_ok, _ = pollinations_available()
+    all_methods = {"multi": True, "pollinations": poll_ok, **avail}
     available_keys = [k for k,v in all_methods.items() if v]
     display_labels = [method_labels[k] for k in available_keys]
 
@@ -251,6 +254,14 @@ def page_images(restaurants: list):
             "details": "يجلب صور من 3 مصادر في نفس الوقت — أنت تختار الأنسب لكل أكلة",
             "warning": "",
             "cost": "مجاني 100%",
+        },
+        "pollinations": {
+            "icon": "🎨",
+            "color": "#a78bfa",
+            "title": "Pollinations AI — يولد صور حصرية",
+            "details": "ذكاء اصطناعي يولد 5 صور احترافية خاصة بأكلتك — لا تجدها في أي مكان آخر",
+            "warning": "",
+            "cost": "1500 صورة/أسبوع مجاناً",
         },
         "unsplash": {
             "icon": "🆓",
@@ -400,6 +411,68 @@ def page_images(restaurants: list):
 
         else:
             st.warning("📭 لا توجد أكلات في هذا الصنف — أضف الأكلات أولاً")
+
+    # ─────────────────────────────────────────────────────
+    # PANEL P: POLLINATIONS AI
+    # ─────────────────────────────────────────────────────
+    elif selected_method == "pollinations":
+        st.markdown("#### 🎨 توليد صور AI — Pollinations")
+        st.markdown(
+            '<div style="color:#a78bfa;font-size:.85rem">🎨 يولد 5 صور حصرية لكل أكلة — AI يصمم لك صورة احترافية</div>',
+            unsafe_allow_html=True
+        )
+
+        if not items_from_sheet:
+            st.warning("📭 لا توجد أكلات — أضف الأكلات أولاً")
+        else:
+            item_names = [i.get("name","") for i in items_from_sheet if i.get("name")]
+            sel_item = st.selectbox("اختر الأكلة", item_names, key="poll_item_sel")
+            sel_obj  = next((i for i in items_from_sheet if i.get("name") == sel_item), {})
+
+            # اسم البحث — نستخدم الإنجليزي إذا توفر
+            search_name = sel_obj.get("name_en","") or sel_obj.get("name_fr","") or sel_item or ""
+
+            col_q, col_btn = st.columns([3, 1])
+            with col_q:
+                search_q = st.text_input(
+                    "✏️ وصف الصورة (إنجليزي)",
+                    value=search_name,
+                    key="poll_search_q",
+                    help="كلما كان الوصف أدق كانت الصورة أفضل"
+                )
+            with col_btn:
+                st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
+                gen_btn = st.button("🎨 توليد 5 صور", use_container_width=True, key="poll_gen_btn")
+
+            if gen_btn:
+                st.session_state.pop("_poll_photos", None)
+
+            if gen_btn or st.session_state.get("_poll_photos"):
+                if gen_btn:
+                    with st.spinner(f"🎨 يولد 5 صور لـ '{search_q}'... قد يستغرق 30 ثانية"):
+                        photos = fetch_pollinations(search_q, count=5)
+                        st.session_state["_poll_photos"] = photos
+                        st.session_state["_poll_item"]   = sel_obj
+                else:
+                    photos = st.session_state.get("_poll_photos", [])
+
+                if not photos:
+                    st.error("❌ فشل التوليد — حاول مرة أخرى")
+                else:
+                    st.markdown(f"### 🎨 اختر الأنسب لـ {sel_item}")
+                    cols = st.columns(min(len(photos), 5))
+                    for idx, photo in enumerate(photos):
+                        with cols[idx % 5]:
+                            st.image(photo["url"], use_container_width=True)
+                            if st.button("✅ اختر", key=f"poll_pick_{idx}", use_container_width=True):
+                                target = dict(st.session_state["_poll_item"])
+                                target["image_url"]    = photo["url"]
+                                target["image_credit"] = photo["credit"]
+                                updated = update_images_in_sheet(sheet_id, final_tab, [target])
+                                if updated:
+                                    st.success(f"✅ تم حفظ الصورة!")
+                                    st.session_state.pop("_poll_photos", None)
+                                    st.rerun()
 
     # ─────────────────────────────────────────────────────
     # PANEL A: UNSPLASH
