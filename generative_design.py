@@ -172,37 +172,70 @@ _FONTS_DIR  = os.path.join(_THIS_DIR, "fonts")
 
 # روابط تحميل Noto Naskh Arabic (Google Fonts CDN)
 _ARABIC_URLS = {
-    "bold": "https://github.com/google/fonts/raw/main/ofl/notonaskharabic/NotoNaskhArabic-Bold.ttf",
-    "reg":  "https://github.com/google/fonts/raw/main/ofl/notonaskharabic/NotoNaskhArabic-Regular.ttf",
+    "bold": [
+        "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notonaskharabic/NotoNaskhArabic-Bold.ttf",
+        "https://raw.githubusercontent.com/google/fonts/main/ofl/notonaskharabic/NotoNaskhArabic-Bold.ttf",
+        "https://github.com/google/fonts/raw/main/ofl/notonaskharabic/NotoNaskhArabic-Bold.ttf",
+    ],
+    "reg": [
+        "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notonaskharabic/NotoNaskhArabic-Regular.ttf",
+        "https://raw.githubusercontent.com/google/fonts/main/ofl/notonaskharabic/NotoNaskhArabic-Regular.ttf",
+        "https://github.com/google/fonts/raw/main/ofl/notonaskharabic/NotoNaskhArabic-Regular.ttf",
+    ],
 }
 _LATIN_URLS = {
-    "bold": "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf",
-    "reg":  "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Regular.ttf",
+    "bold": [
+        "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf",
+        "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf",
+    ],
+    "reg": [
+        "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf",
+        "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf",
+    ],
 }
 
+def _download_font(fname: str, urls: list) -> bool:
+    """يحاول تحميل الخط من قائمة روابط — يتوقف عند أول نجاح"""
+    dest = os.path.join(_FONTS_DIR, fname)
+    for url in urls:
+        try:
+            log.info(f"⬇️  تحميل {fname} من: {url}")
+            r = _requests.get(url, timeout=30, allow_redirects=True,
+                              headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code == 200 and len(r.content) > 10_000:
+                with open(dest, "wb") as fh:
+                    fh.write(r.content)
+                log.info(f"✅ تم تحميل: {fname} ({len(r.content)//1024} KB)")
+                return True
+            else:
+                log.warning(f"⚠️  {url} → status={r.status_code} size={len(r.content)}")
+        except Exception as e:
+            log.warning(f"⚠️  فشل {url}: {e}")
+    log.error(f"❌ فشل تحميل {fname} من كل الروابط!")
+    return False
+
 def _ensure_fonts():
-    """يحمّل الخطوط مرة واحدة عند أول استخدام"""
+    """يحمّل الخطوط مرة واحدة عند أول استخدام — مع fallback متعدد"""
     os.makedirs(_FONTS_DIR, exist_ok=True)
     targets = {
         "NotoNaskhArabic-Bold.ttf":    _ARABIC_URLS["bold"],
         "NotoNaskhArabic-Regular.ttf": _ARABIC_URLS["reg"],
+        "NotoSansArabic-Regular.ttf": [
+            "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf",
+            "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf",
+        ],
         "Poppins-Bold.ttf":            _LATIN_URLS["bold"],
         "Poppins-Regular.ttf":         _LATIN_URLS["reg"],
     }
     if not _HAS_REQUESTS:
+        log.warning("⚠️  requests غير متاح — لن تُحمَّل الخطوط")
         return
-    for fname, url in targets.items():
+    for fname, urls in targets.items():
         dest = os.path.join(_FONTS_DIR, fname)
         if not os.path.exists(dest):
-            try:
-                log.info(f"⬇️  تحميل خط: {fname}")
-                r = _requests.get(url, timeout=30)
-                if r.status_code == 200:
-                    with open(dest, "wb") as fh:
-                        fh.write(r.content)
-                    log.info(f"✅ تم تحميل: {fname}")
-            except Exception as e:
-                log.warning(f"⚠️  فشل تحميل {fname}: {e}")
+            _download_font(fname, urls)
+        else:
+            log.info(f"✔️  الخط موجود: {fname}")
 
 # تشغيل تحميل الخطوط فور import
 try:
@@ -220,6 +253,7 @@ def _find_font(bold=False, arabic=False):
             os.path.join(_FONTS_DIR, "NotoNaskhArabic-Bold.ttf")    if bold else
             os.path.join(_FONTS_DIR, "NotoNaskhArabic-Regular.ttf"),
             os.path.join(_FONTS_DIR, "NotoNaskhArabic-Bold.ttf"),
+            os.path.join(_FONTS_DIR, "NotoSansArabic-Regular.ttf"),
         ]
     else:
         local = [
@@ -233,11 +267,17 @@ def _find_font(bold=False, arabic=False):
     # ── 2. خطوط النظام (Ubuntu / Render) ──────────────────────────
     system_arabic = [
         "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf",
+        "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
         "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
         "/usr/share/fonts/opentype/noto/NotoNaskhArabic-Bold.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansArabic-Bold.ttf",
         "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf",
         "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        # مسارات إضافية على Render / Debian
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
     ]
     system_latin_bold = [
         "/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf",
