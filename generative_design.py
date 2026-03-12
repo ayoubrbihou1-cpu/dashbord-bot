@@ -478,7 +478,7 @@ _ICON_FUNCS = {
 def draw_social_bar(img: Image.Image, y_start: int,
                     socials: dict, accent: Tuple, fg: Tuple,
                     bg_color: Tuple) -> int:
-    """يرسم شريط مواقع التواصل الاجتماعي بأيقونات هندسية"""
+    """يرسم شريط مواقع التواصل الاجتماعي — مع دعم كامل للعربية"""
     if not socials:
         return y_start
 
@@ -489,16 +489,14 @@ def draw_social_bar(img: Image.Image, y_start: int,
 
     draw = ImageDraw.Draw(img)
 
-    # خط فاصل ذهبي
-    sep_col = blend(accent, fg, 0.3)
-    draw.line([MARGIN, y_start-5, CARD_W-MARGIN, y_start-5], fill=sep_col, width=1)
+    # خط فاصل ذهبي أنيق
+    sep_col = blend(accent, fg, 0.35)
+    draw.line([MARGIN + 20, y_start - 8, CARD_W - MARGIN - 20, y_start - 8],
+              fill=sep_col, width=1)
 
-    val_font   = get_font(18, bold=True)
-    label_font = get_font(14)
-
-    icon_r  = 20
-    item_w  = max(160, (CARD_W - MARGIN*2) // max(len(active), 1))
-    item_w  = min(item_w, 210)
+    icon_r  = 22
+    item_w  = max(150, (CARD_W - MARGIN * 2) // max(len(active), 1))
+    item_w  = min(item_w, 220)
     total_w = len(active) * item_w
     x_start = (CARD_W - total_w) // 2
 
@@ -506,32 +504,43 @@ def draw_social_bar(img: Image.Image, y_start: int,
         cfg  = SOCIAL_CONFIG[key]
         fn   = _ICON_FUNCS.get(key)
         cx   = x_start + i * item_w + item_w // 2
-        cy   = y_start + 30
+        cy   = y_start + 32
 
-        # دائرة خلفية — لون العلامة التجارية مباشرة (أوضح)
+        # دائرة خلفية ملونة
         brand_color = cfg["color"]
-        draw.ellipse([cx-icon_r-2, cy-icon_r-2, cx+icon_r+2, cy+icon_r+2],
-                     fill=brand_color, outline=blend(brand_color, (255,255,255), 0.2), width=1)
+        draw.ellipse([cx - icon_r - 3, cy - icon_r - 3,
+                      cx + icon_r + 3, cy + icon_r + 3],
+                     fill=brand_color)
+        draw.ellipse([cx - icon_r - 3, cy - icon_r - 3,
+                      cx + icon_r + 3, cy + icon_r + 3],
+                     outline=blend(brand_color, (255, 255, 255), 0.25), width=1)
 
-        # أيقونة
+        # رسم الأيقونة
         if fn:
             try:
-                fn(draw, cx, cy, icon_r, (255,255,255))
+                fn(draw, cx, cy, icon_r, (255, 255, 255))
             except:
                 pass
 
-        # قيمة
-        display = val[:16] + "…" if len(val) > 16 else val
-        vw, vh  = text_wh(draw, display, val_font)
-        draw.text((cx-vw//2, cy+icon_r+8), display, font=val_font, fill=accent)
+        # اسم المنصة (دائماً بالإنجليزية)
+        lbl       = cfg["label"]
+        lbl_font  = get_font(13, bold=True)
+        lw, lh    = text_wh(draw, lbl, lbl_font)
+        draw.text((cx - lw // 2, cy + icon_r + 6), lbl,
+                  font=lbl_font, fill=accent)
 
-        # label صغير
-        lbl  = cfg["label"]
-        lw, lh = text_wh(draw, lbl, label_font)
-        draw.text((cx-lw//2, cy+icon_r+8+vh+2), lbl,
-                  font=label_font, fill=blend(fg, bg_color, 0.4))
+        # قيمة المستخدم — دعم كامل للعربية
+        has_ar    = any('\u0600' <= c <= '\u06FF' for c in val)
+        val_fixed = fix_arabic(val) if has_ar else val
+        val_font  = get_font(15, bold=False, arabic=has_ar)
+        if len(val_fixed) > 14:
+            val_fixed = val_fixed[:14] + "..."
+        vw, vh    = text_wh(draw, val_fixed, val_font)
+        val_col   = blend(fg, bg_color, 0.2)
+        draw.text((cx - vw // 2, cy + icon_r + 6 + lh + 3), val_fixed,
+                  font=val_font, fill=val_col)
 
-    return y_start + icon_r*2 + 60
+    return y_start + icon_r * 2 + 72
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -1040,61 +1049,54 @@ def _render_food_photo_card(
     cta_line2: str = "MENU",
 ) -> Image.Image:
     """
-    تصميم Table Tent:
-    - الجزء العلوي (40%): لون + اسم المطعم + نجوم زخرفية
-    - الجزء السفلي (60%): صورة طعام + QR فوقها
+    تصميم Table Tent احترافي:
+    - الجزء العلوي (38%): هيدر داكن + اسم المطعم + شعار وزخارف
+    - الجزء السفلي (62%): صورة طعام + QR في المنتصف + بيانات منظمة
     """
     if socials is None:
         socials = {}
 
+    has_social   = bool(socials and any(v.strip() for v in socials.values()))
+    is_arabic    = any('\u0600' <= c <= '\u06FF' for c in name)
+    name_fixed   = fix_arabic(name)
+    fg           = auto_fg(primary)
+
+    # ── أبعاد المناطق ────────────────────────────────────
+    HEADER_H = int(CARD_H * 0.38)   # منطقة الهيدر
+    PHOTO_Y  = HEADER_H
+    SOC_H    = 90 if has_social else 0
+    PHOTO_H  = CARD_H - HEADER_H    # منطقة الصورة كاملة
+
     # ── الصورة الأساسية ──────────────────────────────────
     img  = Image.new("RGB", (CARD_W, CARD_H), primary)
-    fg   = auto_fg(primary)
-
-    HEADER_H = int(CARD_H * 0.42)
-    PHOTO_Y  = HEADER_H
-
-    # ── الجزء العلوي: لون المطعم ─────────────────────────
     draw = ImageDraw.Draw(img)
 
-    # تدرج خفيف في الهيدر
-    header_light = lighten(primary, 1.25)
+    # تدرج في الهيدر (من أفتح للأداكن)
+    header_light = lighten(primary, 1.3)
     for y in range(HEADER_H):
-        t = y / HEADER_H
-        col = blend(header_light, primary, t * 0.7)
+        t   = y / HEADER_H
+        col = blend(header_light, primary, t * 0.75)
         draw.line([(0, y), (CARD_W, y)], fill=col)
 
-    # ── الجزء السفلي: صورة طعام أو تدرج دافئ ───────────
+    # ── الجزء السفلي: صورة أو تدرج دافئ ────────────────
     if photo_bytes:
         try:
-            photo = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
-            # قص وتكبير لملء المنطقة
-            ph_target = (CARD_W, CARD_H - PHOTO_Y)
-            ph_ratio  = CARD_W / CARD_H
-            pw, ph    = photo.size
-            if pw / ph > ph_ratio:
-                new_h = ph_target[1]
-                new_w = int(pw * new_h / ph)
-            else:
-                new_w = ph_target[0]
-                new_h = int(ph * new_w / pw)
-            photo = photo.resize((new_w, new_h), Image.LANCZOS)
-            # crop center
-            px = (new_w - ph_target[0]) // 2
-            py = (new_h - ph_target[1]) // 2
-            photo = photo.crop((px, py, px+ph_target[0], py+ph_target[1]))
-            # طمس خفيف للحافة العليا (blend مع اللون الرئيسي)
-            fade_h = 80
-            for fy in range(fade_h):
-                alpha = 1 - (fy / fade_h)
-                for fx in range(0, CARD_W, 4):
-                    try:
-                        pc = photo.getpixel((fx, fy))
-                        bc = primary
-                        blended = blend(bc, pc, 1 - alpha * 0.8)
-                        photo.putpixel((fx, fy), blended)
-                    except:
-                        pass
+            photo    = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
+            ph_w, ph_h = photo.size
+            # ملء الجزء السفلي بالكامل
+            target_w, target_h = CARD_W, PHOTO_H
+            scale = max(target_w / ph_w, target_h / ph_h)
+            nw    = int(ph_w * scale)
+            nh    = int(ph_h * scale)
+            photo = photo.resize((nw, nh), Image.LANCZOS)
+            ox    = (nw - target_w) // 2
+            oy    = (nh - target_h) // 2
+            photo = photo.crop((ox, oy, ox + target_w, oy + target_h))
+
+            # تعتيم خفيف لتحسين قراءة النص فوق الصورة
+            overlay = Image.new("RGB", (CARD_W, target_h), (0, 0, 0))
+            photo   = Image.blend(photo, overlay, 0.30)
+
             img.paste(photo, (0, PHOTO_Y))
         except Exception as e:
             log.warning(f"Photo error: {e}")
@@ -1104,119 +1106,136 @@ def _render_food_photo_card(
 
     draw = ImageDraw.Draw(img)
 
-    # ── إطار أنيق ─────────────────────────────────────────
+    # ── إطار فاخر ─────────────────────────────────────────
     _frame_luxury(draw, accent, primary)
 
-    # خط فاصل ذهبي بين الهيدر والصورة
-    draw.rectangle([0, HEADER_H-3, CARD_W, HEADER_H+3], fill=accent)
+    # شريط ذهبي فاصل بين الهيدر والصورة
+    draw.rectangle([0, HEADER_H - 4, CARD_W, HEADER_H + 4], fill=accent)
 
-    # ── نصوص الهيدر ──────────────────────────────────────
-    is_arabic = any('\u0600' <= c <= '\u06FF' for c in name)
-    name_fixed = fix_arabic(name)
+    # ════════════════════════════════════════════════════
+    # HEADER — نصوص وزخارف الجزء العلوي
+    # ════════════════════════════════════════════════════
 
-    # نجوم زخرفية مرسومة (بدون unicode)
-    star_y = 32
-    for sx in [CARD_W//2 - 220, CARD_W//2 + 210]:
-        _draw_star(draw, sx, star_y + 10, 8, accent, points=4)
+    # نجوم زخرفية في أعلى الهيدر
+    star_y = 38
+    for sx in [CARD_W // 2 - 240, CARD_W // 2 + 230]:
+        _draw_star(draw, sx, star_y, 7, blend(accent, (255,255,255), 0.5), points=4)
 
-    # CTA line 1 (VIEW OUR / امسح لرؤية)
+    # سطر CTA صغير فوق الاسم
     if is_arabic:
-        l1, l2 = fix_arabic("امسح لرؤية"), fix_arabic("المنيو")
+        cta_small = fix_arabic("امسح لرؤية")
     else:
-        l1, l2 = cta_line1, cta_line2
+        cta_small = cta_line1  # e.g. "VIEW OUR"
 
-    l1_font = get_font(32, bold=False, arabic=is_arabic)
-    l1_w, l1_h = text_wh(draw, l1, l1_font)
-    draw.text((CARD_W//2 - l1_w//2, 28), l1, font=l1_font, fill=blend(fg, accent, 0.3))
+    cta_small_font = get_font(26, bold=False, arabic=is_arabic)
+    csw, csh       = text_wh(draw, cta_small, cta_small_font)
+    cta_y          = 30
+    # خط زخرفي على الجانبين
+    line_len = (CARD_W - csw - 80) // 2
+    line_y   = cta_y + csh // 2
+    draw.line([40, line_y, 40 + line_len, line_y],        fill=blend(accent, primary, 0.6), width=1)
+    draw.line([CARD_W - 40 - line_len, line_y, CARD_W - 40, line_y], fill=blend(accent, primary, 0.6), width=1)
+    draw.text((CARD_W // 2 - csw // 2, cta_y), cta_small,
+              font=cta_small_font, fill=blend(fg, accent, 0.4))
 
-    # اسم المطعم / MENU كبير
-    name_font, _ = auto_font_size(
-        name_fixed if is_arabic else l2,
-        CARD_W - 160, 90,
-        bold=True, arabic=is_arabic, max_s=88
+    # اسم المطعم — كبير وبارز في وسط الهيدر
+    name_max_w = CARD_W - 120
+    name_max_h = HEADER_H - csh - 80
+    name_font, name_sz = auto_font_size(
+        name_fixed, name_max_w, name_max_h,
+        bold=True, arabic=is_arabic, max_s=90, min_s=28
     )
-    target_text = name_fixed if is_arabic else l2
-    draw_center(draw, target_text, CARD_W//2, 28 + l1_h + 44,
-                name_font, fg, darken(fg, 0.6))
+    name_center_y = cta_y + csh + (HEADER_H - cta_y - csh - 35) // 2 + 8
+    shd_col       = darken(fg, 0.5) if fg == (255,255,255) else (150,150,150)
+    draw_center(draw, name_fixed, CARD_W // 2, name_center_y, name_font, fg, shd_col, 2)
 
-    # اسم المطعم صغير تحت (للنسخة غير العربية)
+    # سطر MENU / المنيو تحت الاسم (للإنجليزية)
     if not is_arabic:
-        sub_font, _ = auto_font_size(name_fixed, CARD_W - 200, 36,
-                                      bold=False, max_s=30)
-        draw_center(draw, name_fixed, CARD_W//2, HEADER_H - 28,
-                    sub_font, blend(fg, accent, 0.5))
+        l2_font = get_font(30, bold=False)
+        l2w, l2h = text_wh(draw, cta_line2, l2_font)
+        draw_center(draw, cta_line2, CARD_W // 2, HEADER_H - 28,
+                    l2_font, blend(fg, accent, 0.55))
 
-    # نجوم أسفل الهيدر (مرسومة)
-    for sx in [CARD_W//2 - 130, CARD_W//2, CARD_W//2 + 120]:
-        _draw_star(draw, sx, HEADER_H - 42, 6, accent, points=4)
+    # نجوم زخرفية أسفل الهيدر (خط صغير ونجوم)
+    bot_star_y = HEADER_H - 18
+    for sx in [CARD_W // 2 - 110, CARD_W // 2, CARD_W // 2 + 100]:
+        _draw_star(draw, sx, bot_star_y, 5, accent, points=4)
 
-    # ── QR ────────────────────────────────────────────────
-    has_social = bool(socials and any(v.strip() for v in socials.values()))
-    social_reserve = 100 if has_social else 0
-    photo_zone_h = CARD_H - PHOTO_Y
+    # ════════════════════════════════════════════════════
+    # PHOTO ZONE — QR + نصوص على الصورة
+    # ════════════════════════════════════════════════════
 
-    qr_size   = 290
-    qr_border = 16
+    # حساب الارتفاع المتاح للـ QR والنصوص (فوق شريط السوشيال)
+    available_h = PHOTO_H - SOC_H - 20
+    qr_size   = min(280, available_h - 100)   # QR يتكيّف مع المساحة
+    qr_border = 14
     total_qr  = qr_size + qr_border * 2 + 8
 
-    # نضع QR في المنتصف العلوي من الجزء السفلي لإفساح المجال
-    qr_center_y = PHOTO_Y + (photo_zone_h - social_reserve) // 2 - 20
-    qr_x = CARD_W//2 - total_qr//2
-    qr_y = qr_center_y - total_qr//2
+    # توسيط QR عمودياً في المنطقة المتاحة
+    qr_zone_h = available_h - 85   # مساحة للـ QR فقط (الباقي للنصوص أسفله)
+    qr_x      = CARD_W // 2 - total_qr // 2
+    qr_y      = PHOTO_Y + (qr_zone_h - total_qr) // 2 + 5
 
-    # ألوان QR: داكن على فاتح (ليُقرأ على الصورة)
-    qr_img = make_qr(qr_data, fg=(20,10,5), bg=(255,255,255), size=qr_size)
+    # ألوان QR: داكن على أبيض — قابل للقراءة دائماً
+    qr_img = make_qr(qr_data, fg=(15, 10, 5), bg=(255, 255, 255), size=qr_size)
 
-    # ظل ناعم خلف QR
-    shadow = Image.new("RGBA", (total_qr + 20, total_qr + 20), (0,0,0,120))
+    # ظل ناعم خلف إطار QR
+    shadow   = Image.new("RGBA", (total_qr + 24, total_qr + 24), (0, 0, 0, 140))
     img_rgba = img.convert("RGBA")
-    img_rgba.paste(shadow, (qr_x - 10, qr_y - 6), shadow)
-    img = img_rgba.convert("RGB")
-    draw = ImageDraw.Draw(img)
+    img_rgba.paste(shadow, (qr_x - 12, qr_y - 6), shadow)
+    img      = img_rgba.convert("RGB")
+    draw     = ImageDraw.Draw(img)
 
-    # إطار أبيض + ذهبي
+    # إطار ذهبي + أبيض حول QR
     framed = Image.new("RGB", (total_qr, total_qr), accent)
-    inner  = Image.new("RGB", (qr_size + 8, qr_size + 8), (255,255,255))
-    inner.paste(qr_img, (4,4))
+    inner  = Image.new("RGB", (qr_size + 8, qr_size + 8), (255, 255, 255))
+    inner.paste(qr_img, (4, 4))
     framed.paste(inner, (qr_border, qr_border))
     img.paste(framed, (qr_x, qr_y))
     draw = ImageDraw.Draw(img)
 
-    # ── نص تحت QR ────────────────────────────────────────
-    below_y = qr_y + total_qr + 12
+    # ── نصوص أسفل QR — منطقة معلومات ────────────────────
+    info_y = qr_y + total_qr + 10
+
+    # نص امسح / Scan
     if card_type == "menu":
-        scan_text = "امسح للطلب" if is_arabic else "Scan to Order"
+        scan_text = fix_arabic("امسح للطلب") if is_arabic else "Scan to Order"
     else:
-        scan_text = "WiFi" + (f" — {ssid}" if ssid else "")
+        scan_text_raw = f"WiFi{' — ' + ssid if ssid else ''}"
+        scan_text = fix_arabic(scan_text_raw) if is_arabic else scan_text_raw
 
-    scan_font = get_font(26, bold=True, arabic=is_arabic)
-    # خلفية شبه شفافة للنص (يُقرأ على الصورة)
-    sw, sh = text_wh(draw, fix_arabic(scan_text), scan_font)
-    pad = 12
+    scan_ar    = is_arabic or any('\u0600' <= c <= '\u06FF' for c in scan_text)
+    scan_font  = get_font(24, bold=True, arabic=scan_ar)
+    sw, sh     = text_wh(draw, scan_text, scan_font)
+    pad        = 14
+    # خلفية نص (شبه شفافة داكنة)
     draw.rounded_rectangle(
-        [CARD_W//2 - sw//2 - pad, below_y - 4,
-         CARD_W//2 + sw//2 + pad, below_y + sh + 8],
-        radius=8, fill=blend(primary, (0,0,0), 0.35)
+        [CARD_W // 2 - sw // 2 - pad, info_y - 4,
+         CARD_W // 2 + sw // 2 + pad, info_y + sh + 6],
+        radius=8, fill=(0, 0, 0, 180) if False else blend(primary, (0, 0, 0), 0.50)
     )
-    draw_center(draw, scan_text, CARD_W//2, below_y + sh//2, scan_font, accent)
+    draw_center(draw, scan_text, CARD_W // 2, info_y + sh // 2, scan_font, accent)
 
-    # رقم الطاولة
+    # رقم الطاولة — بادج ذهبي واضح
     tbl_font = get_font(22, bold=True)
     tbl_text = f"Table  {table_num}"
-    tbl_y    = below_y + sh + 22
+    tbl_y    = info_y + sh + 14
     tw, th   = text_wh(draw, tbl_text, tbl_font)
     draw.rounded_rectangle(
-        [CARD_W//2 - tw//2 - 14, tbl_y,
-         CARD_W//2 + tw//2 + 14, tbl_y + th + 10],
-        radius=6, fill=accent
+        [CARD_W // 2 - tw // 2 - 18, tbl_y,
+         CARD_W // 2 + tw // 2 + 18, tbl_y + th + 12],
+        radius=8, fill=accent
     )
-    draw.text((CARD_W//2 - tw//2, tbl_y + 5), tbl_text,
+    draw.text((CARD_W // 2 - tw // 2, tbl_y + 6), tbl_text,
               font=tbl_font, fill=auto_fg(accent))
 
-    # ── سوشيال ────────────────────────────────────────────
-    soc_y = CARD_H - 95
-    if socials and any(v.strip() for v in socials.values()):
-        draw_social_bar(img, soc_y, socials, accent, (255,255,255), primary)
+    # ── شريط السوشيال ─────────────────────────────────────
+    if has_social:
+        # شريط خلفية داكن شبه شفاف للسوشيال
+        soc_bg_y = CARD_H - SOC_H - 8
+        draw.rectangle([0, soc_bg_y - 4, CARD_W, CARD_H],
+                       fill=blend(primary, (0, 0, 0), 0.55))
+        draw_social_bar(img, soc_bg_y, socials, accent, (255, 255, 255), primary)
 
     return img
 
