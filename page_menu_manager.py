@@ -4,13 +4,15 @@
 ✅ كل مطعم له شيت خاص به — النظام يميز تلقائياً
 """
 import streamlit as st
+import logging
+log = logging.getLogger(__name__)
 import gspread
 import json
 import os
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
 from gemini_helper import gemini_text, gemini_vision, gemini_available
-from groq_helper import translate_batch_groq, translate_single_groq, groq_available
+from groq_helper import translate_batch_groq, translate_single_groq, groq_available, groq_vision, groq_vision_available
 
 load_dotenv()
 
@@ -610,7 +612,19 @@ Rules:
 Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
 {"items":[{"name":"dish name","price":40,"description":"","category":"الأطباق الرئيسية"}]}"""
 
-                        raw = gemini_vision(prompt, img_b64, mime, max_tokens=4000, temperature=0)
+                        # جرب Groq Vision أولاً (6 مفاتيح مجانية)
+                        # إذا فشل → Gemini كـ fallback
+                        groq_vis_ok, _ = groq_vision_available()
+                        try:
+                            if groq_vis_ok:
+                                raw = groq_vision(prompt, img_b64, mime, max_tokens=4000)
+                                st.info("⚡ تم التحليل بـ Groq Vision")
+                            else:
+                                raise RuntimeError("Groq غير متاح")
+                        except Exception as _groq_err:
+                            log.warning(f"Groq vision failed: {_groq_err} — falling back to Gemini")
+                            raw = gemini_vision(prompt, img_b64, mime, max_tokens=4000, temperature=0)
+                            st.info("🤖 تم التحليل بـ Gemini")
 
                         # تنظيف JSON من أي نص زائد
                         raw = raw.strip()
