@@ -829,46 +829,45 @@ def _draw_texts(draw, style, name, table_num, primary, acc, fg,
     if card_type == "menu":
         cta_text = "Scannez pour voir le menu"
         if is_arabic:
-            cta_text = fix_arabic("امسح للطلب من المنيو")
+            cta_text = fix_arabic("امسح للطلب")
     else:
         cta_text = "Scanner pour le WiFi"
 
     cta_is_ar = any('\u0600' <= c <= '\u06FF' for c in cta_text)
-    cta_font  = get_font(24, bold=True, arabic=cta_is_ar)
+    cta_font  = get_font(22, bold=True, arabic=cta_is_ar)
     cw, ch    = text_wh(draw, cta_text, cta_font)
 
     tbl_text  = f"Table  {table_num}"
-    tf        = get_font(22, bold=True)
+    tf        = get_font(20, bold=True)
     tw, th    = text_wh(draw, tbl_text, tf)
 
-    pad_x     = 24
-    pad_y     = 10
-    gap       = 7
-    strip_w   = max(cw + pad_x * 2, tw + pad_x * 2)
-    strip_h   = ch + th + gap + pad_y * 2
-    sx        = CARD_W // 2 - strip_w // 2
-    sy        = cta_y
+    pad_x   = 28
+    pad_top = 12
+    pad_bot = 12
+    gap     = 10
+    strip_w = max(cw + pad_x * 2, tw + pad_x * 2, 300)
+    strip_h = pad_top + ch + gap + th + pad_bot
+    sx      = CARD_W // 2 - strip_w // 2
+    sy      = cta_y
 
-    # خلفية معتمة تماماً — اللون الأساسي للبطاقة دائماً مقروء
+    # خلفية معتمة تماماً
     _rounded_rect(draw,
                   [sx, sy, sx + strip_w, sy + strip_h],
                   10, primary, acc, 2)
 
     # سطر CTA — لون الأكسنت
-    cta_col = acc if style != "bold" else auto_fg(primary)
-    draw_center(draw, cta_text,
-                CARD_W // 2, sy + pad_y + ch // 2,
-                cta_font, cta_col)
+    cta_col  = acc if style != "bold" else auto_fg(primary)
+    cta_cy   = sy + pad_top + ch // 2
+    draw_center(draw, cta_text, CARD_W // 2, cta_cy, cta_font, cta_col)
 
-    # فاصل خفيف
-    fsep_y = sy + pad_y + ch + gap // 2
-    draw.line([sx + 16, fsep_y, sx + strip_w - 16, fsep_y],
-              fill=blend(acc, primary, 0.55), width=1)
+    # فاصل ذهبي
+    fsep_y = sy + pad_top + ch + gap // 2
+    draw.line([sx + 20, fsep_y, sx + strip_w - 20, fsep_y],
+              fill=blend(acc, primary, 0.5), width=1)
 
-    # رقم الطاولة — fg واضح
-    draw_center(draw, tbl_text,
-                CARD_W // 2, sy + pad_y + ch + gap + th // 2,
-                tf, fg)
+    # رقم الطاولة
+    tbl_cy = sy + pad_top + ch + gap + th // 2
+    draw_center(draw, tbl_text, CARD_W // 2, tbl_cy, tf, fg)
 
     # ── WiFi info ────────────────────────────────────────────────
     if card_type == "wifi" and ssid:
@@ -1218,44 +1217,41 @@ def _render_food_photo_card(
         scan_text = fix_arabic(scan_text_raw) if is_arabic else scan_text_raw
 
     scan_ar   = is_arabic or any('\u0600' <= c <= '\u06FF' for c in scan_text)
-    scan_font = get_font(26, bold=True, arabic=scan_ar)
+    scan_font = get_font(22, bold=True, arabic=scan_ar)
     sw, sh    = text_wh(draw, scan_text, scan_font)
 
-    tbl_font  = get_font(22, bold=True)
+    tbl_font  = get_font(20, bold=True)
     tbl_text  = f"Table  {table_num}"
     tw, th    = text_wh(draw, tbl_text, tbl_font)
 
-    pad_x  = 22
-    pad_y  = 10
-    gap    = 8
-    # عرض الشريط يكفي النصين
+    pad_x   = 28
+    pad_top = 12
+    pad_bot = 12
+    gap     = 10
     strip_w = max(sw + pad_x * 2, tw + pad_x * 2, total_qr)
-    strip_h = sh + th + gap + pad_y * 2
+    strip_h = pad_top + sh + gap + th + pad_bot
     strip_x = CARD_W // 2 - strip_w // 2
     strip_y = info_y
 
-    # ── شريط خلفية معتمة تماماً (لون البطاقة الرئيسي) ──────
+    # شريط خلفية معتمة تماماً
     draw.rounded_rectangle(
         [strip_x, strip_y, strip_x + strip_w, strip_y + strip_h],
-        radius=10,
-        fill=primary,
-        outline=accent,
-        width=2,
+        radius=10, fill=primary, outline=accent, width=2,
     )
 
-    # سطر "امسح للطلب" / Scan — بالأكسنت الذهبي
+    # سطر "امسح للطلب" — أكسنت ذهبي
     draw_center(draw, scan_text,
-                CARD_W // 2, strip_y + pad_y + sh // 2,
+                CARD_W // 2, strip_y + pad_top + sh // 2,
                 scan_font, accent)
 
-    # فاصل خفيف بين السطرين
-    sep_y = strip_y + pad_y + sh + gap // 2
+    # فاصل
+    sep_y = strip_y + pad_top + sh + gap // 2
     draw.line([strip_x + 20, sep_y, strip_x + strip_w - 20, sep_y],
               fill=blend(accent, primary, 0.6), width=1)
 
-    # رقم الطاولة — أبيض / fg
+    # رقم الطاولة
     draw_center(draw, tbl_text,
-                CARD_W // 2, strip_y + pad_y + sh + gap + th // 2,
+                CARD_W // 2, strip_y + pad_top + sh + gap + th // 2,
                 tbl_font, fg)
 
     # ── شريط السوشيال ─────────────────────────────────────
