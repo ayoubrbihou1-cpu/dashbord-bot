@@ -824,38 +824,51 @@ def _draw_texts(draw, style, name, table_num, primary, acc, fg,
         for rx in range(lx-ll//2, lx+ll//2, 16):
             draw.line([rx, deco_y, rx+10, deco_y], fill=acc, width=2)
 
-    # ── CTA تحت QR ──────────────────────────────────────────────
-    cta_y = qr_y + qr_total + 16
+    # ── CTA + رقم الطاولة — شريط واضح دائماً تحت QR ─────────────
+    cta_y = qr_y + qr_total + 10
     if card_type == "menu":
-        cta_text = "Scannez pour commander" if style != "luxury" else "Scannez pour voir le menu"
+        cta_text = "Scannez pour voir le menu"
         if is_arabic:
             cta_text = fix_arabic("امسح للطلب من المنيو")
     else:
         cta_text = "Scanner pour le WiFi"
 
     cta_is_ar = any('\u0600' <= c <= '\u06FF' for c in cta_text)
-    cta_font = get_font(23, bold=(style in ("bold","neon")), arabic=cta_is_ar)
-    cta_col  = acc if style != "bold" else auto_fg(primary)
-    draw_center(draw, cta_text, CARD_W//2, cta_y, cta_font, cta_col)
+    cta_font  = get_font(24, bold=True, arabic=cta_is_ar)
+    cw, ch    = text_wh(draw, cta_text, cta_font)
 
-    # ── رقم الطاولة ─────────────────────────────────────────────
-    tbl_text = f"Table  {table_num}"
-    tbl_y    = cta_y + 50
+    tbl_text  = f"Table  {table_num}"
+    tf        = get_font(22, bold=True)
+    tw, th    = text_wh(draw, tbl_text, tf)
 
-    if style == "bold":
-        tf = get_font(30, bold=True)
-        draw_center(draw, tbl_text, CARD_W//2, CARD_H-34, tf, auto_fg(darken(acc,0.7)))
-    elif style == "luxury":
-        tf = get_font(28, bold=True)
-        draw_center(draw, tbl_text, CARD_W//2, min(tbl_y, bottom_safe-18), tf, fg)
-    else:
-        tf = get_font(24, bold=True)
-        tf_c = auto_fg(acc)
-        tw, th = text_wh(draw, tbl_text, tf)
-        bx = CARD_W//2 - tw//2 - 18
-        by = min(tbl_y-8, bottom_safe-46)
-        _rounded_rect(draw, [bx, by, bx+tw+36, by+th+16], 12, acc)
-        draw.text((bx+18, by+8), tbl_text, font=tf, fill=tf_c)
+    pad_x     = 24
+    pad_y     = 10
+    gap       = 7
+    strip_w   = max(cw + pad_x * 2, tw + pad_x * 2)
+    strip_h   = ch + th + gap + pad_y * 2
+    sx        = CARD_W // 2 - strip_w // 2
+    sy        = cta_y
+
+    # خلفية معتمة تماماً — اللون الأساسي للبطاقة دائماً مقروء
+    _rounded_rect(draw,
+                  [sx, sy, sx + strip_w, sy + strip_h],
+                  radius=10, fill=primary, outline=acc, width=2)
+
+    # سطر CTA — لون الأكسنت
+    cta_col = acc if style != "bold" else auto_fg(primary)
+    draw_center(draw, cta_text,
+                CARD_W // 2, sy + pad_y + ch // 2,
+                cta_font, cta_col)
+
+    # فاصل خفيف
+    fsep_y = sy + pad_y + ch + gap // 2
+    draw.line([sx + 16, fsep_y, sx + strip_w - 16, fsep_y],
+              fill=blend(acc, primary, 0.55), width=1)
+
+    # رقم الطاولة — fg واضح
+    draw_center(draw, tbl_text,
+                CARD_W // 2, sy + pad_y + ch + gap + th // 2,
+                tf, fg)
 
     # ── WiFi info ────────────────────────────────────────────────
     if card_type == "wifi" and ssid:
@@ -1194,40 +1207,56 @@ def _render_food_photo_card(
     img.paste(framed, (qr_x, qr_y))
     draw = ImageDraw.Draw(img)
 
-    # ── نصوص أسفل QR — منطقة معلومات ────────────────────
-    info_y = qr_y + total_qr + 10
+    # ── نصوص أسفل QR — شريط معلومات واضح دائماً ───────────
+    info_y = qr_y + total_qr + 8
 
     # نص امسح / Scan
     if card_type == "menu":
         scan_text = fix_arabic("امسح للطلب") if is_arabic else "Scan to Order"
     else:
-        scan_text_raw = f"WiFi{' — ' + ssid if ssid else ''}"
+        scan_text_raw = f"WiFi  {ssid}" if ssid else "WiFi"
         scan_text = fix_arabic(scan_text_raw) if is_arabic else scan_text_raw
 
-    scan_ar    = is_arabic or any('\u0600' <= c <= '\u06FF' for c in scan_text)
-    scan_font  = get_font(24, bold=True, arabic=scan_ar)
-    sw, sh     = text_wh(draw, scan_text, scan_font)
-    pad        = 14
-    # خلفية نص (شبه شفافة داكنة)
-    draw.rounded_rectangle(
-        [CARD_W // 2 - sw // 2 - pad, info_y - 4,
-         CARD_W // 2 + sw // 2 + pad, info_y + sh + 6],
-        radius=8, fill=(0, 0, 0, 180) if False else blend(primary, (0, 0, 0), 0.50)
-    )
-    draw_center(draw, scan_text, CARD_W // 2, info_y + sh // 2, scan_font, accent)
+    scan_ar   = is_arabic or any('\u0600' <= c <= '\u06FF' for c in scan_text)
+    scan_font = get_font(26, bold=True, arabic=scan_ar)
+    sw, sh    = text_wh(draw, scan_text, scan_font)
 
-    # رقم الطاولة — بادج ذهبي واضح
-    tbl_font = get_font(22, bold=True)
-    tbl_text = f"Table  {table_num}"
-    tbl_y    = info_y + sh + 14
-    tw, th   = text_wh(draw, tbl_text, tbl_font)
+    tbl_font  = get_font(22, bold=True)
+    tbl_text  = f"Table  {table_num}"
+    tw, th    = text_wh(draw, tbl_text, tbl_font)
+
+    pad_x  = 22
+    pad_y  = 10
+    gap    = 8
+    # عرض الشريط يكفي النصين
+    strip_w = max(sw + pad_x * 2, tw + pad_x * 2, total_qr)
+    strip_h = sh + th + gap + pad_y * 2
+    strip_x = CARD_W // 2 - strip_w // 2
+    strip_y = info_y
+
+    # ── شريط خلفية معتمة تماماً (لون البطاقة الرئيسي) ──────
     draw.rounded_rectangle(
-        [CARD_W // 2 - tw // 2 - 18, tbl_y,
-         CARD_W // 2 + tw // 2 + 18, tbl_y + th + 12],
-        radius=8, fill=accent
+        [strip_x, strip_y, strip_x + strip_w, strip_y + strip_h],
+        radius=10,
+        fill=primary,
+        outline=accent,
+        width=2,
     )
-    draw.text((CARD_W // 2 - tw // 2, tbl_y + 6), tbl_text,
-              font=tbl_font, fill=auto_fg(accent))
+
+    # سطر "امسح للطلب" / Scan — بالأكسنت الذهبي
+    draw_center(draw, scan_text,
+                CARD_W // 2, strip_y + pad_y + sh // 2,
+                scan_font, accent)
+
+    # فاصل خفيف بين السطرين
+    sep_y = strip_y + pad_y + sh + gap // 2
+    draw.line([strip_x + 20, sep_y, strip_x + strip_w - 20, sep_y],
+              fill=blend(accent, primary, 0.6), width=1)
+
+    # رقم الطاولة — أبيض / fg
+    draw_center(draw, tbl_text,
+                CARD_W // 2, strip_y + pad_y + sh + gap + th // 2,
+                tbl_font, fg)
 
     # ── شريط السوشيال ─────────────────────────────────────
     if has_social:
