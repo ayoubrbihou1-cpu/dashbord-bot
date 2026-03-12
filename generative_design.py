@@ -842,9 +842,9 @@ def _draw_texts(draw, style, name, table_num, primary, acc, fg,
     tw, th    = text_wh(draw, tbl_text, tf)
 
     pad_x   = 28
-    pad_top = 12
-    pad_bot = 12
-    gap     = 10
+    pad_top = 16
+    pad_bot = 16
+    gap     = 14
     strip_w = max(cw + pad_x * 2, tw + pad_x * 2, 300)
     strip_h = pad_top + ch + gap + th + pad_bot
     sx      = CARD_W // 2 - strip_w // 2
@@ -856,13 +856,13 @@ def _draw_texts(draw, style, name, table_num, primary, acc, fg,
                   10, primary, acc, 2)
 
     # سطر CTA — لون الأكسنت
-    cta_col  = acc if style != "bold" else auto_fg(primary)
-    cta_cy   = sy + pad_top + ch // 2
+    cta_col = acc if style != "bold" else auto_fg(primary)
+    cta_cy  = sy + pad_top + ch // 2
     draw_center(draw, cta_text, CARD_W // 2, cta_cy, cta_font, cta_col)
 
     # فاصل ذهبي
     fsep_y = sy + pad_top + ch + gap // 2
-    draw.line([sx + 20, fsep_y, sx + strip_w - 20, fsep_y],
+    draw.line([sx + 24, fsep_y, sx + strip_w - 24, fsep_y],
               fill=blend(acc, primary, 0.5), width=1)
 
     # رقم الطاولة
@@ -1225,9 +1225,9 @@ def _render_food_photo_card(
     tw, th    = text_wh(draw, tbl_text, tbl_font)
 
     pad_x   = 28
-    pad_top = 12
-    pad_bot = 12
-    gap     = 10
+    pad_top = 16
+    pad_bot = 16
+    gap     = 14
     strip_w = max(sw + pad_x * 2, tw + pad_x * 2, total_qr)
     strip_h = pad_top + sh + gap + th + pad_bot
     strip_x = CARD_W // 2 - strip_w // 2
@@ -1239,19 +1239,21 @@ def _render_food_photo_card(
         radius=10, fill=primary, outline=accent, width=2,
     )
 
-    # سطر "امسح للطلب" — أكسنت ذهبي
+    # سطر "امسح للطلب" — وسط السطر الأول
+    line1_center_y = strip_y + pad_top + sh // 2
     draw_center(draw, scan_text,
-                CARD_W // 2, strip_y + pad_top + sh // 2,
+                CARD_W // 2, line1_center_y,
                 scan_font, accent)
 
-    # فاصل
+    # فاصل — بين السطرين
     sep_y = strip_y + pad_top + sh + gap // 2
-    draw.line([strip_x + 20, sep_y, strip_x + strip_w - 20, sep_y],
-              fill=blend(accent, primary, 0.6), width=1)
+    draw.line([strip_x + 24, sep_y, strip_x + strip_w - 24, sep_y],
+              fill=blend(accent, primary, 0.5), width=1)
 
-    # رقم الطاولة
+    # رقم الطاولة — وسط السطر الثاني
+    line2_center_y = strip_y + pad_top + sh + gap + th // 2
     draw_center(draw, tbl_text,
-                CARD_W // 2, strip_y + pad_top + sh + gap + th // 2,
+                CARD_W // 2, line2_center_y,
                 tbl_font, fg)
 
     # ── شريط السوشيال ─────────────────────────────────────
