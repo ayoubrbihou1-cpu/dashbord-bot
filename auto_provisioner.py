@@ -73,7 +73,7 @@ MENU_TABS = {
 MASTER_HEADERS = [
     "restaurant_id","name","sheet_id","telegram_chat_id",
     "wifi_ssid","wifi_password","primary_color","accent_color",
-    "style","num_tables","logo_url","owner_email","status","created_at"
+    "style","bg_type","socials","num_tables","logo_url","owner_email","status","created_at"
 ]
 
 def _fmt_header(spread, ws, color):
