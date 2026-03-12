@@ -202,3 +202,91 @@ def translate_single_groq(name: str) -> tuple:
     """
     results = translate_batch_groq([name])
     return results[0] if results else ("", "", "")
+
+
+# ══════════════════════════════════════════════════════════════════
+# 📸 تحليل صور المينيو بـ Groq Vision
+# ══════════════════════════════════════════════════════════════════
+
+GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
+def _call_groq_vision(key: str, prompt: str, image_b64: str, mime_type: str, max_tokens: int) -> str | None:
+    """استدعاء Groq Vision بمفتاح محدد"""
+    try:
+        resp = requests.post(
+            GROQ_URL,
+            headers={
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": GROQ_VISION_MODEL,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_b64}"
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ]
+                }],
+                "max_tokens": max_tokens,
+                "temperature": 0
+            },
+            timeout=60
+        )
+
+        if resp.status_code == 200:
+            return resp.json()["choices"][0]["message"]["content"].strip()
+
+        if resp.status_code == 429:
+            log.warning(f"Groq vision rate limit — switching to next key")
+            time.sleep(1)
+            return None
+
+        if resp.status_code == 503:
+            time.sleep(2)
+            return None
+
+        log.error(f"Groq vision error {resp.status_code}: {resp.text[:300]}")
+        return None
+
+    except Exception as e:
+        log.warning(f"Groq vision failed: {e}")
+        return None
+
+
+def groq_vision(prompt: str, image_b64: str, mime_type: str = "image/jpeg", max_tokens: int = 4000) -> str:
+    """
+    تحليل صورة المينيو باستخدام Groq Vision
+    مع دوران تلقائي على 6 مفاتيح
+    """
+    keys = _get_keys()
+    if not keys:
+        raise RuntimeError("❌ لا يوجد GROQ_API_KEY في المتغيرات البيئية")
+
+    for attempt in range(2):
+        for i, key in enumerate(keys):
+            log.info(f"Trying Groq vision key {i+1}/{len(keys)} (attempt {attempt+1})")
+            result = _call_groq_vision(key, prompt, image_b64, mime_type, max_tokens)
+            if result is not None:
+                return result
+        if attempt == 0:
+            log.warning("All Groq vision keys exhausted — waiting 30 seconds...")
+            time.sleep(30)
+
+    raise RuntimeError(f"❌ كل مفاتيح Groq ({len(keys)}) فشلت في تحليل الصورة")
+
+
+def groq_vision_available() -> tuple:
+    """يتحقق من توفر Groq Vision"""
+    keys = _get_keys()
+    if not keys:
+        return False, "لا يوجد GROQ_API_KEY"
+    return True, f"{len(keys)} مفتاح متاح"
