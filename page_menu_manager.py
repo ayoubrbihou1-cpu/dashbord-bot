@@ -10,6 +10,7 @@ import os
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
 from gemini_helper import gemini_text, gemini_vision, gemini_available
+from groq_helper import translate_batch_groq, translate_single_groq, groq_available
 
 load_dotenv()
 
@@ -483,7 +484,9 @@ def page_menu_manager(restaurants: list):
                 st.error("❌ أدخل سعراً صحيحاً")
             else:
                 # إذا لم يدخل المستخدم الترجمة يدوياً — يترجم تلقائياً
-                _ar3, _fr3, _en3 = translate_three_languages(n_name.strip())
+                groq_ok3, _ = groq_available()
+                _ar3, _fr3, _en3 = (translate_single_groq(n_name.strip()) 
+                    if groq_ok3 else translate_three_languages(n_name.strip()))
                 final_fr = n_name_fr.strip() or _fr3
                 final_en = n_name_en.strip() or _en3
                 final_ar = _ar3 if _ar3 else n_name.strip()
@@ -686,7 +689,12 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
 
                             # ترجمة كل الأسماء في استدعاء Gemini واحد فقط
                             names_list = [item_data["name"].strip() for _, item_data in valid_items]
-                            translations = translate_batch(names_list)
+                            # Groq للترجمة — أسرع وأوفر لـ Gemini
+                            groq_ok, _ = groq_available()
+                            if groq_ok:
+                                translations = translate_batch_groq(names_list)
+                            else:
+                                translations = translate_batch(names_list)
 
                             # تجميع حسب الصنف
                             by_tab = defaultdict(list)
@@ -747,7 +755,9 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
                 if not price_.replace(".","").isdigit():
                     errors.append(f"⚠️ سعر غير صحيح: {line[:40]}")
                     continue
-                _ar, _fr, _en = translate_three_languages(name_)
+                groq_ok_b, _ = groq_available()
+                _ar, _fr, _en = (translate_single_groq(name_) 
+                    if groq_ok_b else translate_three_languages(name_))
                 _main = _ar if _ar else name_
                 ok = add_item(sheet_id, tab_sel, {
                     "name": _main, "name_fr": _fr, "name_en": _en,
