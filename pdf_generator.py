@@ -75,7 +75,8 @@ def generate_table_tents_pdf(
         )
         c.setFont("Helvetica", 7)
         c.setFillColorRGB(0.5, 0.5, 0.5)
-        c.drawString(5*mm, 4*mm, f"T{table_num} | Menu QR | {restaurant_name}")
+        # استخدام رقم الطاولة فقط في الـ footer (Helvetica لا يدعم العربية)
+        c.drawString(5*mm, 4*mm, f"T{table_num} | Menu QR | #{table_num}")
         c.showPage()
 
         # ── الصفحة 2: QR WiFi ────────────────────────────────
@@ -93,7 +94,7 @@ def generate_table_tents_pdf(
         )
         c.setFont("Helvetica", 7)
         c.setFillColorRGB(0.5, 0.5, 0.5)
-        c.drawString(5*mm, 4*mm, f"T{table_num} | WiFi QR | {restaurant_name}")
+        c.drawString(5*mm, 4*mm, f"T{table_num} | WiFi QR | #{table_num}")
 
         if table_num < num_tables:
             c.showPage()
