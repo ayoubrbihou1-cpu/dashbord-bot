@@ -466,19 +466,20 @@ def page_images(restaurants: list):
                     st.error("❌ فشل التوليد — حاول مرة أخرى")
                 else:
                     st.markdown(f"### 🎨 الصورة المولّدة لـ {sel_item}")
-                    cols = st.columns(min(len(photos), 5))
                     for idx, photo in enumerate(photos):
-                        with cols[idx % 5]:
-                            st.image(photo["url"], use_container_width=True)
-                            if st.button("✅ اختر", key=f"poll_pick_{idx}", use_container_width=True):
-                                target = dict(st.session_state["_poll_item"])
-                                target["image_url"]    = photo["url"]
-                                target["image_credit"] = photo["credit"]
-                                updated = update_images_in_sheet(sheet_id, final_tab, [target])
-                                if updated:
-                                    st.success(f"✅ تم حفظ الصورة!")
-                                    st.session_state.pop("_poll_photos", None)
-                                    st.rerun()
+                        # عرض الصورة من bytes إذا متوفرة وإلا من URL
+                        img_src = photo.get("bytes") or photo.get("url")
+                        st.image(img_src, use_container_width=True)
+                        if st.button("✅ اختر هذه الصورة", key=f"poll_pick_{idx}", use_container_width=True):
+                            target = dict(st.session_state["_poll_item"])
+                            target["image_url"]    = photo["url"]
+                            target["image_credit"] = photo["credit"]
+                            updated = update_images_in_sheet(sheet_id, final_tab, [target])
+                            if updated:
+                                st.success(f"✅ تم حفظ الصورة لـ {sel_item}!")
+                                st.session_state.pop("_poll_photos", None)
+                                st.session_state.pop("_poll_prev_item", None)
+                                st.rerun()
 
     # ─────────────────────────────────────────────────────
     # PANEL A: UNSPLASH
