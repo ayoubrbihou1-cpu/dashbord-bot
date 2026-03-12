@@ -442,15 +442,15 @@ def page_images(restaurants: list):
                 )
             with col_btn:
                 st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
-                gen_btn = st.button("🎨 توليد 5 صور", use_container_width=True, key="poll_gen_btn")
+                gen_btn = st.button("🎨 توليد صورة", use_container_width=True, key="poll_gen_btn")
 
             if gen_btn:
                 st.session_state.pop("_poll_photos", None)
 
             if gen_btn or st.session_state.get("_poll_photos"):
                 if gen_btn:
-                    with st.spinner(f"🎨 يولد 5 صور لـ '{search_q}'... قد يستغرق 30 ثانية"):
-                        photos = fetch_pollinations(search_q, count=5)
+                    with st.spinner(f"🎨 يولد صورة لـ '{search_q}'... قد يستغرق 60 ثانية"):
+                        photos = fetch_pollinations(search_q, count=1)
                         st.session_state["_poll_photos"] = photos
                         st.session_state["_poll_item"]   = sel_obj
                 else:
@@ -459,7 +459,7 @@ def page_images(restaurants: list):
                 if not photos:
                     st.error("❌ فشل التوليد — حاول مرة أخرى")
                 else:
-                    st.markdown(f"### 🎨 اختر الأنسب لـ {sel_item}")
+                    st.markdown(f"### 🎨 الصورة المولّدة لـ {sel_item}")
                     cols = st.columns(min(len(photos), 5))
                     for idx, photo in enumerate(photos):
                         with cols[idx % 5]:
