@@ -75,8 +75,35 @@ def fetch_pollinations(name: str, count: int = 1) -> list:
     """
     results = []
 
-    # prompt احترافي للأكلة المغربية
-    base_prompt = f"professional food photography of {name}, moroccan restaurant dish, appetizing, high resolution, natural lighting, top view, no text"
+    # prompt احترافي خاص بالأكل المغربي
+    # نضيف كلمات تجعل الصورة أقرب للحقيقة
+    name_lower = name.lower()
+
+    # تحديد نوع الطبق لإضافة تفاصيل دقيقة
+    if any(w in name_lower for w in ["tajine", "tagine", "طاجين"]):
+        style = "moroccan clay tagine pot with conical lid, traditional moroccan spices, preserved lemon, olives, tender meat"
+    elif any(w in name_lower for w in ["couscous", "كسكس"]):
+        style = "moroccan couscous in large traditional plate, vegetables, chickpeas, meat on top, colorful"
+    elif any(w in name_lower for w in ["pastilla", "bastilla", "بسطيلة"]):
+        style = "moroccan pastilla pie, flaky phyllo dough, powdered sugar, cinnamon pattern on top"
+    elif any(w in name_lower for w in ["harira", "حريرة"]):
+        style = "moroccan harira soup in bowl, tomato broth, lemon wedge, herbs"
+    elif any(w in name_lower for w in ["brochette", "skewer", "مشوي", "brochettes"]):
+        style = "moroccan grilled skewers on charcoal grill, spiced meat, herbs"
+    elif any(w in name_lower for w in ["sandwich"]):
+        style = "moroccan sandwich with vegetables and meat, fresh bread"
+    elif any(w in name_lower for w in ["salade", "salad", "سلطة"]):
+        style = "fresh moroccan salad in white plate, colorful vegetables"
+    elif any(w in name_lower for w in ["omelette", "بيض"]):
+        style = "moroccan omelette in cast iron pan, herbs, tomatoes"
+    else:
+        style = "traditional moroccan dish served in authentic moroccan tableware"
+
+    base_prompt = (
+        f"professional food photography of {name}, {style}, "
+        "shot on dark stone background, restaurant quality, appetizing, "
+        "high resolution, natural warm lighting, close up shot, no text, no watermark"
+    )
     encoded = requests.utils.quote(base_prompt)
 
     headers = {}
