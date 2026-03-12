@@ -22,7 +22,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from auto_provisioner import provision_restaurant, ProvisionResult, build_reg_link
-from generative_design import generate_table_card, card_to_bytes
+from generative_design import generate_table_card, card_to_bytes, STYLE_LABELS, BG_LABELS, SOCIAL_CONFIG
 from pdf_generator import generate_table_tents_pdf, generate_single_table_preview
 from page_images import page_images
 from page_menu_manager import page_menu_manager
@@ -302,23 +302,58 @@ def pg_add(rs):
             📧 <b>Gmail:</b> يرسل تلقائياً إذا أضفت GMAIL_USER في المتغيرات
             </div>""", unsafe_allow_html=True)
 
-    defs = {"luxury":("#0a0804","#C9A84C"),"modern":("#121212","#00DCB4"),"classic":("#fcf8ee","#8B4513")}
+    defs = {
+        "luxury":  ("#0a0804","#C9A84C"),
+        "modern":  ("#121212","#00DCB4"),
+        "classic": ("#fcf8ee","#8B4513"),
+        "bold":    ("#1a0a00","#FF6B35"),
+        "neon":    ("#050510","#00FF88"),
+        "rustic":  ("#2d1b0a","#D4A853"),
+    }
     with t2:
         c1,c2 = st.columns(2)
         with c1:
-            rstyle   = st.selectbox("🎭 الطابع", ["luxury","modern","classic"],
-                format_func=lambda x:{"luxury":"✨ فاخر","modern":"⚡ عصري","classic":"🏛️ كلاسيكي"}[x])
-            dp, da   = defs[rstyle]
+            rstyle   = st.selectbox("🎭 الطابع",
+                list(STYLE_LABELS.keys()),
+                format_func=lambda x: STYLE_LABELS.get(x, x))
+            dp, da   = defs.get(rstyle, ("#0a0804","#C9A84C"))
             rprimary = st.color_picker("🎨 اللون الأساسي", dp)
             raccent  = st.color_picker("✨ لون التمييز", da)
+            rbg_type = st.selectbox("🖼️ خلفية البطاقة",
+                list(BG_LABELS.keys()),
+                format_func=lambda x: BG_LABELS.get(x, x))
         with c2:
             st.markdown("##### 👁️ معاينة")
             st.markdown(f"""<div style="background:{rprimary};border:2px solid {raccent};
               border-radius:12px;padding:1.5rem;text-align:center;margin-top:.5rem">
               <div style="color:{raccent};font-size:1.2rem;font-weight:900">
                 {rname or "اسم المطعم"}</div>
-              <div style="color:{raccent};opacity:.5;font-size:.8rem;margin-top:.4rem">{rstyle}</div>
+              <div style="color:{raccent};opacity:.5;font-size:.8rem;margin-top:.4rem">
+                {STYLE_LABELS.get(rstyle,rstyle)} · {BG_LABELS.get(rbg_type,rbg_type)}</div>
             </div>""", unsafe_allow_html=True)
+
+    # ── تبويب جديد: مواقع التواصل ─────────────────────────
+    st.markdown("##### 📱 مواقع التواصل الاجتماعي (اختياري)")
+    st.markdown('<div style="color:#888;font-size:.82rem;margin-bottom:.5rem">تظهر أسفل بطاقة QR — اتركها فارغة إذا لم تريدها</div>', unsafe_allow_html=True)
+    soc_c1, soc_c2, soc_c3, soc_c4 = st.columns(4)
+    with soc_c1:
+        s_instagram = st.text_input("📷 Instagram", placeholder="@restaurant", key="add_ig")
+        s_facebook  = st.text_input("👍 Facebook",  placeholder="NomPage",     key="add_fb")
+    with soc_c2:
+        s_whatsapp  = st.text_input("💬 WhatsApp",  placeholder="+212600000000", key="add_wa")
+        s_tiktok    = st.text_input("🎵 TikTok",    placeholder="@handle",      key="add_tt")
+    with soc_c3:
+        s_website   = st.text_input("🌐 Site Web",  placeholder="www.resto.ma", key="add_ws")
+        s_phone     = st.text_input("📞 Téléphone", placeholder="+212600000000", key="add_ph")
+    with soc_c4:
+        s_snapchat  = st.text_input("👻 Snapchat",  placeholder="@handle",      key="add_sc")
+        s_youtube   = st.text_input("▶️ YouTube",   placeholder="@channel",     key="add_yt")
+    rsocials = {k:v for k,v in {
+        "instagram": s_instagram, "facebook": s_facebook,
+        "whatsapp": s_whatsapp,   "tiktok": s_tiktok,
+        "website": s_website,     "phone": s_phone,
+        "snapchat": s_snapchat,   "youtube": s_youtube,
+    }.items() if v.strip()}
 
     with t3:
         c1,c2 = st.columns(2)
@@ -357,7 +392,8 @@ def pg_add(rs):
             sheet_id=rsheetid.strip(),
             wifi_ssid=rssid.strip(), wifi_password=rwpass.strip(),
             style=rstyle, primary_color=rprimary, accent_color=raccent,
-            num_tables=rtables, logo_url=rlogo.strip(), owner_email=remail.strip())
+            num_tables=rtables, logo_url=rlogo.strip(), owner_email=remail.strip(),
+            bg_type=rbg_type, socials=rsocials)
 
         done = len([s for s in result.steps if "✅" in s])
         show(min(done, len(steps_lbl)-1), result.steps)
@@ -408,7 +444,7 @@ def pg_add(rs):
             with st.spinner("🎨 توليد البطاقات..."):
                 menu_img, wifi_img = generate_table_card(
                     rname, rssid, rwpass, 1, f"{mu}&table=1",
-                    rstyle, rprimary, raccent)
+                    rstyle, rprimary, raccent, rbg_type, rsocials)
                 mb = io.BytesIO(); menu_img.save(mb,"PNG"); mb.seek(0)
                 wb = io.BytesIO(); wifi_img.save(wb,"PNG"); wb.seek(0)
                 st.session_state.update({
@@ -516,7 +552,8 @@ def pg_pdf(rs):
                     r.get("wifi_password",""), FRONTEND_URL,
                     r.get("restaurant_id","1"), pv,
                     r.get("style","luxury"), r.get("primary_color","#0a0804"),
-                    r.get("accent_color","#C9A84C"))
+                    r.get("accent_color","#C9A84C"),
+                    r.get("bg_type","minimal"), r.get("socials",{}))
                 st.session_state["prev_m"] = card_to_bytes(mi)
                 st.session_state["prev_w"] = card_to_bytes(wi)
             except Exception as e:
@@ -536,7 +573,8 @@ def pg_pdf(rs):
                     r.get("wifi_password",""), FRONTEND_URL,
                     r.get("restaurant_id","1"), n,
                     r.get("style","luxury"), r.get("primary_color","#0a0804"),
-                    r.get("accent_color","#C9A84C"))
+                    r.get("accent_color","#C9A84C"),
+                    r.get("bg_type","minimal"), r.get("socials",{}))
                 st.session_state["pg_pdf"] = pdf
                 st.session_state["pg_pdf_nm"] = r.get("name","")
                 st.session_state["pg_pdf_n"]  = n
@@ -557,36 +595,10 @@ def pg_pdf(rs):
 def pg_manage(rs):
     st.markdown("## ⚙️ إدارة المطاعم")
 
-    # ── Telegram Webhook ──
+    # Telegram Webhook
     st.markdown("### 🤖 Telegram Webhook")
     wh_url = f"{ROUTER_URL}/webhook/telegram"
     st.code(f"Webhook URL: {wh_url}")
-
-    # فحص حالة التوكن تلقائياً
-    if not TG_TOKEN:
-        st.error("❌ **TELEGRAM_BOT_TOKEN** غير محدد في متغيرات البيئة!\n\n"
-                 "أضفه في Streamlit Cloud → Settings → Secrets:\n"
-                 "```\nTELEGRAM_BOT_TOKEN = \"توكنك هنا\"\n```")
-    else:
-        try:
-            r_me = requests.get(f"https://api.telegram.org/bot{TG_TOKEN}/getMe", timeout=5)
-            me = r_me.json()
-            if me.get("ok"):
-                b = me["result"]
-                st.success(f"✅ البوت متصل: **@{b.get('username')}** — {b.get('first_name')}")
-                r_wh = requests.get(f"https://api.telegram.org/bot{TG_TOKEN}/getWebhookInfo", timeout=5)
-                wh_info = r_wh.json().get("result", {})
-                current_wh = wh_info.get("url", "")
-                if current_wh == wh_url:
-                    st.success("✅ Webhook مسجل بالفعل ومطابق")
-                elif current_wh:
-                    st.warning(f"⚠️ Webhook حالي مختلف: `{current_wh}` — اضغط تسجيل لتحديثه")
-                else:
-                    st.warning("⚠️ لا يوجد Webhook مسجل — اضغط **تسجيل Webhook** أدناه")
-            else:
-                st.error(f"❌ توكن خاطئ: {me.get('description','')}")
-        except Exception as e:
-            st.warning(f"⚠️ لم نتمكن من التحقق: {e}")
 
     c1,c2 = st.columns(2)
     with c1:
@@ -597,10 +609,10 @@ def pg_manage(rs):
                 try:
                     resp = requests.post(
                         f"https://api.telegram.org/bot{TG_TOKEN}/setWebhook",
-                        json={"url": wh_url, "allowed_updates": ["message"]}, timeout=10)
+                        json={"url": wh_url}, timeout=10)
                     d = resp.json()
                     if d.get("ok"):
-                        st.success(f"✅ مسجل بنجاح: {wh_url}")
+                        st.success(f"✅ مسجل: {wh_url}")
                     else:
                         st.error(f"❌ {d.get('description')}")
                 except Exception as e:
@@ -619,19 +631,6 @@ def pg_manage(rs):
                 except Exception as e:
                     st.error(str(e))
 
-    # ── Gmail Status ──
-    st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
-    st.markdown("### 📧 Gmail")
-    gmail_user = os.getenv("GMAIL_USER","")
-    gmail_pass = os.getenv("GMAIL_APP_PASSWORD","")
-    if not gmail_user or not gmail_pass:
-        st.warning("⚠️ Gmail غير مفعّل — لإرسال إيميلات تلقائية أضف في متغيرات البيئة:\n"
-                   "```\nGMAIL_USER = \"بريدك@gmail.com\"\nGMAIL_APP_PASSWORD = \"كلمة مرور التطبيق\"\n```\n"
-                   "🔑 احصل على App Password من: myaccount.google.com → Security → App Passwords")
-    else:
-        st.success(f"✅ Gmail مفعّل: **{gmail_user}**")
-
-    # ── قائمة المطاعم ──
     st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
     st.markdown("### 🍽️ قائمة المطاعم")
     if not rs: st.info("لا توجد مطاعم"); return
