@@ -465,6 +465,8 @@ def pg_add(rs):
                     "last_rstyle": rstyle, "last_rprimary": rprimary,
                     "last_raccent": raccent, "last_rtables": rtables,
                     "last_rid": rid,
+                    "last_rbg_type": rbg_type,
+                    "last_rsocials": rsocials,
                 })
                 st.session_state.pop("last_pdf_bytes", None)
 
@@ -500,6 +502,8 @@ def _show_cards_and_pdf():
     ra      = st.session_state.get("last_raccent","#C9A84C")
     rtables = st.session_state.get("last_rtables",10)
     rid     = st.session_state.get("last_rid","1")
+    rbg     = st.session_state.get("last_rbg_type","minimal")
+    rsoc    = st.session_state.get("last_rsocials",{})
     if not mb or not wb: return
 
     qc1,qc2 = st.columns(2)
@@ -523,7 +527,12 @@ def _show_cards_and_pdf():
                 from pdf_generator import generate_table_tents_pdf
                 pdf = generate_table_tents_pdf(
                     rname, rssid, rwpass, FRONTEND_URL,
-                    rid, rtables, rstyle, rp, ra)
+                    rid, rtables, rstyle, rp, ra,
+                    bg_type=rbg, socials=rsoc,
+                    pexels_key=PEXELS_KEY,
+                    unsplash_key=UNSPLASH_KEY,
+                    pixabay_key=PIXABAY_KEY,
+                    photo_query=rname)
                 st.session_state["last_pdf_bytes"] = pdf
                 st.session_state["last_pdf_name"]  = rname
             except Exception as e:
