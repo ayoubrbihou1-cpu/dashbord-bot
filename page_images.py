@@ -109,13 +109,37 @@ def _gs():
     return gspread.authorize(c)
 
 def load_sheet_items(sheet_id: str, tab: str) -> list[dict]:
-    """يجلب الأكلات الموجودة في الشيت"""
-    try:
-        ws = _gs().open_by_key(sheet_id).worksheet(tab)
-        return ws.get_all_records()
-    except Exception as e:
-        st.error(f"خطأ في قراءة الشيت: {e}")
-        return []
+    """يجلب الأكلات من الشيت مع cache لتفادي quota exceeded"""
+    cache_key = f"_sheet_cache_{sheet_id}_{tab}"
+
+    # إذا البيانات محفوظة في session وعمرها أقل من 60 ثانية — استخدمها مباشرة
+    import time
+    ts_key = f"_sheet_cache_ts_{sheet_id}_{tab}"
+    cached_ts = st.session_state.get(ts_key, 0)
+    if st.session_state.get(cache_key) and (time.time() - cached_ts) < 60:
+        return st.session_state[cache_key]
+
+    # جلب من الشيت مع retry تلقائي عند 429
+    for attempt in range(3):
+        try:
+            ws = _gs().open_by_key(sheet_id).worksheet(tab)
+            data = ws.get_all_records()
+            st.session_state[cache_key] = data
+            st.session_state[ts_key]    = time.time()
+            return data
+        except gspread.exceptions.APIError as e:
+            if "429" in str(e) and attempt < 2:
+                import time as _t
+                wait = (attempt + 1) * 5   # 5s, 10s
+                st.toast(f"⏳ Google Sheets rate limit — انتظر {wait}ث...", icon="⚠️")
+                _t.sleep(wait)
+            else:
+                st.error(f"خطأ في قراءة الشيت: {e}")
+                return st.session_state.get(cache_key, [])
+        except Exception as e:
+            st.error(f"خطأ في قراءة الشيت: {e}")
+            return []
+    return []
 
 def update_images_in_sheet(sheet_id: str, tab: str, items: list[dict]) -> int:
     """يحدث عمود image_url في الشيت — يرجع عدد الصفوف المحدثة"""
@@ -307,11 +331,19 @@ def page_images(restaurants: list):
     # PANELS حسب الطريقة
     # ══════════════════════════════════════════════════════
 
-    # ── جلب الأكلات من الشيت
+    # ── جلب الأكلات من الشيت (مع cache 60ث)
     items_from_sheet = []
     if sheet_id:
-        with st.spinner("📊 جاري قراءة القائمة من الشيت..."):
-            items_from_sheet = load_sheet_items(sheet_id, final_tab)
+        col_load, col_refresh = st.columns([5, 1])
+        with col_refresh:
+            if st.button("🔄", help="تحديث القائمة من الشيت", key="refresh_sheet_btn"):
+                # مسح الـ cache
+                for k in list(st.session_state.keys()):
+                    if k.startswith(f"_sheet_cache_{sheet_id}"):
+                        del st.session_state[k]
+        with col_load:
+            with st.spinner("📊 جاري قراءة القائمة..."):
+                items_from_sheet = load_sheet_items(sheet_id, final_tab)
 
     if not items_from_sheet and selected_method != "manual":
         st.warning(f"📭 لا توجد أكلات في Tab '{final_tab}' — أضف الأكلات أولاً أو اختر tab آخر")
