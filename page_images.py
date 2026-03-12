@@ -343,9 +343,11 @@ def page_images(restaurants: list):
             item_names = [i.get("name","") for i in items_from_sheet if i.get("name")]
             sel_item_multi = st.selectbox("اختر الأكلة", item_names, key="multi_item_sel")
 
-            # البحث
+            # البحث — تحويل الاسم لكلمة بحث إنجليزية
             sel_item_obj = next((i for i in items_from_sheet if i.get("name") == sel_item_multi), {})
-            default_query = _arabic_to_search(sel_item_multi)
+            # إذا كان الاسم بالفرنسية أو الإنجليزية نستخدمه مباشرة
+            _ar_result = _arabic_to_search(sel_item_multi)
+            default_query = _ar_result if _ar_result and _ar_result != sel_item_multi else sel_item_multi
 
             col_q, col_btn = st.columns([3, 1])
             with col_q:
