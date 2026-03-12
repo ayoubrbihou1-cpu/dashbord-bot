@@ -30,6 +30,7 @@ def _call_gemini(key: str, parts: list, max_tokens: int = 1000, temperature: flo
     """
     استدعاء Gemini بمفتاح محدد — يرجع النص أو None عند الفشل
     """
+    import time
     try:
         resp = requests.post(
             f"{GEMINI_URL}?key={key}",
@@ -41,18 +42,25 @@ def _call_gemini(key: str, parts: list, max_tokens: int = 1000, temperature: flo
                     "temperature": temperature
                 }
             },
-            timeout=30
+            timeout=60
         )
 
         if resp.status_code == 200:
             return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
 
-        # أخطاء تستوجب التحويل للمفتاح التالي
-        if resp.status_code in (429, 503, quota_error(resp)):
+        # 429 = quota/rate limit — انتظر ثم جرب المفتاح التالي
+        if resp.status_code == 429:
             log.warning(f"Key quota/limit — switching to next key. Status: {resp.status_code}")
+            time.sleep(2)  # انتظر ثانيتين قبل المفتاح التالي
             return None
 
-        # خطأ آخر — سجّله لكن لا تحاول بمفتاح آخر
+        # 503 = server overloaded
+        if resp.status_code == 503:
+            log.warning(f"Gemini overloaded — switching to next key.")
+            time.sleep(3)
+            return None
+
+        # خطأ آخر
         log.error(f"Gemini error {resp.status_code}: {resp.text[:200]}")
         return None
 
@@ -86,25 +94,26 @@ def gemini_text(prompt: str, max_tokens: int = 1000, temperature: float = 0) -> 
 
     parts = [{"text": prompt}]
 
-    for i, key in enumerate(keys):
-        log.info(f"Trying Gemini key {i+1}/{len(keys)}")
-        result = _call_gemini(key, parts, max_tokens, temperature)
-        if result is not None:
-            return result
+    import time
+    for attempt in range(2):
+        for i, key in enumerate(keys):
+            log.info(f"Trying Gemini key {i+1}/{len(keys)} (attempt {attempt+1})")
+            result = _call_gemini(key, parts, max_tokens, temperature)
+            if result is not None:
+                return result
+        if attempt == 0:
+            time.sleep(65)
 
-    raise RuntimeError(f"❌ كل مفاتيح Gemini ({len(keys)}) نفذت حصتها أو فشلت")
+    raise RuntimeError(f"❌ كل مفاتيح Gemini ({len(keys)}) نفذت حصتها — حاول بعد دقيقة")
 
 
 def gemini_vision(prompt: str, image_b64: str, mime_type: str = "image/jpeg",
                   max_tokens: int = 2000, temperature: float = 0) -> str:
     """
     استدعاء Gemini بصورة + نص مع دوران تلقائي على المفاتيح
-    
-    مثال:
-        with open("menu.jpg", "rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
-        result = gemini_vision("استخرج الأكلات", b64, "image/jpeg")
+    يحاول مرتين على كل المفاتيح إذا كانت المشكلة Rate Limit مؤقتة
     """
+    import time
     keys = _get_keys()
     if not keys:
         raise RuntimeError("❌ لا يوجد GEMINI_API_KEY في المتغيرات البيئية")
@@ -114,13 +123,19 @@ def gemini_vision(prompt: str, image_b64: str, mime_type: str = "image/jpeg",
         {"inline_data": {"mime_type": mime_type, "data": image_b64}}
     ]
 
-    for i, key in enumerate(keys):
-        log.info(f"Trying Gemini vision key {i+1}/{len(keys)}")
-        result = _call_gemini(key, parts, max_tokens, temperature)
-        if result is not None:
-            return result
+    # محاولتان — الثانية بعد انتظار 60 ثانية
+    for attempt in range(2):
+        for i, key in enumerate(keys):
+            log.info(f"Trying Gemini vision key {i+1}/{len(keys)} (attempt {attempt+1})")
+            result = _call_gemini(key, parts, max_tokens, temperature)
+            if result is not None:
+                return result
 
-    raise RuntimeError(f"❌ كل مفاتيح Gemini ({len(keys)}) نفذت حصتها أو فشلت")
+        if attempt == 0:
+            log.warning("All keys exhausted — waiting 65 seconds for rate limit reset...")
+            time.sleep(65)  # انتظر دقيقة لإعادة تعيين الحد
+
+    raise RuntimeError(f"❌ كل مفاتيح Gemini ({len(keys)}) نفذت حصتها — حاول بعد دقيقة")
 
 
 def gemini_available() -> tuple[bool, str]:
