@@ -162,35 +162,101 @@ def with_alpha(rgb, a):
     return (*rgb, a)
 
 # ─────────────────────────────────────────────────────────────────
-# 🔤 FONTS
+# 🔤 FONTS — مع تحميل تلقائي للخطوط العربية
 # ─────────────────────────────────────────────────────────────────
 _FONT_CACHE = {}
 
+# مجلد الخطوط بجانب هذا الملف
+_THIS_DIR   = os.path.dirname(os.path.abspath(__file__))
+_FONTS_DIR  = os.path.join(_THIS_DIR, "fonts")
+
+# روابط تحميل Noto Naskh Arabic (Google Fonts CDN)
+_ARABIC_URLS = {
+    "bold": "https://github.com/google/fonts/raw/main/ofl/notonaskharabic/NotoNaskhArabic-Bold.ttf",
+    "reg":  "https://github.com/google/fonts/raw/main/ofl/notonaskharabic/NotoNaskhArabic-Regular.ttf",
+}
+_LATIN_URLS = {
+    "bold": "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf",
+    "reg":  "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Regular.ttf",
+}
+
+def _ensure_fonts():
+    """يحمّل الخطوط مرة واحدة عند أول استخدام"""
+    os.makedirs(_FONTS_DIR, exist_ok=True)
+    targets = {
+        "NotoNaskhArabic-Bold.ttf":    _ARABIC_URLS["bold"],
+        "NotoNaskhArabic-Regular.ttf": _ARABIC_URLS["reg"],
+        "Poppins-Bold.ttf":            _LATIN_URLS["bold"],
+        "Poppins-Regular.ttf":         _LATIN_URLS["reg"],
+    }
+    if not _HAS_REQUESTS:
+        return
+    for fname, url in targets.items():
+        dest = os.path.join(_FONTS_DIR, fname)
+        if not os.path.exists(dest):
+            try:
+                log.info(f"⬇️  تحميل خط: {fname}")
+                r = _requests.get(url, timeout=30)
+                if r.status_code == 200:
+                    with open(dest, "wb") as fh:
+                        fh.write(r.content)
+                    log.info(f"✅ تم تحميل: {fname}")
+            except Exception as e:
+                log.warning(f"⚠️  فشل تحميل {fname}: {e}")
+
+# تشغيل تحميل الخطوط فور import
+try:
+    _ensure_fonts()
+except Exception as _fe:
+    log.warning(f"Font init error: {_fe}")
+
+
 def _find_font(bold=False, arabic=False):
-    """يبحث عن أفضل خط متاح"""
-    if arabic or bold:
-        candidates_bold = [
-            "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf",
-            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        ]
-        candidates_reg = [
-            "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
-            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    """يبحث عن أفضل خط متاح — يفضّل الخطوط المحملة"""
+
+    # ── 1. الخطوط المحملة في مجلد fonts/ ─────────────────────────
+    if arabic:
+        local = [
+            os.path.join(_FONTS_DIR, "NotoNaskhArabic-Bold.ttf")    if bold else
+            os.path.join(_FONTS_DIR, "NotoNaskhArabic-Regular.ttf"),
+            os.path.join(_FONTS_DIR, "NotoNaskhArabic-Bold.ttf"),
         ]
     else:
-        candidates_bold = [
-            "/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf",
-            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        local = [
+            os.path.join(_FONTS_DIR, "Poppins-Bold.ttf")    if bold else
+            os.path.join(_FONTS_DIR, "Poppins-Regular.ttf"),
         ]
-        candidates_reg = [
-            "/usr/share/fonts/truetype/google-fonts/Poppins-Regular.ttf",
-            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        ]
-    paths = candidates_bold if bold else candidates_reg
+    for p in local:
+        if p and os.path.exists(p):
+            return p
+
+    # ── 2. خطوط النظام (Ubuntu / Render) ──────────────────────────
+    system_arabic = [
+        "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf",
+        "/usr/share/fonts/opentype/noto/NotoNaskhArabic-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ]
+    system_latin_bold = [
+        "/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ]
+    system_latin_reg = [
+        "/usr/share/fonts/truetype/google-fonts/Poppins-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+
+    if arabic:
+        paths = system_arabic
+    elif bold:
+        paths = system_latin_bold
+    else:
+        paths = system_latin_reg
+
     for p in paths:
         if os.path.exists(p):
             return p
