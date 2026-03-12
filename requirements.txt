@@ -10,3 +10,5 @@ requests
 pandas
 openpyxl
 pymupdf
+arabic-reshaper
+python-bidi
