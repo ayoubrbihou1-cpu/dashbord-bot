@@ -22,7 +22,11 @@ def generate_table_tents_pdf(
     primary_color: str = "#0a0804",
     accent_color: str = "#C9A84C",
     bg_type: str = "minimal",
-    socials: dict = None
+    socials: dict = None,
+    pexels_key: str = "",
+    unsplash_key: str = "",
+    pixabay_key: str = "",
+    photo_query: str = "",
 ) -> bytes:
     """
     🏭 توليد PDF كامل — صفحتان لكل طاولة
@@ -49,7 +53,11 @@ def generate_table_tents_pdf(
             primary_color_hex=primary_color,
             accent_color_hex=accent_color,
             bg_type=bg_type,
-            socials=socials or {}
+            socials=socials or {},
+            pexels_key=pexels_key,
+            unsplash_key=unsplash_key,
+            pixabay_key=pixabay_key,
+            photo_query=photo_query or restaurant_name,
         )
 
         # ── الصفحة 1: QR المينيو ──────────────────────────────
@@ -99,7 +107,8 @@ def generate_single_table_preview(
     restaurant_name, ssid, wifi_password, menu_base_url,
     restaurant_id, table_num=1, style="luxury",
     primary_color="#0a0804", accent_color="#C9A84C",
-    bg_type="minimal", socials=None
+    bg_type="minimal", socials=None,
+    pexels_key="", unsplash_key="", pixabay_key="", photo_query=""
 ) -> tuple:
     """معاينة طاولة واحدة — للـ Dashboard"""
     menu_url = f"{menu_base_url}?rest_id={restaurant_id}&table={table_num}"
@@ -113,5 +122,9 @@ def generate_single_table_preview(
         primary_color_hex=primary_color,
         accent_color_hex=accent_color,
         bg_type=bg_type,
-        socials=socials or {}
+        socials=socials or {},
+        pexels_key=pexels_key,
+        unsplash_key=unsplash_key,
+        pixabay_key=pixabay_key,
+        photo_query=photo_query or restaurant_name,
     )
