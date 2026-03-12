@@ -852,7 +852,7 @@ def _draw_texts(draw, style, name, table_num, primary, acc, fg,
     # خلفية معتمة تماماً — اللون الأساسي للبطاقة دائماً مقروء
     _rounded_rect(draw,
                   [sx, sy, sx + strip_w, sy + strip_h],
-                  radius=10, fill=primary, outline=acc, width=2)
+                  10, primary, acc, 2)
 
     # سطر CTA — لون الأكسنت
     cta_col = acc if style != "bold" else auto_fg(primary)
