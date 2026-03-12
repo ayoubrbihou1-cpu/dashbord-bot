@@ -64,7 +64,9 @@ def get_food_emoji(name: str, category: str = "") -> str:
 # ══════════════════════════════════════════════════════════════════
 
 POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY", "")
-POLLINATIONS_URL = "https://image.pollinations.ai/prompt"
+# الـ endpoint الجديد من 2025
+POLLINATIONS_URL_NEW = "https://gen.pollinations.ai/image"
+POLLINATIONS_URL_OLD = "https://image.pollinations.ai/prompt"
 
 def fetch_pollinations(name: str, count: int = 1) -> list:
     """
@@ -74,7 +76,7 @@ def fetch_pollinations(name: str, count: int = 1) -> list:
     results = []
 
     # prompt احترافي للأكلة المغربية
-    base_prompt = f"professional food photography of {name}, moroccan restaurant dish, appetizing, high resolution, natural lighting, top view"
+    base_prompt = f"professional food photography of {name}, moroccan restaurant dish, appetizing, high resolution, natural lighting, top view, no text"
     encoded = requests.utils.quote(base_prompt)
 
     headers = {}
@@ -84,24 +86,46 @@ def fetch_pollinations(name: str, count: int = 1) -> list:
     for i in range(count):
         try:
             seed = 42 + (i * 13)
-            # نستخدم nologo=true لإزالة الووترمارك مع المفتاح
-            extra = "&nologo=true" if POLLINATIONS_KEY else ""
-            url = f"{POLLINATIONS_URL}/{encoded}?width=768&height=768&seed={seed}&model=flux{extra}"
+            nologo = "true" if POLLINATIONS_KEY else "false"
+
+            # جرب الـ endpoint الجديد أولاً
+            url_new = f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}"
+            url_old = f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}"
 
             if i > 0:
                 time.sleep(3)
 
-            resp = requests.get(url, headers=headers, timeout=90)  # timeout أطول
-            if resp.status_code == 200 and resp.headers.get("content-type","").startswith("image"):
+            img_url = None
+            # جرب الجديد
+            try:
+                resp = requests.get(url_new, headers=headers, timeout=90)
+                if resp.status_code == 200 and resp.headers.get("content-type","").startswith("image"):
+                    img_url = url_new
+                else:
+                    log.warning(f"New endpoint failed {resp.status_code}, trying old...")
+            except Exception:
+                pass
+
+            # إذا فشل الجديد → جرب القديم
+            if not img_url:
+                try:
+                    resp2 = requests.get(url_old, headers=headers, timeout=90)
+                    if resp2.status_code == 200 and resp2.headers.get("content-type","").startswith("image"):
+                        img_url = url_old
+                    else:
+                        log.warning(f"Pollinations both endpoints failed for {name}")
+                except Exception as e2:
+                    log.warning(f"Pollinations old endpoint error for {name}: {e2}")
+
+            if img_url:
                 results.append({
-                    "url": url,
-                    "thumb": url,
-                    "credit": f"AI Generated — Pollinations",
+                    "url": img_url,
+                    "thumb": img_url,
+                    "credit": "AI Generated — Pollinations",
                     "method": "pollinations",
                     "seed": seed
                 })
-            else:
-                log.warning(f"Pollinations bad response {resp.status_code} for {name}")
+
         except Exception as e:
             log.warning(f"Pollinations error for {name}: {e}")
             continue
