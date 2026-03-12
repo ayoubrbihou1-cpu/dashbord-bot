@@ -172,15 +172,14 @@ _FONTS_DIR  = os.path.join(_THIS_DIR, "fonts")
 
 # روابط تحميل Noto Naskh Arabic (Google Fonts CDN)
 _ARABIC_URLS = {
-    "bold": [
-        "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notonaskharabic/NotoNaskhArabic-Bold.ttf",
-        "https://raw.githubusercontent.com/google/fonts/main/ofl/notonaskharabic/NotoNaskhArabic-Bold.ttf",
-        "https://github.com/google/fonts/raw/main/ofl/notonaskharabic/NotoNaskhArabic-Bold.ttf",
+    # NotoNaskhArabic — أصبح variable font، الاسم تغيّر في Google Fonts
+    "naskh_bold": [
+        "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notonaskharabic/NotoNaskhArabic%5Bwght%5D.ttf",
+        "https://fonts.gstatic.com/s/notonaskharabic/v33/IdGgIokULBLRYcmAYRAY7dlBBjJTLQBc_6mAtGnl6D6LQIMF3tBatBU.ttf",
     ],
-    "reg": [
-        "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notonaskharabic/NotoNaskhArabic-Regular.ttf",
-        "https://raw.githubusercontent.com/google/fonts/main/ofl/notonaskharabic/NotoNaskhArabic-Regular.ttf",
-        "https://github.com/google/fonts/raw/main/ofl/notonaskharabic/NotoNaskhArabic-Regular.ttf",
+    # NotoSansArabic variable font — يعمل بنجاح ✅
+    "sans_var": [
+        "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf",
     ],
 }
 _LATIN_URLS = {
@@ -215,22 +214,40 @@ def _download_font(fname: str, urls: list) -> bool:
     return False
 
 def _ensure_fonts():
-    """يحمّل الخطوط مرة واحدة عند أول استخدام — مع fallback متعدد"""
+    """
+    يحمّل الخطوط — NotoSansArabic هو الخط العربي الأساسي (يعمل ✅)
+    NotoNaskhArabic غيّر اسمه لـ variable font → نحاول تحميله كـ bonus
+    """
     os.makedirs(_FONTS_DIR, exist_ok=True)
-    targets = {
-        "NotoNaskhArabic-Bold.ttf":    _ARABIC_URLS["bold"],
-        "NotoNaskhArabic-Regular.ttf": _ARABIC_URLS["reg"],
-        "NotoSansArabic-Regular.ttf": [
-            "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf",
-            "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf",
-        ],
-        "Poppins-Bold.ttf":            _LATIN_URLS["bold"],
-        "Poppins-Regular.ttf":         _LATIN_URLS["reg"],
-    }
     if not _HAS_REQUESTS:
         log.warning("⚠️  requests غير متاح — لن تُحمَّل الخطوط")
         return
-    for fname, urls in targets.items():
+
+    # ── 1. NotoSansArabic (الأساسي — يعمل ✅) ─────────────────────
+    sans_dest = os.path.join(_FONTS_DIR, "NotoSansArabic-Regular.ttf")
+    if not os.path.exists(sans_dest):
+        _download_font("NotoSansArabic-Regular.ttf", _ARABIC_URLS["sans_var"])
+    else:
+        log.info("✔️  الخط موجود: NotoSansArabic-Regular.ttf")
+
+    # ── 2. NotoNaskhArabic (محاولة — الاسم تغيّر) ─────────────────
+    naskh_dest = os.path.join(_FONTS_DIR, "NotoNaskhArabic-Bold.ttf")
+    if not os.path.exists(naskh_dest):
+        ok = _download_font("NotoNaskhArabic-Bold.ttf", _ARABIC_URLS["naskh_bold"])
+        if ok:
+            import shutil
+            reg_dest = os.path.join(_FONTS_DIR, "NotoNaskhArabic-Regular.ttf")
+            if not os.path.exists(reg_dest):
+                shutil.copy(naskh_dest, reg_dest)
+                log.info("✅ نسخ NotoNaskhArabic-Bold → Regular")
+    else:
+        log.info("✔️  الخط موجود: NotoNaskhArabic-Bold.ttf")
+
+    # ── 3. خطوط لاتينية ────────────────────────────────────────────
+    for fname, urls in [
+        ("Poppins-Bold.ttf",    _LATIN_URLS["bold"]),
+        ("Poppins-Regular.ttf", _LATIN_URLS["reg"]),
+    ]:
         dest = os.path.join(_FONTS_DIR, fname)
         if not os.path.exists(dest):
             _download_font(fname, urls)
@@ -250,10 +267,12 @@ def _find_font(bold=False, arabic=False):
     # ── 1. الخطوط المحملة في مجلد fonts/ ─────────────────────────
     if arabic:
         local = [
+            # NotoSansArabic أولاً — يُحمَّل بنجاح ✅
+            os.path.join(_FONTS_DIR, "NotoSansArabic-Regular.ttf"),
+            # NotoNaskhArabic ثانياً — إن نجح تحميله
             os.path.join(_FONTS_DIR, "NotoNaskhArabic-Bold.ttf")    if bold else
             os.path.join(_FONTS_DIR, "NotoNaskhArabic-Regular.ttf"),
             os.path.join(_FONTS_DIR, "NotoNaskhArabic-Bold.ttf"),
-            os.path.join(_FONTS_DIR, "NotoSansArabic-Regular.ttf"),
         ]
     else:
         local = [
