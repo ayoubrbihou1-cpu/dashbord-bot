@@ -429,16 +429,22 @@ def page_images(restaurants: list):
             sel_item = st.selectbox("اختر الأكلة", item_names, key="poll_item_sel")
             sel_obj  = next((i for i in items_from_sheet if i.get("name") == sel_item), {})
 
-            # اسم البحث — نستخدم الإنجليزي إذا توفر
+            # تحديث الوصف تلقائياً عند تغيير الأكلة
             search_name = sel_obj.get("name_en","") or sel_obj.get("name_fr","") or sel_item or ""
+
+            # إذا تغيرت الأكلة — امسح الوصف القديم وضع الجديد
+            prev_item = st.session_state.get("_poll_prev_item", "")
+            if prev_item != sel_item:
+                st.session_state["poll_search_q"] = search_name
+                st.session_state["_poll_prev_item"] = sel_item
+                st.session_state.pop("_poll_photos", None)
 
             col_q, col_btn = st.columns([3, 1])
             with col_q:
                 search_q = st.text_input(
                     "✏️ وصف الصورة (إنجليزي)",
-                    value=search_name,
                     key="poll_search_q",
-                    help="كلما كان الوصف أدق كانت الصورة أفضل"
+                    help="يتحدث تلقائياً عند تغيير الأكلة — يمكنك تعديله"
                 )
             with col_btn:
                 st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
