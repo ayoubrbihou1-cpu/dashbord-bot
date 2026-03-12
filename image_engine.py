@@ -59,8 +59,12 @@ def get_food_emoji(name: str, category: str = "") -> str:
 
 
 def _arabic_to_search(name: str) -> str:
-    """تحويل اسم عربي لكلمة بحث إنجليزية"""
+    """
+    تحويل اسم الأكلة لكلمة بحث إنجليزية
+    يدعم العربية والفرنسية والإنجليزية
+    """
     ar_map = {
+        # عربي
         "طاجين دجاج":  "moroccan chicken tagine",
         "طاجين لحم":   "moroccan beef tagine",
         "طاجين":       "moroccan tagine",
@@ -84,13 +88,54 @@ def _arabic_to_search(name: str) -> str:
         "ساندويش":     "sandwich",
         "لحم":         "meat dish",
         "دجاج":        "chicken dish",
+        # فرنسي → إنجليزي
+        "tajine":      "moroccan tagine food",
+        "couscous":    "moroccan couscous",
+        "pastilla":    "moroccan pastilla pie",
+        "harira":      "moroccan harira soup",
+        "briouats":    "moroccan briouats",
+        "tanjia":      "moroccan tanjia meat",
+        "seffa":       "moroccan seffa noodles",
+        "rafissa":     "moroccan rafissa chicken",
+        "sardine":     "sardines fish dish",
+        "filet":       "beef filet steak",
+        "poulet":      "chicken dish",
+        "viande":      "meat dish",
+        "salade":      "salad dish",
+        "soupe":       "soup bowl",
+        "creme":       "cream soup",
+        "tarte":       "tart dessert",
+        "mousse":      "chocolate mousse dessert",
+        "sorbet":      "sorbet ice cream",
+        "crepe":       "crepes dessert",
+        "tiramisu":    "tiramisu dessert",
+        "brulee":      "creme brulee dessert",
+        "panacota":    "panna cotta dessert",
+        "millefeuille":"millefeuille pastry",
+        "gateau":      "cake dessert",
+        "fondant":     "chocolate fondant",
+        "soufle":      "souffle dish",
+        "omelette":    "omelette eggs",
+        "auberge":     "eggplant dish",
     }
-    name_l = name.strip()
-    for ar, en in ar_map.items():
-        if ar in name_l:
+    name_l = name.strip().lower()
+
+    # بحث في القاموس
+    for key, en in ar_map.items():
+        if key.lower() in name_l:
             return en
-    # إذا ما لقى — ارجع الاسم كما هو (يمكن فرنسي/إنجليزي)
-    return name_l
+
+    # إذا كان بالفرنسية/الإنجليزية — أضف "food" فقط
+    # للتأكد أن البحث يجلب صور أكل
+    if any(c.isascii() and c.isalpha() for c in name_l):
+        # اسم لاتيني — استخدمه مباشرة + food
+        clean = name.strip().lower()
+        # احذف كلمات عامة لا تفيد البحث
+        for w in ["de", "du", "la", "le", "les", "au", "aux", "et", "a"]:
+            clean = clean.replace(f" {w} ", " ")
+        return f"{clean.strip()} food dish"
+
+    return name.strip()
 
 
 # ══════════════════════════════════════════════════════════
