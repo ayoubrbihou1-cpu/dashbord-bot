@@ -39,6 +39,11 @@ SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
 TG_TOKEN        = os.getenv("TELEGRAM_BOT_TOKEN","")
 KITCHEN_URL     = os.getenv("KITCHEN_URL","https://kitchen-qr.netlify.app")
 
+# مفاتيح الصور للخلفية food_photo
+PEXELS_KEY    = os.getenv("PEXELS_API_KEY","")
+UNSPLASH_KEY  = os.getenv("UNSPLASH_ACCESS_KEY","")
+PIXABAY_KEY   = os.getenv("PIXABAY_API_KEY","")
+
 # ══════════════════════════════════════════════════════════
 # CSS
 # ══════════════════════════════════════════════════════════
@@ -444,7 +449,12 @@ def pg_add(rs):
             with st.spinner("🎨 توليد البطاقات..."):
                 menu_img, wifi_img = generate_table_card(
                     rname, rssid, rwpass, 1, f"{mu}&table=1",
-                    rstyle, rprimary, raccent, rbg_type, rsocials)
+                    rstyle, rprimary, raccent, rbg_type, rsocials,
+                    pexels_key=PEXELS_KEY,
+                    unsplash_key=UNSPLASH_KEY,
+                    pixabay_key=PIXABAY_KEY,
+                    photo_query=rname,
+                )
                 mb = io.BytesIO(); menu_img.save(mb,"PNG"); mb.seek(0)
                 wb = io.BytesIO(); wifi_img.save(wb,"PNG"); wb.seek(0)
                 st.session_state.update({
@@ -553,7 +563,9 @@ def pg_pdf(rs):
                     r.get("restaurant_id","1"), pv,
                     r.get("style","luxury"), r.get("primary_color","#0a0804"),
                     r.get("accent_color","#C9A84C"),
-                    r.get("bg_type","minimal"), r.get("socials",{}))
+                    r.get("bg_type","minimal"), r.get("socials",{}),
+                    pexels_key=PEXELS_KEY, unsplash_key=UNSPLASH_KEY,
+                    pixabay_key=PIXABAY_KEY, photo_query=r.get("name",""))
                 st.session_state["prev_m"] = card_to_bytes(mi)
                 st.session_state["prev_w"] = card_to_bytes(wi)
             except Exception as e:
@@ -574,7 +586,9 @@ def pg_pdf(rs):
                     r.get("restaurant_id","1"), n,
                     r.get("style","luxury"), r.get("primary_color","#0a0804"),
                     r.get("accent_color","#C9A84C"),
-                    r.get("bg_type","minimal"), r.get("socials",{}))
+                    r.get("bg_type","minimal"), r.get("socials",{}),
+                    pexels_key=PEXELS_KEY, unsplash_key=UNSPLASH_KEY,
+                    pixabay_key=PIXABAY_KEY, photo_query=r.get("name",""))
                 st.session_state["pg_pdf"] = pdf
                 st.session_state["pg_pdf_nm"] = r.get("name","")
                 st.session_state["pg_pdf_n"]  = n
