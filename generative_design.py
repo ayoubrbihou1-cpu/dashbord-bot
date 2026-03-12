@@ -1,580 +1,658 @@
 """
-🎨 محرك التصميم التوليدي (Generative Design Engine)
-باستخدام Pillow — يصمم بطاقات الطاولات برمجياً بثلاثة أطوار بصرية
+🎨 محرك التصميم التوليدي v2 — 6 أطوار بصرية + خلفيات طعام + أيقونات سوشيال
 """
 
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import qrcode
-import qrcode.image.pil
-import math
-import io
-import os
+import math, io, os
 import colorsys
-import textwrap
 from dataclasses import dataclass
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 # ─────────────────────────────────────────────────────────────────
 # 📐 CONSTANTS
 # ─────────────────────────────────────────────────────────────────
-
-# A5 at 150 DPI — optimal for table tents
-CARD_W, CARD_H = 1240, 874   # landscape A5 @ 150dpi
-MARGIN = 60
-
-FONTS_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+CARD_W, CARD_H = 1240, 874   # A5 landscape @ 150dpi
+MARGIN = 55
 
 # ─────────────────────────────────────────────────────────────────
 # 🔧 UTILS
 # ─────────────────────────────────────────────────────────────────
 
-@dataclass
-class Theme:
-    name: str
-    bg:        Tuple[int,int,int]
-    fg:        Tuple[int,int,int]
-    accent:    Tuple[int,int,int]
-    accent2:   Tuple[int,int,int]
-    font_display: str
-    font_body:    str
-    style: str  # modern | luxury | classic
+def hex_to_rgb(h: str) -> Tuple[int,int,int]:
+    h = h.strip("#")
+    return tuple(int(h[i:i+2], 16) for i in (0,2,4))
 
-
-THEMES = {
-    "modern": Theme(
-        name="Modern",
-        bg=(18, 18, 18),
-        fg=(255, 255, 255),
-        accent=(0, 220, 180),
-        accent2=(0, 150, 130),
-        font_display="bold",
-        font_body="regular",
-        style="modern"
-    ),
-    "luxury": Theme(
-        name="Luxury",
-        bg=(10, 8, 4),
-        fg=(250, 240, 210),
-        accent=(201, 168, 76),
-        accent2=(140, 100, 30),
-        font_display="bold",
-        font_body="regular",
-        style="luxury"
-    ),
-    "classic": Theme(
-        name="Classic",
-        bg=(252, 248, 238),
-        fg=(40, 25, 10),
-        accent=(139, 69, 19),
-        accent2=(180, 100, 40),
-        font_display="bold",
-        font_body="regular",
-        style="classic"
-    ),
-}
-
-
-def hex_to_rgb(hex_color: str) -> Tuple[int,int,int]:
-    hex_color = hex_color.strip("#")
-    return tuple(int(hex_color[i:i+2], 16) for i in (0,2,4))
-
-
-def luminance(rgb: Tuple[int,int,int]) -> float:
+def luminance(rgb):
     r,g,b = [c/255 for c in rgb]
     r = r/12.92 if r<=0.03928 else ((r+0.055)/1.055)**2.4
     g = g/12.92 if g<=0.03928 else ((g+0.055)/1.055)**2.4
     b = b/12.92 if b<=0.03928 else ((b+0.055)/1.055)**2.4
     return 0.2126*r + 0.7152*g + 0.0722*b
 
+def auto_fg(bg):
+    return (255,255,255) if luminance(bg)+0.05 > 0.179 and luminance(bg) < 0.4 else (
+        (255,255,255) if luminance(bg) < 0.4 else (20,20,20)
+    )
 
-def contrast_ratio(c1, c2) -> float:
-    l1, l2 = luminance(c1)+0.05, luminance(c2)+0.05
-    return max(l1,l2)/min(l1,l2)
+def blend(c1, c2, t):
+    return tuple(int(c1[i]*(1-t)+c2[i]*t) for i in range(3))
 
+def darken(c, f=0.6):
+    return tuple(int(x*f) for x in c)
 
-def auto_fg(bg: Tuple[int,int,int]) -> Tuple[int,int,int]:
-    """اختار اللون الأبيض أو الأسود بناءً على التباين"""
-    return (255,255,255) if contrast_ratio(bg,(255,255,255)) > contrast_ratio(bg,(0,0,0)) else (0,0,0)
+def lighten(c, f=1.4):
+    return tuple(min(255, int(x*f)) for x in c)
 
+def alpha_composite_manual(base_img, overlay_color, alpha):
+    """Add semi-transparent overlay"""
+    overlay = Image.new("RGB", base_img.size, overlay_color)
+    return Image.blend(base_img, overlay, alpha)
 
-def get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    """حاول تحميل خط، إذا فشل ارجع للخط الافتراضي"""
-    font_paths = []
+def get_font(size: int, bold=False) -> ImageFont.FreeTypeFont:
+    paths = []
     if bold:
-        font_paths = [
+        paths = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-            "/System/Library/Fonts/Helvetica.ttc",
+            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
         ]
     else:
-        font_paths = [
+        paths = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-            "/System/Library/Fonts/Helvetica.ttc",
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
         ]
-    for path in font_paths:
-        if os.path.exists(path):
-            try:
-                return ImageFont.truetype(path, size)
-            except:
-                continue
+    for p in paths:
+        if os.path.exists(p):
+            try: return ImageFont.truetype(p, size)
+            except: continue
     return ImageFont.load_default()
 
-
-def auto_font_size(text: str, max_w: int, max_h: int, bold: bool=True, min_size=20, max_size=120) -> Tuple[ImageFont.FreeTypeFont, int]:
-    """حساب حجم الخط تلقائياً ليناسب المساحة المتاحة"""
-    for size in range(max_size, min_size-1, -2):
-        font = get_font(size, bold)
-        # تقدير عرض النص
-        test_img = Image.new("RGB", (1,1))
-        draw = ImageDraw.Draw(test_img)
+def auto_font_size(text, max_w, max_h, bold=True, min_s=18, max_s=110):
+    for s in range(max_s, min_s-1, -2):
+        f = get_font(s, bold)
+        tmp = Image.new("RGB",(1,1)); d = ImageDraw.Draw(tmp)
         try:
-            bbox = draw.textbbox((0,0), text, font=font)
-            w = bbox[2]-bbox[0]
-            h = bbox[3]-bbox[1]
+            bb = d.textbbox((0,0), text, font=f)
+            w,h = bb[2]-bb[0], bb[3]-bb[1]
         except:
-            w = len(text)*size*0.6
-            h = size
+            w,h = len(text)*s*0.6, s
         if w <= max_w and h <= max_h:
-            return font, size
-    return get_font(min_size, bold), min_size
+            return f, s
+    return get_font(min_s, bold), min_s
 
-
-def draw_text_centered(draw, text, cx, cy, font, color, shadow=None):
-    """رسم نص في المنتصف مع ظل اختياري"""
+def text_wh(draw, text, font):
     try:
-        bbox = draw.textbbox((0,0), text, font=font)
-        w = bbox[2]-bbox[0]
-        h = bbox[3]-bbox[1]
+        bb = draw.textbbox((0,0), text, font=font)
+        return bb[2]-bb[0], bb[3]-bb[1]
     except:
-        w = len(text)*20
-        h = 30
-    x = cx - w//2
-    y = cy - h//2
-    if shadow:
-        draw.text((x+2, y+2), text, font=font, fill=shadow)
+        return len(text)*20, 30
+
+def draw_center(draw, text, cx, cy, font, color, shadow_c=None, shadow_off=3):
+    w,h = text_wh(draw, text, font)
+    x,y = cx-w//2, cy-h//2
+    if shadow_c:
+        draw.text((x+shadow_off, y+shadow_off), text, font=font, fill=shadow_c)
     draw.text((x, y), text, font=font, fill=color)
     return h
 
-
-def make_qr(data: str, fg=(0,0,0), bg=(255,255,255), size=200) -> Image.Image:
-    """توليد QR Code بألوان مخصصة"""
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_H,
-        box_size=10, border=2
-    )
+def make_qr(data: str, fg=(0,0,0), bg=(255,255,255), size=260) -> Image.Image:
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=2)
     qr.add_data(data)
     qr.make(fit=True)
-    img = qr.make_image(fill_color=fg, back_color=bg)
-    img = img.convert("RGB")
+    img = qr.make_image(fill_color=fg, back_color=bg).convert("RGB")
     return img.resize((size, size), Image.LANCZOS)
 
-
-def round_rectangle(draw, xy, radius, fill, outline=None, width=2):
-    """رسم مستطيل بزوايا مدورة"""
+def rounded_rect(draw, xy, r, fill, outline=None, width=2):
     x1,y1,x2,y2 = xy
-    draw.rectangle([x1+radius, y1, x2-radius, y2], fill=fill)
-    draw.rectangle([x1, y1+radius, x2, y2-radius], fill=fill)
-    draw.ellipse([x1, y1, x1+2*radius, y1+2*radius], fill=fill)
-    draw.ellipse([x2-2*radius, y1, x2, y1+2*radius], fill=fill)
-    draw.ellipse([x1, y2-2*radius, x1+2*radius, y2], fill=fill)
-    draw.ellipse([x2-2*radius, y2-2*radius, x2, y2], fill=fill)
+    draw.rectangle([x1+r,y1,x2-r,y2], fill=fill)
+    draw.rectangle([x1,y1+r,x2,y2-r], fill=fill)
+    for cx,cy in [(x1,y1),(x2-2*r,y1),(x1,y2-2*r),(x2-2*r,y2-2*r)]:
+        draw.ellipse([cx,cy,cx+2*r,cy+2*r], fill=fill)
     if outline:
-        draw.arc([x1, y1, x1+2*radius, y1+2*radius], 180, 270, fill=outline, width=width)
-        draw.arc([x2-2*radius, y1, x2, y1+2*radius], 270, 360, fill=outline, width=width)
-        draw.arc([x1, y2-2*radius, x1+2*radius, y2], 90, 180, fill=outline, width=width)
-        draw.arc([x2-2*radius, y2-2*radius, x2, y2], 0, 90, fill=outline, width=width)
-        draw.line([x1+radius, y1, x2-radius, y1], fill=outline, width=width)
-        draw.line([x1+radius, y2, x2-radius, y2], fill=outline, width=width)
-        draw.line([x1, y1+radius, x1, y2-radius], fill=outline, width=width)
-        draw.line([x2, y1+radius, x2, y2-radius], fill=outline, width=width)
-
+        for m,c in [(0,outline)]:
+            draw.arc([x1,y1,x1+2*r,y1+2*r],180,270,fill=c,width=width)
+            draw.arc([x2-2*r,y1,x2,y1+2*r],270,360,fill=c,width=width)
+            draw.arc([x1,y2-2*r,x1+2*r,y2],90,180,fill=c,width=width)
+            draw.arc([x2-2*r,y2-2*r,x2,y2],0,90,fill=c,width=width)
+            draw.line([x1+r,y1,x2-r,y1],fill=c,width=width)
+            draw.line([x1+r,y2,x2-r,y2],fill=c,width=width)
+            draw.line([x1,y1+r,x1,y2-r],fill=c,width=width)
+            draw.line([x2,y1+r,x2,y2-r],fill=c,width=width)
 
 # ─────────────────────────────────────────────────────────────────
-# 🎨 STYLE ENGINES
+# 🍽️ FOOD BACKGROUND GENERATORS
 # ─────────────────────────────────────────────────────────────────
 
-def render_modern_wifi(name, ssid, password, table_num, primary_color, accent_color, wifi_qr_data=None) -> Image.Image:
-    """بطاقة WiFi — طابع عصري"""
-    bg = primary_color
-    fg = auto_fg(bg)
-    acc = accent_color
-
-    img = Image.new("RGB", (CARD_W, CARD_H), bg)
+def draw_tajine_bg(img: Image.Image, accent: Tuple) -> Image.Image:
+    """خلفية طاجين مغربي — أواني فخارية وزخارف"""
     draw = ImageDraw.Draw(img)
+    w, h = img.size
+    a = accent
 
-    # خط عمودي ملون كزخرفة
-    bar_w = 12
-    draw.rectangle([0, 0, bar_w, CARD_H], fill=acc)
+    def tajine(cx, cy, s, alpha_=0.18):
+        # قاعدة الطاجين (دائرية)
+        base_r = s
+        col = blend(a, (0,0,0), 1-alpha_)
+        draw.ellipse([cx-base_r, cy+s//2, cx+base_r, cy+s//2+s//3], fill=col)
+        # جسم الطاجين
+        draw.polygon([
+            (cx-base_r, cy+s//2+s//6),
+            (cx+base_r, cy+s//2+s//6),
+            (cx+base_r//2, cy-s//4),
+            (cx-base_r//2, cy-s//4),
+        ], fill=col)
+        # غطاء مخروطي
+        draw.polygon([
+            (cx-base_r//2, cy-s//4),
+            (cx+base_r//2, cy-s//4),
+            (cx, cy-s),
+        ], fill=blend(a, (255,255,255), 0.1 if alpha_ < 0.15 else 0))
+        # رأس المخروط
+        draw.ellipse([cx-8, cy-s-8, cx+8, cy-s+8], fill=a)
 
-    # مستطيل ضبابي في الخلفية
-    for i in range(3):
-        r = 150 + i*80
-        x0 = CARD_W - r - 20
-        y0 = -r//2
-        opacity_factor = 0.04 - i*0.01
-        overlay_color = tuple(
-            int(c + (255-c)*opacity_factor) if fg == (0,0,0)
-            else int(c*opacity_factor)
-            for c in bg
-        )
-        draw.ellipse([x0, y0, x0+r*2, y0+r*2], fill=overlay_color)
+    # طاجين كبير — خلفية
+    tajine(150, h//2+80, 120, 0.12)
+    tajine(CARD_W-160, h//2+80, 110, 0.10)
+    tajine(CARD_W//2, h-100, 90, 0.08)
+    # صغيرة مبعثرة
+    tajine(80, 100, 55, 0.07)
+    tajine(CARD_W-90, 110, 50, 0.07)
+    tajine(CARD_W//2-180, 80, 45, 0.05)
 
-    # اسم المطعم
-    name_font, name_size = auto_font_size(name, CARD_W//2 - MARGIN*2, 120, bold=True, max_size=90)
-    shadow_c = tuple(max(0, c-40) for c in fg) if fg==(255,255,255) else tuple(min(255, c+40) for c in fg)
-    draw_text_centered(draw, name, CARD_W//4 + bar_w//2, 180, name_font, fg, shadow=None)
+    return img
+
+def draw_sandwich_bg(img: Image.Image, accent: Tuple) -> Image.Image:
+    """خلفية ساندويش وبرغر"""
+    draw = ImageDraw.Draw(img)
+    w, h = img.size
+    a = accent
+
+    def bun(cx, cy, s, alpha_=0.15):
+        col = blend(a, (180, 100, 30), 0.4)
+        col2 = blend(col, (0,0,0), 1-alpha_)
+        # خبزة عليا (نصف دائرة)
+        draw.pieslice([cx-s, cy-s//2, cx+s, cy+s//2], 180, 360, fill=col2)
+        # حشوة (خط ملون)
+        fill_col = blend(a, (100, 180, 50), 0.5)
+        fill_col2 = blend(fill_col, (0,0,0), 1-alpha_)
+        draw.rectangle([cx-s, cy, cx+s, cy+s//5], fill=fill_col2)
+        # خبزة سفلى
+        draw.ellipse([cx-s, cy+s//6, cx+s, cy+s//2+s//3], fill=col2)
+
+    bun(160, h//2, 130, 0.14)
+    bun(CARD_W-170, h//2+20, 120, 0.12)
+    bun(CARD_W//2, h-80, 100, 0.10)
+    bun(90, 130, 60, 0.08)
+    bun(CARD_W-100, 90, 55, 0.08)
+
+    return img
+
+def draw_couscous_bg(img: Image.Image, accent: Tuple) -> Image.Image:
+    """خلفية كسكس — صحون مغربية وزخارف هندسية"""
+    draw = ImageDraw.Draw(img)
+    w, h = img.size
+    a = accent
+
+    def plate(cx, cy, r, alpha_=0.15):
+        col = blend(a, (220,200,150), 0.3)
+        col = blend(col, (0,0,0), 1-alpha_)
+        # طبق
+        draw.ellipse([cx-r, cy-r//4, cx+r, cy+r//4], fill=col)
+        # حافة
+        inner = blend(a, (255,255,255), 0.05)
+        draw.ellipse([cx-r+12, cy-r//4+6, cx+r-12, cy+r//4-6], fill=inner)
+        # كسكس (نقاط صغيرة)
+        for i in range(8):
+            px = cx + int((r//2)*math.cos(i*math.pi/4))
+            py = cy + int((r//8)*math.sin(i*math.pi/4))
+            draw.ellipse([px-5,py-5,px+5,py+5], fill=col)
+
+    plate(150, h//2+50, 130, 0.14)
+    plate(CARD_W-160, h//2+40, 120, 0.12)
+    plate(CARD_W//2, h-60, 100, 0.10)
+    plate(90, 110, 65, 0.08)
+
+    # زخارف هندسية مغربية (نجوم)
+    def star(cx, cy, r, pts=8, alpha_=0.08):
+        col = blend(a, (255,255,255), alpha_)
+        angle_step = math.pi / pts
+        coords = []
+        for i in range(pts*2):
+            rad = r if i%2==0 else r//2
+            angle = i * angle_step - math.pi/2
+            coords.append((cx + int(rad*math.cos(angle)), cy + int(rad*math.sin(angle))))
+        draw.polygon(coords, fill=col)
+
+    star(CARD_W//4, CARD_H//4, 60, 8, 0.07)
+    star(3*CARD_W//4, CARD_H//4, 50, 8, 0.06)
+    star(CARD_W//2, CARD_H//2, 40, 8, 0.05)
+
+    return img
+
+def draw_arabic_pattern_bg(img: Image.Image, accent: Tuple) -> Image.Image:
+    """خلفية زخارف عربية هندسية"""
+    draw = ImageDraw.Draw(img)
+    a = accent
+
+    def hexagon(cx, cy, r, alpha_=0.1):
+        col = blend(a, (255,255,255), alpha_)
+        pts = [(cx+int(r*math.cos(math.pi/3*i-math.pi/6)),
+                cy+int(r*math.sin(math.pi/3*i-math.pi/6))) for i in range(6)]
+        draw.polygon(pts, outline=col, fill=None)
+        # داخل صغير
+        r2 = r*0.5
+        pts2 = [(cx+int(r2*math.cos(math.pi/3*i-math.pi/6+math.pi/6)),
+                 cy+int(r2*math.sin(math.pi/3*i-math.pi/6+math.pi/6))) for i in range(6)]
+        draw.polygon(pts2, fill=blend(a,(0,0,0),0.85))
+
+    # شبكة سداسية
+    step_x, step_y = 140, 120
+    for row in range(-1, CARD_H//step_y+2):
+        for col in range(-1, CARD_W//step_x+2):
+            cx = col*step_x + (70 if row%2 else 0)
+            cy = row*step_y
+            hexagon(cx, cy, 55, 0.09)
+
+    return img
+
+def draw_moroccan_tiles_bg(img: Image.Image, accent: Tuple) -> Image.Image:
+    """خلفية بلاط مغربي — zellige"""
+    draw = ImageDraw.Draw(img)
+    a = accent
+
+    tile_s = 80
+    for row in range(CARD_H//tile_s + 2):
+        for col in range(CARD_W//tile_s + 2):
+            x = col * tile_s
+            y = row * tile_s
+            # مربع خارجي
+            draw.rectangle([x+2, y+2, x+tile_s-2, y+tile_s-2],
+                          outline=blend(a,(0,0,0),0.82), width=1)
+            # نجمة داخلية
+            cx, cy = x+tile_s//2, y+tile_s//2
+            r_out, r_in = 28, 14
+            pts = []
+            for i in range(8):
+                r = r_out if i%2==0 else r_in
+                ang = i*math.pi/4 - math.pi/8
+                pts.append((cx+int(r*math.cos(ang)), cy+int(r*math.sin(ang))))
+            draw.polygon(pts, fill=blend(a,(0,0,0),0.80))
+
+    return img
+
+def draw_minimal_bg(img: Image.Image, accent: Tuple) -> Image.Image:
+    """خلفية بسيطة بخطوط أنيقة"""
+    draw = ImageDraw.Draw(img)
+    a = accent
+    w, h = img.size
+
+    # خطوط قطرية خفيفة
+    col = blend(a, (0,0,0), 0.88)
+    step = 90
+    for i in range(-h, w+h, step):
+        draw.line([(i, 0), (i+h, h)], fill=col, width=1)
+
+    return img
+
+
+# اختيار الخلفية حسب الطابع
+BG_FUNCS = {
+    "tajine":   draw_tajine_bg,
+    "sandwich": draw_sandwich_bg,
+    "couscous": draw_couscous_bg,
+    "arabesque": draw_arabic_pattern_bg,
+    "zellige":  draw_moroccan_tiles_bg,
+    "minimal":  draw_minimal_bg,
+}
+
+BG_LABELS = {
+    "tajine":    "🫕 طاجين مغربي",
+    "sandwich":  "🥙 ساندويش وبرغر",
+    "couscous":  "🍲 كسكس وأطباق",
+    "arabesque": "🌟 زخارف عربية",
+    "zellige":   "🔷 بلاط مغربي",
+    "minimal":   "✨ بسيط وأنيق",
+}
+
+# ─────────────────────────────────────────────────────────────────
+# 📱 SOCIAL MEDIA ICONS (text-based, no external images)
+# ─────────────────────────────────────────────────────────────────
+
+SOCIAL_CONFIG = {
+    "instagram": {"label": "Instagram",  "icon": "📷", "color": (193, 53, 132)},
+    "facebook":  {"label": "Facebook",   "icon": "👍", "color": (24, 119, 242)},
+    "whatsapp":  {"label": "WhatsApp",   "icon": "💬", "color": (37, 211, 102)},
+    "tiktok":    {"label": "TikTok",     "icon": "🎵", "color": (255, 0, 80)},
+    "website":   {"label": "Website",    "icon": "🌐", "color": (100, 149, 237)},
+    "phone":     {"label": "Téléphone",  "icon": "📞", "color": (100, 200, 100)},
+    "snapchat":  {"label": "Snapchat",   "icon": "👻", "color": (255, 252, 0)},
+    "youtube":   {"label": "YouTube",    "icon": "▶️", "color": (255, 0, 0)},
+}
+
+def draw_social_bar(draw: ImageDraw, img_w: int, y_start: int,
+                    socials: dict, accent: Tuple, fg: Tuple,
+                    bg_color: Tuple, card_height: int) -> int:
+    """
+    يرسم شريط مواقع التواصل أسفل البطاقة
+    socials = {"instagram": "@my_resto", "whatsapp": "+212600000000", ...}
+    يرجع: Y النهاية
+    """
+    if not socials:
+        return y_start
+
+    active = [(k, v) for k, v in socials.items() if v.strip() and k in SOCIAL_CONFIG]
+    if not active:
+        return y_start
 
     # خط فاصل
-    sep_x = CARD_W//2
-    draw.line([sep_x, MARGIN, sep_x, CARD_H-MARGIN], fill=acc, width=2)
+    sep_col = blend(accent, fg, 0.3)
+    draw.line([MARGIN, y_start-10, img_w-MARGIN, y_start-10], fill=sep_col, width=1)
 
-    # WiFi QR أو icon
-    cx, cy = CARD_W//4 + bar_w//2, CARD_H//2 + 20
-    if wifi_qr_data:
-        qr_size = 200
-        qr_img = make_qr(wifi_qr_data, fg=bg, bg=acc, size=qr_size)
-        padded = Image.new("RGB", (qr_size+12, qr_size+12), acc)
-        padded.paste(qr_img, (6,6))
-        img.paste(padded, (cx - (qr_size+12)//2, cy - (qr_size+12)//2 - 20))
+    icon_font  = get_font(22, bold=True)
+    label_font = get_font(18)
+    val_font   = get_font(20, bold=True)
+
+    # حساب عرض كل عنصر
+    item_w = (img_w - MARGIN*2) // max(len(active), 1)
+    item_w = min(item_w, 220)
+    total_w = len(active) * item_w
+    x_start = (img_w - total_w) // 2
+
+    for i, (key, val) in enumerate(active):
+        cfg = SOCIAL_CONFIG[key]
+        cx = x_start + i * item_w + item_w // 2
+        cy = y_start + 30
+
+        # دائرة خلفية للأيقونة
+        r = 22
+        icon_bg = blend(cfg["color"], bg_color, 0.7)
+        draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=icon_bg)
+
+        # أيقونة
+        iw, ih = text_wh(draw, cfg["icon"], icon_font)
+        draw.text((cx-iw//2, cy-ih//2), cfg["icon"], font=icon_font, fill=(255,255,255))
+
+        # قيمة (handle أو رقم)
+        display = val[:18] + "…" if len(val) > 18 else val
+        vw, vh = text_wh(draw, display, val_font)
+        draw.text((cx-vw//2, cy+r+8), display, font=val_font, fill=accent)
+
+    return y_start + 80
+
+
+# ─────────────────────────────────────────────────────────────────
+# 🎨 STYLE RENDERERS — 6 STYLES
+# ─────────────────────────────────────────────────────────────────
+
+def _render_card(
+    style: str,
+    name: str,
+    qr_data: str,
+    table_num: int,
+    primary: Tuple,
+    accent: Tuple,
+    bg_type: str,
+    socials: dict,
+    card_type: str,   # "menu" | "wifi"
+    ssid: str = "",
+    wifi_pass: str = ""
+) -> Image.Image:
+    """المعالج الموحد لكل الأطوار"""
+
+    img = Image.new("RGB", (CARD_W, CARD_H), primary)
+    draw = ImageDraw.Draw(img)
+
+    fg = auto_fg(primary)
+    acc = accent
+
+    # ── خلفية ───────────────────────────────────────────────────
+    bg_fn = BG_FUNCS.get(bg_type, draw_minimal_bg)
+    img = bg_fn(img, acc)
+    draw = ImageDraw.Draw(img)
+
+    # ── إطار حسب الطابع ─────────────────────────────────────────
+    if style == "luxury":
+        _frame_luxury(draw, acc, primary)
+    elif style == "modern":
+        _frame_modern(draw, acc, primary)
+    elif style == "classic":
+        _frame_classic(draw, acc, primary)
+    elif style == "bold":
+        _frame_bold(draw, acc, primary, fg)
+    elif style == "neon":
+        _frame_neon(draw, acc, primary)
+    elif style == "rustic":
+        _frame_rustic(draw, acc, primary)
+
+    # ── QR ──────────────────────────────────────────────────────
+    qr_size, qr_x, qr_y = _place_qr(
+        img, draw, style, qr_data, primary, acc, fg, card_type
+    )
+
+    # ── نص ──────────────────────────────────────────────────────
+    social_y = _draw_texts(
+        draw, style, name, table_num, primary, acc, fg,
+        qr_x, qr_y, qr_size, card_type, ssid, wifi_pass, socials
+    )
+
+    # ── سوشيال ─────────────────────────────────────────────────
+    if socials:
+        draw_social_bar(draw, CARD_W, social_y, socials, acc, fg, primary, CARD_H)
+
+    return img
+
+
+# ── إطارات ──────────────────────────────────────────────────────
+
+def _frame_luxury(draw, acc, bg):
+    for m, w in [(14,2),(26,1)]:
+        draw.rectangle([m,m,CARD_W-m,CARD_H-m], outline=acc, width=w)
+    for cx,cy in [(26,26),(CARD_W-26,26),(26,CARD_H-26),(CARD_W-26,CARD_H-26)]:
+        draw.ellipse([cx-6,cy-6,cx+6,cy+6], fill=acc)
+        draw.ellipse([cx-3,cy-3,cx+3,cy+3], fill=bg)
+
+def _frame_modern(draw, acc, bg):
+    # خط علوي ملون
+    draw.rectangle([0,0,CARD_W,10], fill=acc)
+    draw.rectangle([0,CARD_H-10,CARD_W,CARD_H], fill=acc)
+    # خط جانبي
+    draw.rectangle([0,0,8,CARD_H], fill=darken(acc, 0.8))
+
+def _frame_classic(draw, acc, bg):
+    for m, w in [(14,3),(26,1)]:
+        draw.rectangle([m,m,CARD_W-m,CARD_H-m], outline=acc, width=w)
+    # نقاط زوايا
+    for cx,cy in [(14,14),(CARD_W-14,14),(14,CARD_H-14),(CARD_W-14,CARD_H-14)]:
+        draw.ellipse([cx-8,cy-8,cx+8,cy+8], fill=acc)
+
+def _frame_bold(draw, acc, bg, fg):
+    # شريط علوي عريض
+    draw.rectangle([0,0,CARD_W,90], fill=acc)
+    # شريط سفلي
+    draw.rectangle([0,CARD_H-60,CARD_W,CARD_H], fill=darken(acc,0.7))
+
+def _frame_neon(draw, acc, bg):
+    # إطار متوهج
+    neon = lighten(acc, 1.5)
+    for m, w, a in [(10,4,acc),(14,2,lighten(acc,1.3)),(18,1,acc)]:
+        draw.rectangle([m,m,CARD_W-m,CARD_H-m], outline=a, width=w)
+
+def _frame_rustic(draw, acc, bg):
+    # إطار خشبي متقطع
+    seg = 40
+    for x in range(14, CARD_W-14, seg*2):
+        draw.line([x,14,x+seg,14], fill=acc, width=3)
+        draw.line([x,CARD_H-14,x+seg,CARD_H-14], fill=acc, width=3)
+    for y in range(14, CARD_H-14, seg*2):
+        draw.line([14,y,14,y+seg], fill=acc, width=3)
+        draw.line([CARD_W-14,y,CARD_W-14,y+seg], fill=acc, width=3)
+    # نجوم في الزوايا
+    for cx,cy in [(28,28),(CARD_W-28,28),(28,CARD_H-28),(CARD_W-28,CARD_H-28)]:
+        draw.text((cx-10,cy-12), "✦", font=get_font(24), fill=acc)
+
+
+# ── وضع QR ──────────────────────────────────────────────────────
+
+def _place_qr(img, draw, style, data, primary, acc, fg, card_type):
+    """يضع QR في موقعه ويرجع (size, x, y)"""
+    qr_size = 300
+
+    if style in ("bold",):
+        qr_x = CARD_W//2 - qr_size//2
+        qr_y = CARD_H//2 - qr_size//2 + 30
     else:
-        for r in [80, 55, 30]:
-            draw.arc([cx-r, cy-r, cx+r, cy+r], 210, 330, fill=acc, width=4)
-        draw.ellipse([cx-8, cy-8, cx+8, cy+8], fill=acc)
+        qr_x = CARD_W//2 - qr_size//2
+        qr_y = CARD_H//2 - qr_size//2 + 15
 
-    # WiFi label
-    wifi_font = get_font(28, bold=True)
-    draw.text((cx - 60, cy + 95), "📶  WiFi", font=wifi_font, fill=acc)
+    # ألوان QR حسب الطابع
+    if style == "luxury":
+        qr_img = make_qr(data, fg=primary, bg=acc, size=qr_size)
+        border, border_col = 14, acc
+    elif style == "neon":
+        qr_img = make_qr(data, fg=primary, bg=lighten(acc,1.4), size=qr_size)
+        border, border_col = 10, lighten(acc,1.4)
+    elif style == "bold":
+        qr_img = make_qr(data, fg=primary, bg=fg, size=qr_size)
+        border, border_col = 12, fg
+    elif style == "rustic":
+        qr_img = make_qr(data, fg=darken(acc,0.6), bg=lighten(primary,1.3), size=qr_size)
+        border, border_col = 12, acc
+    else:  # modern, classic
+        qr_img = make_qr(data, fg=primary, bg=acc, size=qr_size)
+        border, border_col = 12, acc
 
-    # كارطة المعلومات
-    info_x = CARD_W//2 + MARGIN
-    info_w = CARD_W//2 - MARGIN*2
+    # إطار حول QR
+    framed = Image.new("RGB", (qr_size+border*2, qr_size+border*2), border_col)
+    framed.paste(qr_img, (border, border))
+    img.paste(framed, (qr_x, qr_y))
+
+    return qr_size, qr_x, qr_y
+
+
+# ── النصوص ──────────────────────────────────────────────────────
+
+def _draw_texts(draw, style, name, table_num, primary, acc, fg,
+                qr_x, qr_y, qr_size, card_type, ssid, wifi_pass, socials):
+    """يرسم كل النصوص ويرجع Y لشريط السوشيال"""
+
+    has_social = bool(socials and any(v.strip() for v in socials.values()))
+    social_reserve = 90 if has_social else 0
+    bottom_y = CARD_H - 50 - social_reserve
+
+    # ── اسم المطعم ──────────────────────────────────────────────
+    if style == "bold":
+        # الاسم في الشريط العلوي
+        name_font, _ = auto_font_size(name, CARD_W-100, 65, bold=True, max_s=65)
+        name_fg = auto_fg(acc)
+        shadow_c = darken(name_fg, 0.7) if name_fg==(255,255,255) else lighten(name_fg,1.3)
+        draw_center(draw, name, CARD_W//2, 48, name_font, name_fg, shadow_c)
+    else:
+        # الاسم أعلى QR
+        name_font, _ = auto_font_size(name, CARD_W-120, 70, bold=True, max_s=72)
+        shadow_c = darken(fg, 0.6) if fg==(255,255,255) else (200,200,200)
+        draw_center(draw, name, CARD_W//2, qr_y - 55, name_font, fg, shadow_c)
+
+    # ── خط زخرفي تحت الاسم ──────────────────────────────────────
+    if style == "luxury":
+        lx = CARD_W//2
+        ll = 220
+        draw.line([lx-ll//2, qr_y-22, lx+ll//2, qr_y-22], fill=acc, width=1)
+        draw.text((lx-8, qr_y-34), "✦", font=get_font(18), fill=acc)
+    elif style == "classic":
+        lx = CARD_W//2; ll = 200
+        draw.line([lx-ll//2, qr_y-20, lx+ll//2, qr_y-20], fill=acc, width=2)
+    elif style in ("modern", "neon"):
+        lx = CARD_W//2; ll = 180
+        draw.line([lx-ll//2, qr_y-20, lx+ll//2, qr_y-20], fill=acc, width=3)
+
+    # ── نص CTA تحت QR ───────────────────────────────────────────
+    cta_y = qr_y + qr_size + 28 + 14  # 28 = border*2
+    if card_type == "menu":
+        cta_text = "↑ Scannez pour commander ↑" if style != "luxury" else "✦  Scannez pour voir le menu  ✦"
+    else:
+        cta_text = "↑ Scanner pour se connecter au WiFi ↑"
+
+    cta_font = get_font(22, bold=(style in ("bold","neon")))
+    cta_col = acc if style not in ("bold",) else auto_fg(primary)
+    draw_center(draw, cta_text, CARD_W//2, cta_y, cta_font, cta_col)
+
+    # ── رقم الطاولة ─────────────────────────────────────────────
+    tbl_text = f"Table  {table_num}"
+    tbl_y = cta_y + 50
+
+    if style == "bold":
+        # في الشريط السفلي
+        tbl_font = get_font(30, bold=True)
+        tbl_fg = auto_fg(darken(acc,0.7))
+        draw_center(draw, tbl_text, CARD_W//2, CARD_H - 34, tbl_font, tbl_fg)
+    elif style == "luxury":
+        tbl_font = get_font(28, bold=True)
+        draw_center(draw, tbl_text, CARD_W//2, min(tbl_y, bottom_y-10), tbl_font, fg)
+    else:
+        # Badge
+        tbl_font = get_font(24, bold=True)
+        tbl_fg_c = auto_fg(acc)
+        tw, th = text_wh(draw, tbl_text, tbl_font)
+        bx = CARD_W//2 - tw//2 - 20
+        by = min(tbl_y - 10, bottom_y - 45)
+        rounded_rect(draw, [bx, by, bx+tw+40, by+th+18], 12, acc)
+        draw.text((bx+20, by+9), tbl_text, font=tbl_font, fill=tbl_fg_c)
+
+    # ── معلومات WiFi (بطاقة WiFi فقط) ──────────────────────────
+    if card_type == "wifi" and ssid:
+        _draw_wifi_info(draw, ssid, wifi_pass, primary, acc, fg, style, qr_x, qr_y, qr_size, bottom_y)
+
+    return bottom_y + 10
+
+
+def _draw_wifi_info(draw, ssid, wifi_pass, primary, acc, fg, style, qr_x, qr_y, qr_size, bottom_y):
+    """معلومات الشبكة — تُعرض بجانب/أسفل QR"""
+
+    # نضعها على يسار أو يمين QR حسب المكان المتاح
+    info_x = 40
+    info_w  = qr_x - 80
+    if info_w < 200:
+        # نضعها أسفل
+        info_x = MARGIN
+        info_w  = CARD_W - MARGIN*2
+        base_y  = qr_y + qr_size + 60
+    else:
+        base_y = qr_y + 40
+
+    label_font = get_font(22)
+    val_font   = get_font(32, bold=True)
+    label_col  = blend(fg, primary, 0.35)
 
     # SSID
-    ssid_label_font = get_font(22)
-    ssid_font, _ = auto_font_size(ssid, info_w, 60, bold=True, max_size=52, min_size=24)
-    draw.text((info_x, 120), "SSID", font=ssid_label_font, fill=tuple(int(c*0.6) for c in fg) if fg==(255,255,255) else tuple(int(c+40) for c in fg))
-    draw_text_centered(draw, ssid, info_x + info_w//2, 200, ssid_font, fg)
+    draw.text((info_x, base_y), "RÉSEAU / SSID", font=label_font, fill=label_col)
+    ssid_font, _ = auto_font_size(ssid, info_w, 50, bold=True, max_s=42, min_s=20)
+    ssid_w, ssid_h = text_wh(draw, ssid, ssid_font)
+    draw.text((info_x, base_y+28), ssid, font=ssid_font, fill=fg)
 
-    # خط فاصل داخلي
-    draw.line([info_x, 240, info_x + info_w, 240], fill=acc, width=1)
+    # فاصل
+    sep_y = base_y + 28 + ssid_h + 12
+    draw.line([info_x, sep_y, info_x+info_w, sep_y], fill=acc, width=1)
 
     # Password
-    draw.text((info_x, 260), "Password", font=ssid_label_font, fill=tuple(int(c*0.6) for c in fg) if fg==(255,255,255) else tuple(int(c+40) for c in fg))
-    pass_font, _ = auto_font_size(password, info_w, 60, bold=True, max_size=52, min_size=20)
-    draw_text_centered(draw, password, info_x + info_w//2, 340, pass_font, acc)
-
-    # Table number badge
-    badge_x, badge_y = info_x + info_w - 100, CARD_H - 120
-    round_rectangle(draw, [badge_x, badge_y, badge_x+180, badge_y+70], 12, acc)
-    tbl_font = get_font(26, bold=True)
-    tbl_fg = auto_fg(acc)
-    draw.text((badge_x + 12, badge_y + 18), f"Table {table_num}", font=tbl_font, fill=tbl_fg)
-
-    # Footer
-    footer_font = get_font(20)
-    footer_c = tuple(int(c*0.5) for c in fg) if fg==(255,255,255) else tuple(min(255, c+80) for c in fg)
-    draw.text((bar_w + MARGIN, CARD_H - 50), "Connectez-vous et commandez", font=footer_font, fill=footer_c)
-
-    return img
-
-
-def render_luxury_wifi(name, ssid, password, table_num, primary_color, accent_color, wifi_qr_data=None) -> Image.Image:
-    """بطاقة WiFi — طابع فاخر"""
-    GOLD = accent_color
-    DARK = primary_color
-    CREAM = auto_fg(DARK)
-
-    img = Image.new("RGB", (CARD_W, CARD_H), DARK)
-    draw = ImageDraw.Draw(img)
-
-    # إطار ذهبي
-    frame_m = 20
-    draw.rectangle([frame_m, frame_m, CARD_W-frame_m, CARD_H-frame_m], outline=GOLD, width=2)
-    inner_m = 32
-    draw.rectangle([inner_m, inner_m, CARD_W-inner_m, CARD_H-inner_m], outline=GOLD, width=1)
-
-    # زخارف زوايا
-    corner_size = 40
-    for cx, cy in [(inner_m, inner_m), (CARD_W-inner_m, inner_m),
-                   (inner_m, CARD_H-inner_m), (CARD_W-inner_m, CARD_H-inner_m)]:
-        draw.ellipse([cx-5, cy-5, cx+5, cy+5], fill=GOLD)
-
-    # اسم المطعم
-    name_font, _ = auto_font_size(name, CARD_W//2 - 100, 100, bold=True, max_size=80)
-    draw_text_centered(draw, name, CARD_W//4, 150, name_font, GOLD)
-
-    # خط ذهبي تحت الاسم
-    center_x = CARD_W//4
-    line_len = min(300, CARD_W//3)
-    draw.line([center_x-line_len//2, 210, center_x+line_len//2, 210], fill=GOLD, width=1)
-    draw.text((center_x - 12, 198), "✦", font=get_font(20), fill=GOLD)
-
-    # WiFi QR أو دوائر
-    qcx, qcy = CARD_W//4, CARD_H//2 + 10
-    if wifi_qr_data:
-        qr_size = 190
-        qr_img = make_qr(wifi_qr_data, fg=DARK, bg=GOLD, size=qr_size)
-        border = 10
-        framed = Image.new("RGB", (qr_size+border*2, qr_size+border*2), GOLD)
-        framed.paste(qr_img, (border, border))
-        img.paste(framed, (qcx-(qr_size+border*2)//2, qcy-(qr_size+border*2)//2 - 15))
-    else:
-        for r, w in [(90, 2), (60, 2), (32, 3)]:
-            draw.arc([qcx-r, qcy-r, qcx+r, qcy+r], 210, 330, fill=GOLD, width=w)
-        draw.ellipse([qcx-7, qcy-7, qcx+7, qcy+7], fill=GOLD)
-
-    # فاصل عمودي
-    mid = CARD_W//2
-    for y in range(inner_m+10, CARD_H-inner_m-10, 15):
-        draw.line([mid, y, mid, y+8], fill=GOLD, width=1)
-
-    # معلومات الاتصال
-    info_x = mid + 60
-    info_w = CARD_W - mid - inner_m - 60
-    label_font = get_font(22)
-    label_color = tuple(int(c*0.6) for c in CREAM)
-
-    draw.text((info_x, 100), "RÉSEAU", font=label_font, fill=label_color)
-    ssid_font, _ = auto_font_size(ssid, info_w, 70, bold=True, max_size=55, min_size=22)
-    draw_text_centered(draw, ssid, info_x + info_w//2, 175, ssid_font, CREAM)
-
-    draw.line([info_x, 215, info_x+info_w, 215], fill=GOLD, width=1)
-
-    draw.text((info_x, 235), "MOT DE PASSE", font=label_font, fill=label_color)
-    pass_font, _ = auto_font_size(password, info_w, 70, bold=True, max_size=55, min_size=22)
-    draw_text_centered(draw, password, info_x + info_w//2, 315, pass_font, GOLD)
-
-    draw.line([info_x, 360, info_x+info_w, 360], fill=GOLD, width=1)
-
-    draw.text((info_x, 380), "TABLE", font=label_font, fill=label_color)
-    tbl_font = get_font(60, bold=True)
-    draw_text_centered(draw, str(table_num), info_x + info_w//2, 460, tbl_font, CREAM)
-
-    # Footer
-    footer_font = get_font(18)
-    draw_text_centered(draw, "✦  Bienvenue  ✦", CARD_W//2, CARD_H - 55, footer_font, GOLD)
-
-    return img
-
-
-def render_classic_wifi(name, ssid, password, table_num, primary_color, accent_color, wifi_qr_data=None) -> Image.Image:
-    """بطاقة WiFi — طابع كلاسيكي"""
-    CREAM = primary_color
-    BROWN = accent_color
-    TEXT  = auto_fg(CREAM)
-
-    img = Image.new("RGB", (CARD_W, CARD_H), CREAM)
-    draw = ImageDraw.Draw(img)
-
-    # حدود مزدوجة
-    m1, m2 = 15, 28
-    draw.rectangle([m1, m1, CARD_W-m1, CARD_H-m1], outline=BROWN, width=3)
-    draw.rectangle([m2, m2, CARD_W-m2, CARD_H-m2], outline=BROWN, width=1)
-
-    # زخارف زوايا كلاسيكية
-    for ox, oy in [(m2,m2), (CARD_W-m2,m2), (m2,CARD_H-m2), (CARD_W-m2,CARD_H-m2)]:
-        draw.ellipse([ox-8, oy-8, ox+8, oy+8], fill=BROWN)
-        draw.ellipse([ox-4, oy-4, ox+4, oy+4], fill=CREAM)
-
-    # زخرفة علوية مركزية
-    top_y = 50
-    draw_text_centered(draw, "❦", CARD_W//2, top_y, get_font(36), BROWN)
-
-    # اسم المطعم
-    name_font, _ = auto_font_size(name, CARD_W - 150, 90, bold=True, max_size=75)
-    draw_text_centered(draw, name, CARD_W//2, 130, name_font, BROWN)
-
-    # خط فاصل أنيق
-    sep_y = 190
-    draw.line([80, sep_y, CARD_W-80, sep_y], fill=BROWN, width=2)
-    draw_text_centered(draw, "✦", CARD_W//2, sep_y, get_font(16), BROWN)
-
-    # كولونتين لـ WiFi والمعلومات
-    left_cx = CARD_W // 4
-    right_cx = 3 * CARD_W // 4
-
-    # WiFi QR أو دوائر
-    wcy = CARD_H // 2 + 30
-    if wifi_qr_data:
-        qr_size = 180
-        qr_img = make_qr(wifi_qr_data, fg=BROWN, bg=CREAM, size=qr_size)
-        border = 8
-        framed = Image.new("RGB", (qr_size+border*2, qr_size+border*2), BROWN)
-        framed.paste(qr_img, (border, border))
-        img.paste(framed, (left_cx-(qr_size+border*2)//2, wcy-(qr_size+border*2)//2 - 10))
-    else:
-        for r, w in [(75, 3), (50, 3), (27, 3)]:
-            draw.arc([left_cx-r, wcy-r, left_cx+r, wcy+r], 210, 330, fill=BROWN, width=w)
-        draw.ellipse([left_cx-7, wcy-7, left_cx+7, wcy+7], fill=BROWN)
-    wifi_label = get_font(22, bold=True)
-    draw_text_centered(draw, "WiFi", left_cx, wcy+90, wifi_label, BROWN)
-
-    # فاصل عمودي نقطي
-    vx = CARD_W // 2
-    for y in range(200, CARD_H-50, 12):
-        draw.ellipse([vx-2, y-2, vx+2, y+2], fill=BROWN)
-
-    # معلومات
-    label_font = get_font(22)
-    value_font_ssid, _ = auto_font_size(ssid, CARD_W//2-80, 60, bold=True, max_size=48, min_size=20)
-    value_font_pass, _ = auto_font_size(password, CARD_W//2-80, 60, bold=True, max_size=48, min_size=20)
-    info_w = CARD_W//2 - 60
-
-    draw.text((right_cx - info_w//2, 220), "Réseau WiFi", font=label_font, fill=BROWN)
-    draw_text_centered(draw, ssid, right_cx, 290, value_font_ssid, TEXT)
-    draw.line([right_cx-150, 330, right_cx+150, 330], fill=BROWN, width=1)
-
-    draw.text((right_cx - info_w//2, 350), "Mot de passe", font=label_font, fill=BROWN)
-    draw_text_centered(draw, password, right_cx, 420, value_font_pass, BROWN)
-
-    # رقم الطاولة
-    tbl_y = CARD_H - 110
-    draw.line([right_cx-120, tbl_y-15, right_cx+120, tbl_y-15], fill=BROWN, width=1)
-    tbl_font = get_font(42, bold=True)
-    draw_text_centered(draw, f"Table {table_num}", right_cx, tbl_y + 25, tbl_font, BROWN)
-
-    # footer
-    footer_font = get_font(18)
-    draw_text_centered(draw, "Bon appétit  ❦", CARD_W//2, CARD_H - 42, footer_font, BROWN)
-
-    return img
+    draw.text((info_x, sep_y+10), "MOT DE PASSE", font=label_font, fill=label_col)
+    pass_font, _ = auto_font_size(wifi_pass, info_w, 55, bold=True, max_s=46, min_s=20)
+    draw.text((info_x, sep_y+36), wifi_pass, font=pass_font, fill=acc)
 
 
 # ─────────────────────────────────────────────────────────────────
-# 📱 QR MENU CARDS (Side B)
+# 🏭 PUBLIC API
 # ─────────────────────────────────────────────────────────────────
 
-def render_menu_qr_card(name, menu_url, table_num, style, primary_color, accent_color) -> Image.Image:
-    """الوجه الثاني — QR للمينيو"""
-    if style == "modern":
-        return _menu_qr_modern(name, menu_url, table_num, primary_color, accent_color)
-    elif style == "luxury":
-        return _menu_qr_luxury(name, menu_url, table_num, primary_color, accent_color)
-    else:
-        return _menu_qr_classic(name, menu_url, table_num, primary_color, accent_color)
-
-
-def _menu_qr_modern(name, url, table_num, primary, accent):
-    bg = primary; fg = auto_fg(bg); acc = accent
-    img = Image.new("RGB", (CARD_W, CARD_H), bg)
-    draw = ImageDraw.Draw(img)
-
-    # خط جانبي
-    draw.rectangle([CARD_W-12, 0, CARD_W, CARD_H], fill=acc)
-
-    # QR بألوان مخصصة
-    qr_size = 340
-    qr_bg = fg; qr_fg = bg
-    qr_img = make_qr(url, fg=qr_fg, bg=qr_bg, size=qr_size)
-    # إضافة padding للـ QR
-    padded = Image.new("RGB", (qr_size+16, qr_size+16), fg)
-    padded.paste(qr_img, (8,8))
-    round_qr = padded
-    qr_x = CARD_W//2 - qr_size//2 - 8
-    qr_y = CARD_H//2 - qr_size//2 - 8
-    img.paste(padded, (qr_x, qr_y))
-
-    # اسم فوق
-    name_font, _ = auto_font_size(name, CARD_W - 160, 80, bold=True, max_size=68)
-    shadow = tuple(max(0,c-50) for c in fg)
-    draw_text_centered(draw, name, CARD_W//2, 85, name_font, fg)
-
-    # خط أسفل الاسم
-    draw.line([CARD_W//2-120, 130, CARD_W//2+120, 130], fill=acc, width=2)
-
-    # نص الدعوة
-    cta_font = get_font(26, bold=True)
-    cta_y = qr_y + qr_size + 24
-    draw_text_centered(draw, "↑ Scannez pour commander ↑", CARD_W//2, cta_y + 16, cta_font, acc)
-
-    # Table badge
-    badge_w, badge_h = 160, 52
-    bx = MARGIN; by = CARD_H - MARGIN - badge_h
-    round_rectangle(draw, [bx, by, bx+badge_w, by+badge_h], 10, acc)
-    tbl_font = get_font(24, bold=True)
-    tbl_fg = auto_fg(acc)
-    draw.text((bx+12, by+12), f"Table {table_num}", font=tbl_font, fill=tbl_fg)
-
-    return img
-
-
-def _menu_qr_luxury(name, url, table_num, primary, accent):
-    GOLD = accent; DARK = primary; CREAM = auto_fg(DARK)
-    img = Image.new("RGB", (CARD_W, CARD_H), DARK)
-    draw = ImageDraw.Draw(img)
-
-    # إطارات
-    for m, w in [(15,2), (27,1)]:
-        draw.rectangle([m, m, CARD_W-m, CARD_H-m], outline=GOLD, width=w)
-
-    # زخرفة علوية
-    draw_text_centered(draw, "✦", CARD_W//2, 50, get_font(30), GOLD)
-
-    # الاسم
-    name_font, _ = auto_font_size(name, CARD_W - 140, 80, bold=True, max_size=72)
-    draw_text_centered(draw, name, CARD_W//2, 120, name_font, GOLD)
-
-    # خط ذهبي
-    draw.line([CARD_W//2-200, 165, CARD_W//2+200, 165], fill=GOLD, width=1)
-
-    # QR مع إطار ذهبي
-    qr_size = 300
-    qr_img = make_qr(url, fg=DARK, bg=CREAM, size=qr_size)
-    border = 14
-    framed = Image.new("RGB", (qr_size+border*2, qr_size+border*2), GOLD)
-    framed.paste(qr_img, (border, border))
-    qx = CARD_W//2 - (qr_size+border*2)//2
-    qy = CARD_H//2 - (qr_size+border*2)//2 + 10
-    img.paste(framed, (qx, qy))
-
-    # CTA
-    cta_y = qy + qr_size + border*2 + 20
-    draw_text_centered(draw, "✦  Scannez pour commander  ✦", CARD_W//2, cta_y + 14, get_font(22), GOLD)
-
-    # رقم طاولة
-    tbl_font = get_font(26, bold=True)
-    draw_text_centered(draw, f"Table  {table_num}", CARD_W//2, CARD_H - 48, tbl_font, CREAM)
-
-    return img
-
-
-def _menu_qr_classic(name, url, table_num, primary, accent):
-    CREAM = primary; BROWN = accent; TEXT = auto_fg(CREAM)
-    img = Image.new("RGB", (CARD_W, CARD_H), CREAM)
-    draw = ImageDraw.Draw(img)
-
-    for m, w in [(15,3), (27,1)]:
-        draw.rectangle([m, m, CARD_W-m, CARD_H-m], outline=BROWN, width=w)
-
-    draw_text_centered(draw, "❦", CARD_W//2, 50, get_font(36), BROWN)
-
-    name_font, _ = auto_font_size(name, CARD_W-140, 80, bold=True, max_size=72)
-    draw_text_centered(draw, name, CARD_W//2, 120, name_font, BROWN)
-    draw.line([CARD_W//2-180, 165, CARD_W//2+180, 165], fill=BROWN, width=2)
-
-    qr_size = 300
-    qr_img = make_qr(url, fg=BROWN, bg=CREAM, size=qr_size)
-    border = 12
-    framed = Image.new("RGB", (qr_size+border*2, qr_size+border*2), BROWN)
-    framed.paste(qr_img, (border, border))
-    qx = CARD_W//2 - (qr_size+border*2)//2
-    qy = CARD_H//2 - (qr_size+border*2)//2 + 10
-    img.paste(framed, (qx, qy))
-
-    cta_y = qy + qr_size + border*2 + 18
-    draw_text_centered(draw, "❦  Scannez pour voir le menu  ❦", CARD_W//2, cta_y+14, get_font(22), BROWN)
-
-    tbl_font = get_font(26, bold=True)
-    draw_text_centered(draw, f"Table  {table_num}", CARD_W//2, CARD_H-48, tbl_font, BROWN)
-
-    return img
-
-
-# ─────────────────────────────────────────────────────────────────
-# 🏭 PUBLIC FACTORY FUNCTION
-# ─────────────────────────────────────────────────────────────────
+STYLE_LABELS = {
+    "luxury":  "👑 فاخر ذهبي",
+    "modern":  "🔷 عصري",
+    "classic": "📜 كلاسيكي",
+    "bold":    "⚡ جريء",
+    "neon":    "🌈 نيون",
+    "rustic":  "🌿 ريفي",
+}
 
 def generate_table_card(
     restaurant_name: str,
@@ -584,33 +662,38 @@ def generate_table_card(
     menu_url: str,
     style: str = "luxury",
     primary_color_hex: str = "#0a0804",
-    accent_color_hex: str = "#C9A84C"
-) -> Tuple[Image.Image, Image.Image]:
+    accent_color_hex:  str = "#C9A84C",
+    bg_type: str = "minimal",
+    socials: dict = None,
+) -> tuple:
     """
-    🎨 الدالة الرئيسية — تنتج وجهين لبطاقة الطاولة
+    🎨 يولد بطاقتين: (menu_card, wifi_card)
+    
+    bg_type: tajine | sandwich | couscous | arabesque | zellige | minimal
+    socials: {"instagram": "@handle", "whatsapp": "+212...", ...}
+    """
+    if socials is None:
+        socials = {}
 
-    Returns:
-        (wifi_card, menu_qr_card) — صورتان بحجم A5
-    """
     primary = hex_to_rgb(primary_color_hex)
     accent  = hex_to_rgb(accent_color_hex)
     style   = style.lower()
 
-    # ── Menu QR Card (الواجهة الأولى — QR للصفحة)
-    menu_card = render_menu_qr_card(restaurant_name, menu_url, table_number, style, primary, accent)
+    wifi_qr = f"WIFI:T:WPA;S:{ssid};P:{wifi_password};;"
 
-    # ── WiFi QR Card (الواجهة الثانية — QR للـ WiFi)
-    # بناء WiFi QR string (يفتح إعدادات WiFi مباشرة)
-    wifi_qr_data = f"WIFI:T:WPA;S:{ssid};P:{wifi_password};;"
+    menu_card = _render_card(
+        style=style, name=restaurant_name, qr_data=menu_url,
+        table_num=table_number, primary=primary, accent=accent,
+        bg_type=bg_type, socials=socials, card_type="menu"
+    )
 
-    if style == "modern":
-        wifi_card = render_modern_wifi(restaurant_name, ssid, wifi_password, table_number, primary, accent, wifi_qr_data)
-    elif style == "luxury":
-        wifi_card = render_luxury_wifi(restaurant_name, ssid, wifi_password, table_number, primary, accent, wifi_qr_data)
-    else:
-        wifi_card = render_classic_wifi(restaurant_name, ssid, wifi_password, table_number, primary, accent, wifi_qr_data)
+    wifi_card = _render_card(
+        style=style, name=restaurant_name, qr_data=wifi_qr,
+        table_num=table_number, primary=primary, accent=accent,
+        bg_type=bg_type, socials=socials, card_type="wifi",
+        ssid=ssid, wifi_pass=wifi_password
+    )
 
-    # ✅ الواجهة الأولى = QR المينيو | الواجهة الثانية = QR WiFi
     return menu_card, wifi_card
 
 
