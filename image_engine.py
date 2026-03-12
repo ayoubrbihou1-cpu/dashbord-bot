@@ -145,13 +145,23 @@ def fetch_pollinations(name: str, count: int = 1) -> list:
                     log.warning(f"Pollinations old endpoint error for {name}: {e2}")
 
             if img_url:
-                results.append({
-                    "url": img_url,
-                    "thumb": img_url,
-                    "credit": "AI Generated — Pollinations",
-                    "method": "pollinations",
-                    "seed": seed
-                })
+                # نحمّل الصورة كـ base64 لضمان العرض الصحيح في Streamlit
+                try:
+                    img_resp = requests.get(img_url, headers=headers, timeout=60)
+                    if img_resp.status_code == 200:
+                        import base64 as _b64
+                        img_data = _b64.b64encode(img_resp.content).decode()
+                        results.append({
+                            "url": img_url,
+                            "thumb": img_url,
+                            "bytes": img_resp.content,
+                            "b64": img_data,
+                            "credit": "AI Generated — Pollinations",
+                            "method": "pollinations",
+                            "seed": seed
+                        })
+                except Exception as e_img:
+                    log.warning(f"Failed to download image: {e_img}")
 
         except Exception as e:
             log.warning(f"Pollinations error for {name}: {e}")
