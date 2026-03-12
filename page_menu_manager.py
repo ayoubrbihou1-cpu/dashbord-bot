@@ -165,6 +165,59 @@ def translate_three_languages(name: str) -> tuple:
 
 HEADERS = ["name","name_fr","name_en","price","description","available","image_url","image_credit"]
 
+
+def translate_batch(names: list) -> list:
+    """
+    يترجم قائمة أسماء دفعة واحدة في استدعاء Gemini واحد فقط
+    يرجع قائمة من (name_ar, name_fr, name_en) لكل اسم
+    """
+    if not names:
+        return []
+    try:
+        # بناء قائمة الأسماء مرقمة
+        numbered = "\n".join(f"{i+1}. {n}" for i, n in enumerate(names))
+        prompt = (
+            "You are a Moroccan restaurant menu translator.\n"
+            "Translate each dish name below to Arabic, French, and English.\n"
+            "Reply ONLY with a JSON array, no extra text:\n"
+            '[{"ar":"...","fr":"...","en":"..."}]\n\n'
+            f"Dishes:\n{numbered}"
+        )
+        txt = gemini_text(prompt, max_tokens=4000, temperature=0)
+        # تنظيف JSON
+        txt = txt.strip()
+        if "```json" in txt:
+            txt = txt.split("```json")[1].split("```")[0].strip()
+        elif "```" in txt:
+            txt = txt.split("```")[1].split("```")[0].strip()
+        if not txt.startswith("["):
+            start = txt.find("[")
+            if start != -1:
+                txt = txt[start:]
+        import json as _json
+        parsed = _json.loads(txt)
+        result = []
+        for i, item in enumerate(parsed):
+            orig = names[i] if i < len(names) else ""
+            lang = _detect_language(orig)
+            ar = item.get("ar", "") or (orig if lang == "arabic" else "")
+            fr = item.get("fr", "") or (orig if lang == "french" else "")
+            en = item.get("en", "") or (orig if lang == "english" else "")
+            result.append((ar, fr, en))
+        return result
+    except Exception as e:
+        # fallback — إرجاع الاسم الأصلي بدون ترجمة
+        result = []
+        for name in names:
+            lang = _detect_language(name)
+            if lang == "arabic":
+                result.append((name, "", ""))
+            elif lang == "french":
+                result.append(("", name, ""))
+            else:
+                result.append(("", "", name))
+        return result
+
 def _gs():
     if SA_JSON_CONTENT:
         c = Credentials.from_service_account_info(json.loads(SA_JSON_CONTENT), scopes=SCOPES)
@@ -621,20 +674,28 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
                 with col_save:
                     if st.button("💾 حفظ كل الأكلات في Google Sheet ✅",
                                   use_container_width=True, key="btn_save_ai_items"):
-                        with st.spinner("⏳ جاري الحفظ..."):
-                            # تجميع الأكلات حسب الصنف لـ batch write
+                        with st.spinner("⏳ جاري الترجمة والحفظ..."):
                             from collections import defaultdict
-                            by_tab = defaultdict(list)
 
-                            for i, item_data in edits.items():
-                                if not item_data.get("name","").strip():
-                                    continue
-                                ar, fr, en = translate_three_languages(item_data["name"])
+                            # جمع كل الأسماء الصالحة
+                            valid_items = [
+                                (i, item_data)
+                                for i, item_data in edits.items()
+                                if item_data.get("name","").strip()
+                            ]
+
+                            # ترجمة كل الأسماء في استدعاء Gemini واحد فقط
+                            names_list = [item_data["name"].strip() for _, item_data in valid_items]
+                            translations = translate_batch(names_list)
+
+                            # تجميع حسب الصنف
+                            by_tab = defaultdict(list)
+                            for idx2, (i, item_data) in enumerate(valid_items):
+                                ar, fr, en = translations[idx2] if idx2 < len(translations) else ("","","")
+                                main_name = ar if ar else item_data["name"].strip()
                                 save_tab = item_data.get("category","الأطباق الرئيسية")
                                 if target_tab != "كل الأصناف تلقائياً":
                                     save_tab = target_tab
-                                # الاسم الرئيسي = العربي إذا توفر وإلا الأصلي
-                                main_name = ar if ar else item_data["name"].strip()
                                 by_tab[save_tab].append({
                                     "name":         main_name,
                                     "name_fr":      fr,
