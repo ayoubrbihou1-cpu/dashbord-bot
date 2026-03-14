@@ -193,12 +193,23 @@ def translate_batch(names: list) -> list:
             txt = txt.split("```json")[1].split("```")[0].strip()
         elif "```" in txt:
             txt = txt.split("```")[1].split("```")[0].strip()
-        if not txt.startswith("["):
-            start = txt.find("[")
-            if start != -1:
-                txt = txt[start:]
         import json as _json
-        parsed = _json.loads(txt)
+        txt = txt.strip()
+        if "```json" in txt:
+            txt = txt.split("```json")[1].split("```")[0].strip()
+        elif "```" in txt:
+            txt = txt.split("```")[1].split("```")[0].strip()
+        start = txt.find("[")
+        if start != -1:
+            txt = txt[start:]
+        # raw_decode لتجاهل أي نص بعد الـ JSON
+        try:
+            parsed, _ = _json.JSONDecoder().raw_decode(txt)
+        except _json.JSONDecodeError:
+            end = txt.rfind("]")
+            if end != -1:
+                txt = txt[:end+1]
+            parsed = _json.loads(txt)
         result = []
         for i, item in enumerate(parsed):
             orig = names[i] if i < len(names) else ""
@@ -632,18 +643,19 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
                             raw = raw.split("```json")[1].split("```")[0].strip()
                         elif "```" in raw:
                             raw = raw.split("```")[1].split("```")[0].strip()
-                        # أحياناً Gemini يضيف نصاً قبل الـ JSON
-                        if not raw.startswith("{"):
-                            start = raw.find("{")
-                            if start != -1:
-                                raw = raw[start:]
-                        # أحياناً يضيف نصاً بعد الـ JSON
-                        if not raw.endswith("}"):
+                        # أحياناً يضيف نصاً قبل الـ JSON
+                        start = raw.find("{")
+                        if start != -1:
+                            raw = raw[start:]
+                        # استخدام raw_decode لتجاهل أي نص بعد الـ JSON
+                        try:
+                            parsed, _ = json.JSONDecoder().raw_decode(raw)
+                        except json.JSONDecodeError:
+                            # محاولة أخيرة: اقطع عند آخر }
                             end = raw.rfind("}")
                             if end != -1:
                                 raw = raw[:end+1]
-
-                        parsed = json.loads(raw)
+                            parsed = json.loads(raw)
                         items_found = parsed.get("items", [])
                         st.session_state["_analyzed_items"] = items_found
                         st.session_state["_analyzed_edits"] = {i: dict(item) for i, item in enumerate(items_found)}
