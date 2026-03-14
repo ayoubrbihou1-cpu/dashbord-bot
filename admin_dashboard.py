@@ -567,12 +567,12 @@ def _show_cards_and_pdf():
 
     qc1,qc2 = st.columns(2)
     with qc1:
-        st.image(mb, caption="📱 QR المينيو — للطلب", use_column_width=True)
+        st.image(mb, caption="📱 QR المينيو — للطلب", use_container_width=True)
         st.download_button("⬇️ تحميل QR المينيو", mb,
             f"Menu_QR_{rname}.png","image/png",
             use_container_width=True, key="dl_menu_qr")
     with qc2:
-        st.image(wb, caption="📶 QR WiFi — اتصال تلقائي", use_column_width=True)
+        st.image(wb, caption="📶 QR WiFi — اتصال تلقائي", use_container_width=True)
         st.download_button("⬇️ تحميل QR WiFi", wb,
             f"WiFi_QR_{rname}.png","image/png",
             use_container_width=True, key="dl_wifi_qr")
@@ -660,8 +660,8 @@ def pg_pdf(rs):
 
     if st.session_state.get("prev_m"):
         ca,cb = st.columns(2)
-        ca.image(st.session_state["prev_m"], caption=f"📱 QR المينيو T{pv}", use_column_width=True)
-        cb.image(st.session_state["prev_w"], caption=f"📶 QR WiFi T{pv}", use_column_width=True)
+        ca.image(st.session_state["prev_m"], caption=f"📱 QR المينيو T{pv}", use_container_width=True)
+        cb.image(st.session_state["prev_w"], caption=f"📶 QR WiFi T{pv}", use_container_width=True)
 
     if st.button("📄 توليد PDF كامل", use_container_width=True, key="btn_pdf_pg"):
         with st.spinner(f"⏳ {n*2} صفحة..."):
@@ -802,7 +802,7 @@ def main():
         st.markdown(f'<div style="text-align:center;color:#444;font-size:.75rem">'
                     f'{len(rs)} مطعم مسجّل</div>', unsafe_allow_html=True)
         st.markdown("---")
-        page = st.radio("", [
+        page = st.radio("التنقل", [
             "🏠 Dashboard",
             "🚀 إضافة مطعم",
             "🍽️ إدارة القائمة",
