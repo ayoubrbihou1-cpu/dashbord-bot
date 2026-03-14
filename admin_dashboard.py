@@ -130,6 +130,65 @@ def gs():
     except Exception as e:
         st.error(f"❌ Google Auth: {e}"); return None
 
+def _safe_int(val, default=10, lo=1, hi=100):
+    """يحوّل أي قيمة لـ int بأمان — يتجاهل النصوص والفراغات"""
+    try:
+        v = int(str(val).strip().split(".")[0])
+        return max(lo, min(hi, v))
+    except:
+        return default
+
+def _safe_str(val, default=""):
+    """يضمن أن القيمة نص نظيف"""
+    s = str(val).strip() if val is not None else ""
+    return s if s not in ("None","nan","NaN") else default
+
+def _sanitize_record(rec: dict) -> dict:
+    """
+    يُنظّف كل حقل في سجل المطعم بعد قراءته من الشيت.
+    يتعامل مع: أعمدة مختلطة، قيم فارغة، نصوص بدل أرقام...
+    """
+    import json as _json
+
+    # حقول نصية عادية
+    for f in ["restaurant_id","name","sheet_id","telegram_chat_id",
+              "wifi_ssid","wifi_password","primary_color","accent_color",
+              "style","logo_url","owner_email","status","created_at"]:
+        rec[f] = _safe_str(rec.get(f,""))
+
+    # ألوان — قيمة افتراضية إذا غير صالحة
+    if not rec["primary_color"].startswith("#"):
+        rec["primary_color"] = "#0a0804"
+    if not rec["accent_color"].startswith("#"):
+        rec["accent_color"] = "#C9A84C"
+
+    # style — قيمة افتراضية
+    if rec["style"] not in ("luxury","classic","modern","bold","neon","rustic",""):
+        rec["style"] = "luxury"
+    if not rec["style"]:
+        rec["style"] = "luxury"
+
+    # bg_type
+    bg = _safe_str(rec.get("bg_type",""))
+    rec["bg_type"] = bg if bg in ("minimal","food_photo","gradient") else "minimal"
+
+    # num_tables — عدد صحيح بين 1 و 200
+    rec["num_tables"] = _safe_int(rec.get("num_tables", 10), default=10, lo=1, hi=200)
+
+    # socials — dict دائماً
+    raw = rec.get("socials","")
+    if isinstance(raw, dict):
+        rec["socials"] = raw
+    elif isinstance(raw, str) and raw.strip().startswith("{"):
+        try:
+            rec["socials"] = _json.loads(raw)
+        except:
+            rec["socials"] = {}
+    else:
+        rec["socials"] = {}
+
+    return rec
+
 def fetch_all():
     """
     ✅ يقرأ من tab 'Master_DB' حصراً
@@ -157,20 +216,7 @@ def fetch_all():
             padded = row + [''] * (len(headers) - len(row))
             rec = dict(zip(headers, padded))
             if rec.get("restaurant_id","").strip():
-                # فك تشفير socials من JSON
-                raw_soc = rec.get("socials","")
-                if raw_soc and raw_soc.strip().startswith("{"):
-                    try:
-                        import json as _json
-                        rec["socials"] = _json.loads(raw_soc)
-                    except:
-                        rec["socials"] = {}
-                else:
-                    rec["socials"] = {}
-                # قيمة افتراضية لـ bg_type
-                if not rec.get("bg_type","").strip():
-                    rec["bg_type"] = "minimal"
-                records.append(rec)
+                records.append(_sanitize_record(rec))
         return records
     except Exception as e:
         st.error(f"Master DB: {e}"); return []
@@ -573,12 +619,8 @@ def pg_pdf(rs):
 
     c1,c2 = st.columns(2)
     with c1:
-        try:
-            _nt = int(str(r.get("num_tables","10") or "10").strip())
-        except (ValueError, TypeError):
-            _nt = 10
-        _nt = max(1, min(100, _nt))
-        n  = st.number_input("عدد الطاولات", min_value=1, max_value=100, value=_nt)
+        _nt = int(r.get("num_tables", 10))   # مضمون صحيح من _sanitize_record
+        n  = st.number_input("عدد الطاولات", min_value=1, max_value=200, value=_nt)
         pv = st.number_input("معاينة طاولة رقم", min_value=1, max_value=int(n), value=1)
     with c2:
         # bg_type — يقرأ من الشيت أو يسمح بالتغيير
