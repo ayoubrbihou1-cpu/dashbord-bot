@@ -573,8 +573,10 @@ def pg_pdf(rs):
 
     c1,c2 = st.columns(2)
     with c1:
-        n  = st.number_input("عدد الطاولات",1,100,int(r.get("num_tables",10) or 10))
-        pv = st.number_input("معاينة طاولة رقم",1,n,1)
+        _nt = int(r.get("num_tables",10) or 10)
+        _nt = max(1, min(100, _nt))   # تأكد من النطاق 1-100
+        n  = st.number_input("عدد الطاولات", min_value=1, max_value=100, value=_nt)
+        pv = st.number_input("معاينة طاولة رقم", min_value=1, max_value=int(n), value=1)
     with c2:
         # bg_type — يقرأ من الشيت أو يسمح بالتغيير
         saved_bg  = r.get("bg_type","") or "minimal"
