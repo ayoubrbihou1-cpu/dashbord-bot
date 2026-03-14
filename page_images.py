@@ -684,7 +684,7 @@ def page_images(restaurants: list):
             )
         with col2:
             if uploaded:
-                st.image(uploaded, caption="معاينة", use_column_width=True)
+                st.image(uploaded, caption="معاينة", use_container_width=True)
 
         if uploaded and sel_item and st.button("💾 حفظ الصورة في الشيت", use_container_width=True):
             with st.spinner("⏳ جاري المعالجة..."):
