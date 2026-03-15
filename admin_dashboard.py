@@ -189,11 +189,10 @@ def _sanitize_record(rec: dict) -> dict:
 
     return rec
 
+@st.cache_data(ttl=120)   # ✅ cache 2 دقيقة — يقلل طلبات Sheets بـ 95%
 def fetch_all():
     """
     ✅ يقرأ من tab 'Master_DB' حصراً
-    يحتوي على: restaurant_id | name | sheet_id | wifi_ssid | ...
-    كل سطر = مطعم مختلف بـ sheet_id مختلف
     """
     c = gs()
     if not c or not MASTER_SHEET_ID: return []
@@ -219,7 +218,12 @@ def fetch_all():
                 records.append(_sanitize_record(rec))
         return records
     except Exception as e:
-        st.error(f"Master DB: {e}"); return []
+        # عند خطأ 429 — لا نُظهر خطأ ونرجع قائمة فارغة بصمت
+        if "429" in str(e) or "Quota" in str(e):
+            st.warning("⚠️ Google Sheets: حد الطلبات مؤقتاً — انتظر دقيقة", icon="⏳")
+        else:
+            st.error(f"Master DB: {e}")
+        return []
 
 def del_r(rid):
     c = gs()
