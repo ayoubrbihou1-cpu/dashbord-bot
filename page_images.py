@@ -388,19 +388,27 @@ def page_images(restaurants: list):
 
             # البحث — تحويل الاسم لكلمة بحث إنجليزية
             sel_item_obj = next((i for i in items_from_sheet if i.get("name") == sel_item_multi), {})
-            # تحويل اسم الأكلة لكلمة بحث — يدعم العربي والفرنسي والإنجليزي
-            try:
-                _ar_result = _arabic_to_search(sel_item_multi or "")
-                default_query = _ar_result if _ar_result else (sel_item_multi or "food")
-            except Exception:
-                default_query = sel_item_multi or "moroccan food"
+
+            # إذا تغيرت الأكلة — حدّث كلمة البحث تلقائياً
+            prev_multi_item = st.session_state.get("_multi_prev_item", "")
+            if prev_multi_item != sel_item_multi:
+                st.session_state["_multi_prev_item"] = sel_item_multi
+                st.session_state.pop("_multi_photos", None)
+                # أولوية: name_en → name_fr → تحويل العربي
+                en_name = (sel_item_obj.get("name_en","") or
+                           sel_item_obj.get("name_fr","") or "").strip()
+                if not en_name:
+                    try:
+                        en_name = _arabic_to_search(sel_item_multi or "") or sel_item_multi or "food"
+                    except Exception:
+                        en_name = sel_item_multi or "moroccan food"
+                st.session_state["multi_search_q"] = en_name
 
             col_q, col_btn = st.columns([3, 1])
             with col_q:
                 search_q = st.text_input("🔍 كلمة البحث (بالإنجليزي)",
-                                          value=default_query,
                                           key="multi_search_q",
-                                          help="يمكنك تعديلها لنتائج أدق")
+                                          help="يتحدث تلقائياً عند تغيير الأكلة — يمكنك تعديلها")
             with col_btn:
                 st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
                 search_btn = st.button("🔍 بحث", use_container_width=True, key="multi_search_btn")
