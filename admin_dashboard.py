@@ -97,74 +97,6 @@ label{color:#555!important;font-size:.8rem!important}
 .stTabs [data-baseweb="tab-list"]{background:#0e0e0e!important;border-radius:8px;padding:3px}
 .stTabs [data-baseweb="tab"]{color:#444!important;border-radius:6px!important}
 .stTabs [aria-selected="true"]{background:#C9A84C!important;color:#000!important;font-weight:700!important}
-
-/* ══════════════════════════════════════
-   ☀️ وضع النهار — يتجاوز كل شيء أعلاه
-══════════════════════════════════════ */
-.day-mode .stApp,
-.day-mode [data-testid="stAppViewContainer"],
-.day-mode [data-testid="stAppViewBlockContainer"],
-.day-mode .main .block-container
-  {background:#f5f0e8!important;color:#1a1208!important}
-.day-mode section[data-testid="stSidebar"],
-.day-mode [data-testid="stSidebar"]>div
-  {background:#ede8dc!important;border-color:#d5c9a8!important}
-.day-mode [data-testid="stSidebar"] *
-  {color:#1a1208!important}
-/* كروت وحاويات */
-.day-mode .s-card,.day-mode .r-card,.day-mode .iblk
-  {background:#e8e0d0!important;border-color:#d5c9a8!important}
-.day-mode .s-num,.day-mode .r-name,.day-mode .iv
-  {color:#b8860b!important}
-.day-mode .s-lbl,.day-mode .r-meta,.day-mode .il
-  {color:#6a5030!important}
-.day-mode .tgbox
-  {background:rgba(26,82,118,.06)!important;border-color:rgba(26,82,118,.2)!important}
-.day-mode .ok  {color:#1a7a3a!important}
-.day-mode .err {color:#c0392b!important}
-.day-mode .warn{color:#8a6000!important}
-.day-mode .info-box{color:#1a5276!important}
-/* نصوص */
-.day-mode p,.day-mode span,.day-mode div,.day-mode h1,
-.day-mode h2,.day-mode h3,.day-mode h4,.day-mode li,
-.day-mode td,.day-mode a,.day-mode .stMarkdown *
-  {color:#1a1208!important}
-.day-mode h1,.day-mode h2,.day-mode h3
-  {color:#b8860b!important}
-/* حقول */
-.day-mode .stTextInput>div>div>input,
-.day-mode .stTextArea textarea,
-.day-mode .stSelectbox>div>div>div,
-.day-mode .stNumberInput>div>div>input,
-.day-mode [data-baseweb="input"] input,
-.day-mode input,.day-mode textarea
-  {background:#fff!important;color:#1a1208!important;border-color:#d5c9a8!important}
-.day-mode label{color:#6a5030!important;font-size:.8rem!important}
-/* tabs */
-.day-mode .stTabs [data-baseweb="tab-list"]
-  {background:#e0d8c8!important}
-.day-mode .stTabs [data-baseweb="tab"]
-  {color:#8a7450!important}
-.day-mode .stTabs [aria-selected="true"]
-  {background:#C9A84C!important;color:#000!important}
-/* selectbox dropdown */
-.day-mode [data-baseweb="select"] div,
-.day-mode [data-baseweb="select"] span
-  {background:#fff!important;color:#1a1208!important}
-/* steps */
-.day-mode .stp{color:#6a5030!important;border-color:#d5c9a8!important}
-.day-mode .stp.done{color:#1a7a3a!important;border-color:#1a7a3a!important}
-.day-mode .stp.now{color:#b8860b!important;border-color:#b8860b!important}
-.day-mode .prg-out{background:#d5c9a8!important}
-/* code */
-.day-mode code,.day-mode pre
-  {background:#e8e0d0!important;color:#4a2800!important}
-/* header */
-.day-mode [data-testid="stHeader"]
-  {background:#f5f0e8!important}
-/* color picker label */
-.day-mode [data-testid="stColorPicker"] *
-  {color:#1a1208!important}
 </style>
 """, unsafe_allow_html=True)
 
@@ -982,9 +914,15 @@ h1,h2,h3{color:#b8860b !important}
 .warn{color:#7a5000 !important}
 .badge{color:#b8860b !important; background:rgba(184,134,11,.15) !important}
 
-/* ══ حقول الإدخال ══ */
+/* ══ حقول الإدخال — نفس specificity الأصل بالضبط ══ */
+.stTextInput>div>div>input,
+.stTextArea textarea,
+.stSelectbox>div>div>div,
+.stNumberInput>div>div>input
+{background:#fff !important; color:#1a1208 !important; border-color:#c8b898 !important}
+
+/* + specificity إضافية للحقول المنخفضة */
 input,textarea,
-.stTextInput input,.stTextArea textarea,.stNumberInput input,
 [data-baseweb="input"]>div,[data-baseweb="input"] input,
 [data-baseweb="textarea"]
 {background:#fff !important; color:#1a1208 !important; border-color:#c8b898 !important}
@@ -997,7 +935,10 @@ input,textarea,
 [data-baseweb="popover"],[data-baseweb="menu"]
 {background:#fff !important; color:#1a1208 !important}
 
-/* ══ tabs ══ */
+/* ══ tabs — نفس specificity الأصل ══ */
+.stTabs [data-baseweb="tab-list"]{background:#ddd5c0 !important}
+.stTabs [data-baseweb="tab"]{color:#5a4020 !important}
+.stTabs [aria-selected="true"]{background:#C9A84C !important; color:#000 !important}
 [data-baseweb="tab-list"],[data-baseweb="tab-list"]>div
 {background:#ddd5c0 !important}
 [data-baseweb="tab"]{color:#5a4020 !important}
