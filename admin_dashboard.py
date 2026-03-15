@@ -386,6 +386,35 @@ def pg_add(rs):
             rbg_type = st.selectbox("🖼️ خلفية البطاقة",
                 list(BG_LABELS.keys()),
                 format_func=lambda x: BG_LABELS.get(x, x))
+            # نوع المطعم — لتحديد خلفية مناسبة
+            VENUE_TYPES = {
+                "restaurant":  "🍽️ مطعم عادي",
+                "cafe":        "☕ مقهى / كافيه",
+                "fastfood":    "🍔 وجبات سريعة",
+                "pizza":       "🍕 بيتزا",
+                "seafood":     "🦞 مأكولات بحرية",
+                "moroccan":    "🍲 مطعم مغربي",
+                "grill":       "🔥 مشويات / شواء",
+                "sushi":       "🍣 سوشي / آسيوي",
+                "pastry":      "🥐 حلويات / مخبزة",
+                "juice":       "🥤 عصائر ومشروبات",
+            }
+            VENUE_QUERIES = {
+                "restaurant": ["fine dining restaurant food","elegant restaurant interior","gourmet food plating"],
+                "cafe":       ["coffee shop cozy","cafe latte art","coffee beans barista"],
+                "fastfood":   ["burger fast food","fries hamburger","fast food restaurant"],
+                "pizza":      ["pizza wood fired","italian pizza restaurant","pizza chef making"],
+                "seafood":    ["seafood platter fresh","grilled fish restaurant","lobster seafood"],
+                "moroccan":   ["moroccan tagine food","couscous moroccan","moroccan restaurant interior"],
+                "grill":      ["bbq grilled meat","steakhouse grill","charcoal grilled food"],
+                "sushi":      ["sushi restaurant japanese","sushi platter fresh","japanese food"],
+                "pastry":     ["pastry bakery","croissant pastry shop","patisserie cake"],
+                "juice":      ["fresh juice colorful","smoothie bar","tropical fruit drinks"],
+            }
+            rvenue_type = st.selectbox("🏪 نوع المطعم (للخلفية)",
+                list(VENUE_TYPES.keys()),
+                format_func=lambda x: VENUE_TYPES.get(x,x),
+                key="add_venue_type")
         with c2:
             st.markdown("##### 👁️ معاينة")
             st.markdown(f"""<div style="background:{rprimary};border:2px solid {raccent};
@@ -512,13 +541,17 @@ def pg_add(rs):
             st.markdown("### 🔲 بطاقات الطاولات")
 
             with st.spinner("🎨 توليد البطاقات..."):
+                import random
+                # اختيار query عشوائي من قائمة نوع المطعم
+                _queries = VENUE_QUERIES.get(rvenue_type, [rname])
+                _photo_query = random.choice(_queries)
                 menu_img, wifi_img = generate_table_card(
                     rname, rssid, rwpass, 1, f"{mu}&table=1",
                     rstyle, rprimary, raccent, rbg_type, rsocials,
                     pexels_key=PEXELS_KEY,
                     unsplash_key=UNSPLASH_KEY,
                     pixabay_key=PIXABAY_KEY,
-                    photo_query=rname,
+                    photo_query=_photo_query,
                 )
                 mb = io.BytesIO(); menu_img.save(mb,"PNG"); mb.seek(0)
                 wb = io.BytesIO(); wifi_img.save(wb,"PNG"); wb.seek(0)
@@ -625,11 +658,10 @@ def pg_pdf(rs):
 
     c1,c2 = st.columns(2)
     with c1:
-        _nt = int(r.get("num_tables", 10))   # مضمون صحيح من _sanitize_record
+        _nt = int(r.get("num_tables", 10))
         n  = st.number_input("عدد الطاولات", min_value=1, max_value=200, value=_nt)
         pv = st.number_input("معاينة طاولة رقم", min_value=1, max_value=int(n), value=1)
     with c2:
-        # bg_type — يقرأ من الشيت أو يسمح بالتغيير
         saved_bg  = r.get("bg_type","") or "minimal"
         bg_opts   = list(BG_LABELS.keys())
         bg_def    = bg_opts.index(saved_bg) if saved_bg in bg_opts else 0
@@ -644,8 +676,31 @@ def pg_pdf(rs):
                                    index=style_def,
                                    format_func=lambda x: STYLE_LABELS.get(x,x),
                                    key="pdf_style_sel")
+        VENUE_TYPES_PDF = {
+            "restaurant":"🍽️ مطعم","cafe":"☕ مقهى","fastfood":"🍔 وجبات سريعة",
+            "pizza":"🍕 بيتزا","seafood":"🦞 بحري","moroccan":"🍲 مغربي",
+            "grill":"🔥 مشويات","sushi":"🍣 سوشي","pastry":"🥐 حلويات","juice":"🥤 عصائر"
+        }
+        VENUE_QUERIES_PDF = {
+            "restaurant":["fine dining food elegant","gourmet restaurant plating","restaurant food photography"],
+            "cafe":["coffee shop cozy latte","cafe interior coffee","barista coffee art"],
+            "fastfood":["burger fast food crispy","fries hamburger meal","fast food restaurant"],
+            "pizza":["pizza wood fired","italian pizza cheese","pizza restaurant"],
+            "seafood":["seafood fresh platter","grilled fish lemon","seafood restaurant"],
+            "moroccan":["moroccan tagine food","couscous moroccan dish","moroccan cuisine"],
+            "grill":["bbq grilled meat smoke","steakhouse grill","charcoal grilled"],
+            "sushi":["sushi platter fresh","japanese food restaurant","sushi rolls"],
+            "pastry":["pastry bakery croissant","cake patisserie sweet","bakery bread"],
+            "juice":["fresh juice tropical","smoothie colorful fruits","juice bar drinks"],
+        }
+        pdf_venue = st.selectbox("🏪 نوع المطعم",
+            list(VENUE_TYPES_PDF.keys()),
+            format_func=lambda x: VENUE_TYPES_PDF.get(x,x),
+            key="pdf_venue_sel")
 
     socials = r.get("socials", {}) or {}
+    import random as _rand
+    _pdf_query = _rand.choice(VENUE_QUERIES_PDF.get(pdf_venue, [r.get("name","food")]))
 
     if st.button("👁️ معاينة", use_container_width=True, key="btn_preview"):
         with st.spinner("🎨..."):
@@ -658,7 +713,7 @@ def pg_pdf(rs):
                     r.get("accent_color","#C9A84C"),
                     pdf_bg, socials,
                     pexels_key=PEXELS_KEY, unsplash_key=UNSPLASH_KEY,
-                    pixabay_key=PIXABAY_KEY, photo_query=r.get("name",""))
+                    pixabay_key=PIXABAY_KEY, photo_query=_pdf_query)
                 st.session_state["prev_m"] = card_to_bytes(mi)
                 st.session_state["prev_w"] = card_to_bytes(wi)
             except Exception as e:
@@ -765,6 +820,8 @@ def pg_manage(rs):
                 **📶 WiFi:** `{r.get('wifi_ssid','')}` | `{r.get('wifi_password','')}`
 
                 **🎨 طابع:** {r.get('style','')} | 🪑 {r.get('num_tables','')} طاولة
+
+                **🔑 كلمة سر الكوزينة:** `{r.get('kitchen_password','⚠️ غير محددة')}`
                 """)
             with c2:
                 mu = f"{FRONTEND_URL}?rest_id={rid}"
