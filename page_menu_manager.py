@@ -242,6 +242,7 @@ def _gs():
 def _get_ws(sheet_id: str, tab: str):
     return _gs().open_by_key(sheet_id).worksheet(tab)
 
+@st.cache_data(ttl=120)  # cache القائمة 2 دقيقة — يقلل طلبات Sheets API بـ 90%
 def load_items(sheet_id: str, tab: str) -> list:
     """تحميل أكلات tab معين"""
     try:
