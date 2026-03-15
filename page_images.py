@@ -110,17 +110,19 @@ def _gs():
         c = Credentials.from_service_account_file(SA_JSON_PATH, scopes=SCOPES)
     return gspread.authorize(c)
 
+ADMIN_PASSWORD  = os.getenv("ADMIN_PASSWORD","admin_fes_2026")
+
 def _refresh_menu_cache(restaurant_id: str):
     """✅ يمسح cache المنيو في الـ API بعد حفظ الصور — حتى تظهر فوراً في المينيو"""
     try:
         url = f"{ROUTER_BASE_URL}/cache/refresh/{restaurant_id}"
-        resp = _requests.post(url, timeout=8)
+        resp = _requests.post(url, timeout=8,
+                              headers={"X-Admin-Key": ADMIN_PASSWORD})
         if resp.status_code == 200:
-            st.toast(f"✅ تم تحديث المينيو — الصور ستظهر الآن فوراً", icon="🔄")
+            st.toast("✅ تم تحديث المينيو — الصور ستظهر الآن فوراً", icon="🔄")
         else:
             st.toast(f"⚠️ لم يتم تحديث cache الـ API (كود {resp.status_code})", icon="⚠️")
     except Exception as e:
-        # لا نوقف العملية إذا فشل الـ cache refresh
         st.toast(f"⚠️ تعذّر الاتصال بالـ API لتحديث الـ cache: {e}", icon="⚠️")
 
 def load_sheet_items(sheet_id: str, tab: str) -> list[dict]:
