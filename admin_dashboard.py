@@ -952,145 +952,103 @@ def main():
         # تطبيق الثيم
         if not st.session_state.dark_mode:
             st.markdown("""<style>
-/* ══════════════════════════════════════
-   ☀️ وضع النهار الشامل
-══════════════════════════════════════ */
+/* ══ خلفيات ══ */
+.stApp,[data-testid="stAppViewContainer"],[data-testid="stAppViewBlockContainer"],
+[data-testid="stMain"],.main,.block-container,[data-testid="stHeader"]
+{background:#f5f0e8 !important}
 
-/* خلفية */
-.stApp,
-[data-testid="stAppViewContainer"],
-[data-testid="stAppViewBlockContainer"],
-[data-testid="stMain"],
-.main,
-.block-container
-{ background:#f5f0e8 !important }
-
-/* header */
-[data-testid="stHeader"]
-{ background:#f5f0e8 !important }
-
-/* sidebar */
 section[data-testid="stSidebar"],
-[data-testid="stSidebar"],
-[data-testid="stSidebar"] > div,
-[data-testid="stSidebar"] > div > div
-{ background:#ede8dc !important; border-color:#d5c9a8 !important }
+section[data-testid="stSidebar"]>div,
+section[data-testid="stSidebar"]>div>div,
+section[data-testid="stSidebar"] section
+{background:#ede8dc !important}
 
-/* كل نصوص sidebar */
-section[data-testid="stSidebar"] p,
-section[data-testid="stSidebar"] span,
-section[data-testid="stSidebar"] label,
-section[data-testid="stSidebar"] div,
-section[data-testid="stSidebar"] li,
-section[data-testid="stSidebar"] a
-{ color:#1a1208 !important }
+/* ══ كل النصوص ══ */
+p,span,div,h1,h2,h3,h4,h5,h6,label,li,td,th,a,small,strong,em,
+[data-testid] *,
+.stMarkdown *,.stText *,.element-container *
+{color:#1a1208 !important}
 
-/* كروت الداشبورد */
-.s-card
-{ background:#e8e0d0 !important; border-color:#d5c9a8 !important; color:#1a1208 !important }
-.s-num  { color:#b8860b !important }
-.s-lbl  { color:#6a5030 !important }
+/* ══ عناوين ══ */
+h1,h2,h3{color:#b8860b !important}
 
-.r-card
-{ background:#e8e0d0 !important; border-color:#d5c9a8 !important; border-left-color:#C9A84C !important }
-.r-name { color:#b8860b !important }
-.r-meta { color:#5a4020 !important }
+/* ══ كروت ══ */
+.s-card,.r-card,.iblk,.res,.info-box,.tgbox,.gdiv-card
+{background:#e8e0d0 !important; border-color:#c8b898 !important}
+.s-num,.r-name,.iv{color:#b8860b !important}
+.s-lbl,.r-meta,.il{color:#5a4020 !important}
+.ok{color:#1a6a30 !important}
+.err{color:#8b1a1a !important}
+.warn{color:#7a5000 !important}
+.badge{color:#b8860b !important; background:rgba(184,134,11,.15) !important}
 
-.iblk   { background:#e0d8c8 !important; border-color:#d5c9a8 !important }
-.il     { color:#5a4020 !important }
-.iv     { color:#b8860b !important }
+/* ══ حقول الإدخال ══ */
+input,textarea,
+.stTextInput input,.stTextArea textarea,.stNumberInput input,
+[data-baseweb="input"]>div,[data-baseweb="input"] input,
+[data-baseweb="textarea"]
+{background:#fff !important; color:#1a1208 !important; border-color:#c8b898 !important}
 
-.tgbox
-{ background:rgba(26,82,118,.06) !important; border-color:rgba(26,82,118,.25) !important }
-.tgbox * { color:#1a4a6a !important }
+/* ══ selectbox ══ */
+.stSelectbox>div>div,.stSelectbox>div>div>div,
+[data-baseweb="select"]>div,[data-baseweb="select"] div,
+[data-baseweb="select"] span,[data-baseweb="select"] input,
+[role="listbox"],[role="option"],
+[data-baseweb="popover"],[data-baseweb="menu"]
+{background:#fff !important; color:#1a1208 !important}
 
-.info-box { color:#1a5276 !important }
-.ok       { color:#1a5a30 !important }
-.err      { color:#8b1a1a !important }
-.warn     { color:#7a5000 !important }
+/* ══ tabs ══ */
+[data-baseweb="tab-list"],[data-baseweb="tab-list"]>div
+{background:#ddd5c0 !important}
+[data-baseweb="tab"]{color:#5a4020 !important}
+[data-baseweb="tab"][aria-selected="true"]
+{background:#C9A84C !important; color:#000 !important}
+[data-baseweb="tab-panel"],[data-baseweb="tab-panel"]>div
+{background:#f5f0e8 !important}
 
-/* نصوص عامة */
-.stMarkdown p,
-.stMarkdown span,
-.stMarkdown div,
-.stMarkdown h1,
-.stMarkdown h2,
-.stMarkdown h3,
-.stMarkdown a,
-.stMarkdown li
-{ color:#1a1208 !important }
+/* ══ color picker ══ */
+[data-testid="stColorPicker"]>div,[data-testid="stColorPicker"] label
+{color:#5a4020 !important}
 
-h1, h2, h3, h4, h5
-{ color:#b8860b !important }
+/* ══ radio & checkbox ══ */
+[data-testid="stRadio"]>div>label,[data-testid="stRadio"] p,
+[data-testid="stCheckbox"]>label,[data-testid="stCheckbox"] p,
+[role="radiogroup"] label,[role="group"] label
+{color:#1a1208 !important}
 
-p { color:#1a1208 !important }
-a { color:#b8860b !important }
-
-/* labels */
-label
-{ color:#5a4020 !important; font-size:.8rem !important }
-
-/* حقول الإدخال */
-.stTextInput > div > div > input,
-.stTextArea > div > div > textarea,
-.stNumberInput > div > div > input
-{ background:#ffffff !important; color:#1a1208 !important; border-color:#c5b898 !important }
-
-/* selectbox */
-.stSelectbox > div > div,
-.stSelectbox > div > div > div
-{ background:#ffffff !important; color:#1a1208 !important }
-
-[data-baseweb="select"] > div
-{ background:#ffffff !important; color:#1a1208 !important }
-
-/* tabs */
-.stTabs [data-baseweb="tab-list"]
-{ background:#e0d8c8 !important }
-.stTabs [data-baseweb="tab"]
-{ color:#6a5030 !important }
-.stTabs [aria-selected="true"]
-{ background:#C9A84C !important; color:#000 !important }
-
-/* progress */
-.prg-out { background:#d5c9a8 !important }
-
-/* steps */
-.stp
-{ color:#5a4020 !important; border-color:#c5b898 !important }
-.stp.done { color:#1a6a30 !important; border-color:#1a6a30 !important }
-.stp.now  { color:#b8860b !important; border-color:#b8860b !important }
-
-/* code */
-code, pre
-{ background:#e0d5c0 !important; color:#3a2000 !important }
-
-/* radio و checkbox */
-[data-testid="stRadio"] label,
-[data-testid="stRadio"] p,
-[data-testid="stCheckbox"] label,
-[data-testid="stCheckbox"] p
-{ color:#1a1208 !important }
-
-/* expander */
-[data-testid="stExpander"] summary,
+/* ══ expander ══ */
+[data-testid="stExpander"]>div,[data-testid="stExpander"] summary,
 [data-testid="stExpander"] summary p,
-[data-testid="stExpander"] > div
-{ color:#1a1208 !important }
+.streamlit-expanderHeader,.streamlit-expanderContent
+{background:#ede8dc !important; color:#1a1208 !important}
 
-/* color picker */
-[data-testid="stColorPicker"] label
-{ color:#5a4020 !important }
+/* ══ steps & progress ══ */
+.stp{color:#5a4020 !important; border-color:#c8b898 !important}
+.stp.done{color:#1a6a30 !important; border-color:#1a6a30 !important}
+.stp.now {color:#b8860b !important; border-color:#b8860b !important}
+.prg-out {background:#c8b898 !important}
 
-/* badge */
-.badge   { color:#b8860b !important; background:rgba(184,134,11,.1) !important }
-.badge-g { color:#1a6a30 !important }
+/* ══ code ══ */
+code,pre,.stCodeBlock{background:#e0d5c0 !important; color:#3a2000 !important}
 
+/* ══ columns & containers ══ */
+[data-testid="column"],[data-testid="stVerticalBlock"],
+[data-testid="stHorizontalBlock"]
+{background:transparent !important}
+
+/* ══ metric ══ */
+[data-testid="stMetric"]{background:#e8e0d0 !important; border-radius:8px}
+[data-testid="stMetricValue"],[data-testid="stMetricLabel"]
+{color:#1a1208 !important}
+
+/* ══ notifications ══ */
+[data-testid="stAlert"],[data-testid="stAlert"] *
+{color:#1a1208 !important}
 </style>""", unsafe_allow_html=True)
         else:
             st.markdown("""<style>
-.stApp { background:#080808 !important }
-section[data-testid="stSidebar"] { background:#0a0a0a !important }
+.stApp{background:#080808 !important}
+section[data-testid="stSidebar"]{background:#0a0a0a !important}
 </style>""", unsafe_allow_html=True)
         if st.button("🚪 خروج", use_container_width=True, key="btn_logout"):
             st.session_state.ok = False; st.rerun()
