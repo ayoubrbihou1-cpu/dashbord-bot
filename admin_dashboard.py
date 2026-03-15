@@ -884,90 +884,70 @@ def main():
         # تطبيق الثيم
         if not st.session_state.dark_mode:
             st.markdown("""<style>
-            /* ═══ وضع النهار الشامل ═══ */
+            /* ═══ خلفية عامة ═══ */
             .stApp,
             [data-testid="stAppViewContainer"],
             [data-testid="stAppViewBlockContainer"],
-            [data-testid="stMain"],
-            section[data-testid="stMain"] > div,
-            .main > div { background:#f5f0e8 !important }
+            [data-testid="stMain"] > div,
+            .main .block-container { background:#f5f0e8 !important }
 
-            /* sidebar */
+            /* ═══ sidebar ═══ */
             [data-testid="stSidebar"],
             [data-testid="stSidebar"] > div,
-            [data-testid="stSidebar"] section { background:#ede8dc !important }
-            [data-testid="stSidebar"] * { color:#1a1208 !important }
+            [data-testid="stSidebar"] > div > div {
+                background:#ede8dc !important }
+            [data-testid="stSidebar"] p,
+            [data-testid="stSidebar"] span,
+            [data-testid="stSidebar"] label,
+            [data-testid="stSidebar"] div,
+            [data-testid="stSidebar"] a { color:#1a1208 !important }
             [data-testid="stSidebar"] .stButton > button {
-                background:#e0d8c8 !important; color:#1a1208 !important;
-                border-color:#C9A84C !important }
-
-            /* كل الـ div والعناصر — اجبرهم على الخلفية الفاتحة */
-            .stApp div:not([class*="stButton"]):not([class*="progress"]):not([class*="color"]) {
-                background-color: transparent !important }
-
-            /* بطاقات الإحصائيات */
-            [data-testid="stMetric"],
-            [data-testid="metric-container"],
-            div[data-testid="stMetricValue"],
-            div[data-testid="stMetricLabel"],
-            div[data-testid="stMetricDelta"] { color:#1a1208 !important }
-
-            /* expanders وكروت */
-            [data-testid="stExpander"],
-            [data-testid="stExpanderDetails"],
-            details, summary,
-            .streamlit-expanderHeader,
-            .streamlit-expanderContent {
-                background:#ede8dc !important;
+                background:#ddd5c0 !important;
                 color:#1a1208 !important;
-                border-color:#d5c9a8 !important }
+                border-color:#C9A84C !important }
+            [data-testid="stSidebar"] [data-testid="stRadio"] > div {
+                color:#1a1208 !important }
 
-            /* كل النصوص */
-            p, span, label, div, li, td, th, h1, h2, h3, h4, h5,
-            .stMarkdown *, .stText * { color:#1a1208 !important }
+            /* ═══ نصوص المحتوى الرئيسي ═══ */
+            .main p, .main span, .main label,
+            .main h1, .main h2, .main h3, .main h4,
+            .stMarkdown p, .stMarkdown span, .stMarkdown div,
+            [data-testid="stText"] { color:#1a1208 !important }
             h1,h2,h3 { color:#b8860b !important }
 
-            /* حقول الإدخال */
+            /* ═══ بطاقات الإحصائيات ═══ */
+            [data-testid="stMetric"] {
+                background:#e8e0d0 !important;
+                border-radius:10px }
+            [data-testid="stMetricValue"],
+            [data-testid="stMetricLabel"] { color:#1a1208 !important }
+
+            /* ═══ expanders ═══ */
+            [data-testid="stExpander"] > div,
+            details > summary,
+            .streamlit-expanderHeader { color:#1a1208 !important }
+
+            /* ═══ حقول إدخال ═══ */
             input, textarea,
             [data-baseweb="input"] input,
-            [data-baseweb="textarea"],
             [data-testid="stTextInput"] input,
             [data-testid="stNumberInput"] input {
-                background:#ffffff !important;
+                background:#fff !important;
                 color:#1a1208 !important;
                 border-color:#d5c9a8 !important }
 
-            /* selectbox وقوائم */
-            [data-baseweb="select"] *,
-            [data-baseweb="select"] > div,
-            [role="listbox"], [role="option"] {
-                background:#ffffff !important;
-                color:#1a1208 !important }
+            /* ═══ selectbox ═══ */
+            [data-baseweb="select"] div,
+            [data-baseweb="select"] span { color:#1a1208 !important }
 
-            /* color picker */
-            [data-testid="stColorPicker"] * { color:#1a1208 !important }
+            /* ═══ كود ═══ */
+            code, pre { background:#e8e0d0 !important; color:#4a2800 !important }
 
-            /* code blocks */
-            code, pre, .stCodeBlock { 
-                background:#e8e0d0 !important;
-                color:#4a2800 !important }
+            /* ═══ أزرار ═══ */
+            .stButton > button { color:#1a1208 !important; border-color:#C9A84C !important }
 
-            /* أزرار */
-            .stButton > button {
-                color:#1a1208 !important;
-                border-color:#C9A84C !important }
-
-            /* فواصل */
+            /* ═══ فواصل ═══ */
             hr { border-color:#d5c9a8 !important }
-
-            /* radio buttons */
-            [data-testid="stRadio"] label,
-            [data-testid="stCheckbox"] label { color:#1a1208 !important }
-
-            /* toast وإشعارات */
-            [data-testid="stToast"],
-            .stSuccess, .stWarning, .stError, .stInfo {
-                color:#1a1208 !important }
             </style>""", unsafe_allow_html=True)
         else:
             st.markdown("""<style>
