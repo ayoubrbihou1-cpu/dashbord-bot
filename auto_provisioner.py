@@ -73,7 +73,8 @@ MENU_TABS = {
 MASTER_HEADERS = [
     "restaurant_id","name","sheet_id","telegram_chat_id",
     "wifi_ssid","wifi_password","primary_color","accent_color",
-    "style","bg_type","socials","num_tables","logo_url","owner_email","status","created_at"
+    "style","bg_type","socials","num_tables","logo_url",
+    "kitchen_password","owner_email","status","created_at"
 ]
 
 def _fmt_header(spread, ws, color):
@@ -359,7 +360,7 @@ def provision_restaurant(
     sheet_id="",
     style="luxury", primary_color="#0a0804", accent_color="#C9A84C",
     num_tables=10, logo_url="", owner_email="", telegram_chat_id="",
-    bg_type="minimal", socials=None
+    bg_type="minimal", socials=None, kitchen_password=""
 ):
     res = ProvisionResult()
     steps = []
@@ -404,6 +405,7 @@ def provision_restaurant(
         "socials":          json.dumps(socials or {}, ensure_ascii=False),
         "num_tables":       num_tables,
         "logo_url":         logo_url,
+        "kitchen_password": kitchen_password,
         "owner_email":      owner_email,
         "status":           "active" if telegram_chat_id else "pending_telegram",
         "created_at":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
