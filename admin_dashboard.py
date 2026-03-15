@@ -970,19 +970,82 @@ def main():
 
     if not st.session_state.dark_mode:
         st.markdown("""<style>
-/* تطبيق ثيم النهار عبر class على body */
-body, .stApp { }
+/* وضع النهار — يُطبَّق مباشرة بدون JavaScript */
+.stApp,.main,.block-container,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewBlockContainer"],
+[data-testid="stHeader"]
+{background:var(--bg)!important;color:var(--text)!important}
+
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"]>div
+{background:var(--sidebar)!important}
+section[data-testid="stSidebar"] *{color:var(--text)!important}
+
+.stTextInput>div>div>input,.stTextArea textarea,
+.stNumberInput>div>div>input,.stNumberInput input,
+[data-baseweb="input"] input,input,textarea
+{background:var(--input-bg)!important;color:var(--input-text)!important;
+ border-color:var(--input-border)!important}
+::placeholder{color:var(--placeholder)!important;opacity:1!important}
+
+.stNumberInput button,[data-baseweb="input"] button
+{background:var(--bg3)!important;color:var(--text)!important}
+
+.stSelectbox>div>div,.stSelectbox>div>div>div,
+[data-baseweb="select"]>div,[data-baseweb="select"] [class*="control"],
+[data-baseweb="select"] [class*="singleValue"],
+[data-baseweb="select"] [class*="placeholder"]
+{background:var(--input-bg)!important;color:var(--input-text)!important;
+ border-color:var(--input-border)!important}
+[data-baseweb="popover"],[data-baseweb="popover"] *,
+[data-baseweb="menu"],[data-baseweb="menu"] *,
+[role="listbox"] *,[role="option"]
+{background:var(--input-bg)!important;color:var(--input-text)!important}
+[role="option"]:hover{background:var(--bg2)!important}
+
+.stTabs [data-baseweb="tab-list"]{background:var(--tab-bg)!important}
+.stTabs [data-baseweb="tab"]{color:var(--tab-text)!important}
+.stTabs [aria-selected="true"]{background:var(--gold)!important;color:#000!important}
+[data-baseweb="tab-panel"],[data-baseweb="tab-panel"] *
+{background:var(--bg)!important;color:var(--text)!important}
+
+p,span,label,li,a,td,th,small,.stMarkdown *{color:var(--text)!important}
+h1,h2,h3,h4{color:var(--gold)!important}
+label{color:var(--text2)!important}
+
+.s-card,.r-card,.iblk,.tgbox,.info-box,.res
+{background:var(--card-bg)!important;border-color:var(--card-border)!important}
+.s-num,.r-name,.iv{color:var(--gold)!important}
+.s-lbl,.r-meta,.il{color:var(--text2)!important}
+
+[data-testid="stExpander"],[data-testid="stExpander"]>div,
+[data-testid="stExpander"] summary,
+[data-testid="stExpanderDetails"],[data-testid="stExpanderDetails"] *
+{background:var(--bg2)!important;color:var(--text)!important}
+
+.stp{color:var(--text3)!important;border-color:var(--border)!important}
+.stp.done{color:#00e676!important;border-color:#00e676!important}
+.stp.now{color:var(--gold)!important;border-color:var(--gold)!important}
+.prg-out{background:var(--bg3)!important}
+code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
+[data-testid="stRadio"] p,[data-testid="stCheckbox"] p{color:var(--text)!important}
+[data-testid="stMetricValue"],[data-testid="stMetricLabel"]{color:var(--text)!important}
 </style>
-<script>
-(function applyDayTheme(){
-  var els = [document.body, document.documentElement];
-  document.querySelectorAll('.stApp,.main').forEach(function(e){ els.push(e); });
-  els.forEach(function(e){ if(e) e.classList.add('day-theme'); });
-  // إعادة التطبيق بعد render
-  setTimeout(applyDayTheme, 300);
-  setTimeout(applyDayTheme, 1000);
-})();
-</script>""", unsafe_allow_html=True)
+<style>
+/* تعريف قيم النهار على :root مباشرة */
+:root{
+  --bg:#f5f0e8!important;--bg2:#ede8dc!important;--bg3:#e0d8c8!important;
+  --sidebar:#ede8dc!important;--sidebar2:#e0d8c8!important;
+  --text:#1a1208!important;--text2:#5a4020!important;--text3:#8a7050!important;
+  --border:#c8b898!important;--border2:#d5c9a8!important;
+  --input-bg:#ffffff!important;--input-text:#1a1208!important;--input-border:#c8b898!important;
+  --gold:#b8860b!important;--gold2:#8a6010!important;
+  --card-bg:#e8e0d0!important;--card-border:#c8b898!important;
+  --tab-bg:#ddd5c0!important;--tab-text:#5a4020!important;
+  --placeholder:#a09070!important;
+}
+</style>""", unsafe_allow_html=True)
 
     with st.sidebar:
         st.markdown('<div style="color:#C9A84C;font-size:1.1rem;font-weight:900;'
