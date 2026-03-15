@@ -884,76 +884,73 @@ def main():
         # تطبيق الثيم
         if not st.session_state.dark_mode:
             st.markdown("""<style>
-            /* ═══ خلفية عامة ═══ */
-            .stApp,
-            [data-testid="stAppViewContainer"],
+            /* ═══ خلفية النهار ═══ */
+            .stApp, [data-testid="stAppViewContainer"],
             [data-testid="stAppViewBlockContainer"],
-            [data-testid="stMain"] > div,
-            .main .block-container { background:#f5f0e8 !important }
+            .main .block-container { background:#f5f0e8 !important; color:#1a1208 !important }
 
-            /* ═══ sidebar ═══ */
-            [data-testid="stSidebar"],
-            [data-testid="stSidebar"] > div,
-            [data-testid="stSidebar"] > div > div {
-                background:#ede8dc !important }
-            [data-testid="stSidebar"] p,
-            [data-testid="stSidebar"] span,
+            /* ═══ Sidebar ═══ */
+            section[data-testid="stSidebar"],
+            [data-testid="stSidebar"] > div { background:#ede8dc !important; border-color:#d5c9a8 !important }
             [data-testid="stSidebar"] label,
-            [data-testid="stSidebar"] div,
-            [data-testid="stSidebar"] a { color:#1a1208 !important }
-            [data-testid="stSidebar"] .stButton > button {
-                background:#ddd5c0 !important;
-                color:#1a1208 !important;
-                border-color:#C9A84C !important }
-            [data-testid="stSidebar"] [data-testid="stRadio"] > div {
-                color:#1a1208 !important }
+            [data-testid="stSidebar"] span,
+            [data-testid="stSidebar"] p,
+            [data-testid="stSidebar"] div { color:#1a1208 !important }
 
-            /* ═══ نصوص المحتوى الرئيسي ═══ */
-            .main p, .main span, .main label,
-            .main h1, .main h2, .main h3, .main h4,
-            .stMarkdown p, .stMarkdown span, .stMarkdown div,
-            [data-testid="stText"] { color:#1a1208 !important }
-            h1,h2,h3 { color:#b8860b !important }
+            /* ═══ كروت المخصصة (.s-card, .r-card) ═══ */
+            .s-card { background:#e8e0d0 !important; border-color:#d5c9a8 !important }
+            .s-num  { color:#b8860b !important }
+            .s-lbl  { color:#6a5030 !important }
+            .r-card { background:#e8e0d0 !important; border-color:#d5c9a8 !important; border-left-color:#C9A84C !important }
+            .r-name { color:#b8860b !important }
+            .r-meta { color:#6a5030 !important }
+            .iblk   { background:#e0d8c8 !important; border-color:#d5c9a8 !important }
+            .il     { color:#6a5030 !important }
+            .iv     { color:#b8860b !important }
+            .tgbox  { background:rgba(26,82,118,.08) !important; border-color:rgba(26,82,118,.3) !important }
 
-            /* ═══ بطاقات الإحصائيات ═══ */
-            [data-testid="stMetric"] {
-                background:#e8e0d0 !important;
-                border-radius:10px }
-            [data-testid="stMetricValue"],
-            [data-testid="stMetricLabel"] { color:#1a1208 !important }
+            /* ═══ كل النصوص ═══ */
+            p, span, div, label, li, td, th { color:#1a1208 !important }
+            h1, h2, h3, h4 { color:#b8860b !important }
+            a { color:#b8860b !important }
+            code, pre { background:#e8e0d0 !important; color:#4a2800 !important }
 
-            /* ═══ expanders ═══ */
-            [data-testid="stExpander"] > div,
-            details > summary,
-            .streamlit-expanderHeader { color:#1a1208 !important }
-
-            /* ═══ حقول إدخال ═══ */
-            input, textarea,
+            /* ═══ حقول الإدخال ═══ */
+            .stTextInput > div > div > input,
+            .stTextArea textarea,
+            .stNumberInput > div > div > input,
             [data-baseweb="input"] input,
-            [data-testid="stTextInput"] input,
-            [data-testid="stNumberInput"] input {
-                background:#fff !important;
-                color:#1a1208 !important;
+            input, textarea {
+                background:#fff !important; color:#1a1208 !important;
                 border-color:#d5c9a8 !important }
 
             /* ═══ selectbox ═══ */
-            [data-baseweb="select"] div,
-            [data-baseweb="select"] span { color:#1a1208 !important }
+            .stSelectbox > div > div > div,
+            [data-baseweb="select"] div { background:#fff !important; color:#1a1208 !important }
 
-            /* ═══ كود ═══ */
-            code, pre { background:#e8e0d0 !important; color:#4a2800 !important }
+            /* ═══ label ═══ */
+            label { color:#6a5030 !important; font-size:.8rem !important }
 
-            /* ═══ أزرار ═══ */
-            .stButton > button { color:#1a1208 !important; border-color:#C9A84C !important }
+            /* ═══ tabs ═══ */
+            .stTabs [data-baseweb="tab-list"] { background:#e0d8c8 !important }
+            .stTabs [data-baseweb="tab"]       { color:#8a7450 !important }
+            .stTabs [aria-selected="true"]      { background:#C9A84C !important; color:#000 !important }
 
-            /* ═══ فواصل ═══ */
-            hr { border-color:#d5c9a8 !important }
+            /* ═══ progress bar ═══ */
+            .prg-out { background:#d5c9a8 !important }
+
+            /* ═══ step bar ═══ */
+            .stp { color:#6a5030 !important; border-color:#d5c9a8 !important }
+            .stp.done { color:#1a7a3a !important; border-color:#1a7a3a !important }
+            .stp.now  { color:#b8860b !important; border-color:#b8860b !important }
+
+            /* ═══ header الشفاف ═══ */
+            [data-testid="stHeader"] { background:#f5f0e8 !important }
             </style>""", unsafe_allow_html=True)
         else:
             st.markdown("""<style>
-            .stApp { background:#0a0804 !important }
-            [data-testid="stSidebar"],
-            [data-testid="stSidebar"] > div { background:#0d0b08 !important }
+            .stApp { background:#080808 !important }
+            section[data-testid="stSidebar"] { background:#0a0a0a !important }
             </style>""", unsafe_allow_html=True)
         if st.button("🚪 خروج", use_container_width=True, key="btn_logout"):
             st.session_state.ok = False; st.rerun()
