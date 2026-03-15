@@ -884,52 +884,96 @@ def main():
         # تطبيق الثيم
         if not st.session_state.dark_mode:
             st.markdown("""<style>
-            /* خلفية عامة */
-            .stApp,[data-testid="stAppViewContainer"],
-            [data-testid="stAppViewBlockContainer"]{background:#f5f0e8 !important}
+            /* ═══ وضع النهار الشامل ═══ */
+            .stApp,
+            [data-testid="stAppViewContainer"],
+            [data-testid="stAppViewBlockContainer"],
+            [data-testid="stMain"],
+            section[data-testid="stMain"] > div,
+            .main > div { background:#f5f0e8 !important }
+
             /* sidebar */
-            [data-testid="stSidebar"],[data-testid="stSidebar"]>div{background:#ede8dc !important}
-            [data-testid="stSidebar"] *{color:#1a1208 !important}
-            [data-testid="stSidebar"] .stButton>button{
-                background:#e0d8c8 !important;color:#1a1208 !important;
-                border-color:#C9A84C !important}
+            [data-testid="stSidebar"],
+            [data-testid="stSidebar"] > div,
+            [data-testid="stSidebar"] section { background:#ede8dc !important }
+            [data-testid="stSidebar"] * { color:#1a1208 !important }
+            [data-testid="stSidebar"] .stButton > button {
+                background:#e0d8c8 !important; color:#1a1208 !important;
+                border-color:#C9A84C !important }
+
+            /* كل الـ div والعناصر — اجبرهم على الخلفية الفاتحة */
+            .stApp div:not([class*="stButton"]):not([class*="progress"]):not([class*="color"]) {
+                background-color: transparent !important }
+
+            /* بطاقات الإحصائيات */
+            [data-testid="stMetric"],
+            [data-testid="metric-container"],
+            div[data-testid="stMetricValue"],
+            div[data-testid="stMetricLabel"],
+            div[data-testid="stMetricDelta"] { color:#1a1208 !important }
+
+            /* expanders وكروت */
+            [data-testid="stExpander"],
+            [data-testid="stExpanderDetails"],
+            details, summary,
+            .streamlit-expanderHeader,
+            .streamlit-expanderContent {
+                background:#ede8dc !important;
+                color:#1a1208 !important;
+                border-color:#d5c9a8 !important }
+
             /* كل النصوص */
-            p,div,label,span,h1,h2,h3,h4,li,td,th{color:#1a1208 !important}
-            h1,h2,h3{color:#b8860b !important}
-            /* بطاقات الإحصائيات (metric) */
-            [data-testid="stMetric"],[data-testid="metric-container"],
-            [data-testid="stMetricValue"],[data-testid="stMetricLabel"]{
-                background:#ede8dc !important;color:#1a1208 !important}
-            /* expander */
-            [data-testid="stExpander"],[data-testid="stExpanderDetails"],
-            details,summary{background:#ede8dc !important;color:#1a1208 !important;
-                border-color:#d5c9a8 !important}
-            /* كروت وحاويات */
-            [data-testid="stVerticalBlock"] > div,
-            .stContainer,.element-container,.block-container{
-                color:#1a1208 !important}
+            p, span, label, div, li, td, th, h1, h2, h3, h4, h5,
+            .stMarkdown *, .stText * { color:#1a1208 !important }
+            h1,h2,h3 { color:#b8860b !important }
+
             /* حقول الإدخال */
-            input,textarea,[data-testid="stTextInput"] input,
-            [data-testid="stNumberInput"] input,
-            [data-baseweb="input"] input,[data-baseweb="textarea"]{
-                background:#fff !important;color:#1a1208 !important;
-                border-color:#d5c9a8 !important}
-            /* selectbox */
-            [data-baseweb="select"] *,[data-baseweb="select"] div{
-                background:#fff !important;color:#1a1208 !important}
-            /* أكواد */
-            code,pre{background:#e8e0d0 !important;color:#1a1208 !important}
+            input, textarea,
+            [data-baseweb="input"] input,
+            [data-baseweb="textarea"],
+            [data-testid="stTextInput"] input,
+            [data-testid="stNumberInput"] input {
+                background:#ffffff !important;
+                color:#1a1208 !important;
+                border-color:#d5c9a8 !important }
+
+            /* selectbox وقوائم */
+            [data-baseweb="select"] *,
+            [data-baseweb="select"] > div,
+            [role="listbox"], [role="option"] {
+                background:#ffffff !important;
+                color:#1a1208 !important }
+
+            /* color picker */
+            [data-testid="stColorPicker"] * { color:#1a1208 !important }
+
+            /* code blocks */
+            code, pre, .stCodeBlock { 
+                background:#e8e0d0 !important;
+                color:#4a2800 !important }
+
             /* أزرار */
-            .stButton>button{border-color:#C9A84C !important;color:#1a1208 !important}
-            /* الخط الفاصل */
-            hr{border-color:#d5c9a8 !important}
-            /* markdown داكن */
-            .stMarkdown *{color:#1a1208 !important}
+            .stButton > button {
+                color:#1a1208 !important;
+                border-color:#C9A84C !important }
+
+            /* فواصل */
+            hr { border-color:#d5c9a8 !important }
+
+            /* radio buttons */
+            [data-testid="stRadio"] label,
+            [data-testid="stCheckbox"] label { color:#1a1208 !important }
+
+            /* toast وإشعارات */
+            [data-testid="stToast"],
+            .stSuccess, .stWarning, .stError, .stInfo {
+                color:#1a1208 !important }
             </style>""", unsafe_allow_html=True)
         else:
             st.markdown("""<style>
-            .stApp{background:#0a0804 !important}
-            [data-testid="stSidebar"],[data-testid="stSidebar"]>div{background:#0d0b08 !important}
+            .stApp { background:#0a0804 !important }
+            [data-testid="stSidebar"],
+            [data-testid="stSidebar"] > div { background:#0d0b08 !important }
             </style>""", unsafe_allow_html=True)
         if st.button("🚪 خروج", use_container_width=True, key="btn_logout"):
             st.session_state.ok = False; st.rerun()
