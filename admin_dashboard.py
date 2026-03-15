@@ -863,55 +863,48 @@ def main():
         st.session_state.dark_mode = True
 
     if not st.session_state.dark_mode:
+        # ثيم النهار — يطبق على كل عناصر Streamlit بما فيها الـ dropdowns
         st.markdown("""<style>
-.stApp,[data-testid="stAppViewContainer"],[data-testid="stAppViewBlockContainer"],
-[data-testid="stHeader"],.main,.block-container
-{background:#f5f0e8 !important}
+:root {
+  --primary-color: #b8860b;
+  --background-color: #f5f0e8;
+  --secondary-background-color: #ede8dc;
+  --text-color: #1a1208;
+}
+.stApp,[data-testid="stAppViewContainer"],.main,.block-container,
+[data-testid="stHeader"]{background:#f5f0e8 !important}
 section[data-testid="stSidebar"],
-section[data-testid="stSidebar"]>div,
-section[data-testid="stSidebar"]>div>div
-{background:#ede8dc !important}
+section[data-testid="stSidebar"]>div{background:#ede8dc !important}
+/* نصوص */
+p,span,label,li,a,td,th,.stMarkdown *
+{color:#1a1208 !important}
+h1,h2,h3{color:#b8860b !important}
 section[data-testid="stSidebar"] *{color:#1a1208 !important}
-/* حقول — نفس specificity الأصل */
+/* حقول */
 .stTextInput>div>div>input,.stTextArea textarea,
-.stSelectbox>div>div>div,.stNumberInput>div>div>input
+.stNumberInput>div>div>input
 {background:#fff !important;color:#1a1208 !important;border-color:#c8b898 !important}
-/* tabs — نفس specificity الأصل */
+/* selectbox الظاهر */
+.stSelectbox>div>div>div{background:#fff !important;color:#1a1208 !important}
+/* tabs */
 .stTabs [data-baseweb="tab-list"]{background:#ddd5c0 !important}
 .stTabs [data-baseweb="tab"]{color:#5a4020 !important}
 .stTabs [aria-selected="true"]{background:#C9A84C !important;color:#000 !important}
-label{color:#5a4020 !important;font-size:.8rem !important}
-/* نصوص */
-p,span,h1,h2,h3,h4,li,a,td,th,.stMarkdown *
-{color:#1a1208 !important}
-h1,h2,h3{color:#b8860b !important}
 /* كروت */
 .s-card,.r-card,.iblk{background:#e8e0d0 !important;border-color:#c8b898 !important}
 .s-num,.r-name,.iv{color:#b8860b !important}
-.s-lbl,.r-meta,.il{color:#5a4020 !important}
-/* selectbox */
-[data-baseweb="select"]>div,[data-baseweb="select"] div,
-[data-baseweb="select"] span
-{background:#fff !important;color:#1a1208 !important}
+.s-lbl,.r-meta,.il,.r-card p{color:#5a4020 !important}
 /* steps */
 .stp{color:#5a4020 !important;border-color:#c8b898 !important}
 .stp.done{color:#1a6a30 !important;border-color:#1a6a30 !important}
 .stp.now{color:#b8860b !important;border-color:#b8860b !important}
 .prg-out{background:#c8b898 !important}
-/* code */
 code,pre{background:#e0d5c0 !important;color:#3a2000 !important}
-/* expander */
-[data-testid="stExpander"]>div,
-[data-testid="stExpander"] summary,
-[data-testid="stExpander"] summary p
-{background:#ede8dc !important;color:#1a1208 !important}
-/* radio */
-[data-testid="stRadio"] p,[data-testid="stCheckbox"] p
+label{color:#5a4020 !important}
+[data-testid="stRadio"] p,[data-testid="stCheckbox"] p{color:#1a1208 !important}
+[data-testid="stExpander"] summary,[data-testid="stExpander"] summary p
 {color:#1a1208 !important}
-/* metric */
-[data-testid="stMetric"]{background:#e8e0d0 !important}
-[data-testid="stMetricValue"],[data-testid="stMetricLabel"]
-{color:#1a1208 !important}
+[data-testid="stMetricValue"],[data-testid="stMetricLabel"]{color:#1a1208 !important}
 </style>""", unsafe_allow_html=True)
 
     with st.sidebar:
