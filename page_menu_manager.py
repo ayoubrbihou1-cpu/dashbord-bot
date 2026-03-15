@@ -542,9 +542,9 @@ def page_menu_manager(restaurants: list):
 
     # ══ استيراد من صورة ══════════════════════════════════
     with import_tab:
-        _render_image_import_tab(sheet_id, tab_sel, rest)
+        _render_image_import_tab(sheet_id, tab_sel, rest, rid)
 
-def _render_image_import_tab(sheet_id, tab_sel, rest):
+def _render_image_import_tab(sheet_id, tab_sel, rest, rid=""):
     """تبويب استيراد المينيو من صورة باستخدام Gemini"""
     import base64
 
