@@ -7,6 +7,7 @@ import streamlit as st
 import gspread
 import json
 import os
+import requests as _requests
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
 from image_engine import (
@@ -24,6 +25,7 @@ load_dotenv()
 SCOPES          = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
 SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
+ROUTER_BASE_URL = os.getenv("ROUTER_BASE_URL","https://restaurant-qr-saas.onrender.com")
 
 # ══════════════════════════════════════════════════════════
 # 🎨 CSS
@@ -107,6 +109,19 @@ def _gs():
     else:
         c = Credentials.from_service_account_file(SA_JSON_PATH, scopes=SCOPES)
     return gspread.authorize(c)
+
+def _refresh_menu_cache(restaurant_id: str):
+    """✅ يمسح cache المنيو في الـ API بعد حفظ الصور — حتى تظهر فوراً في المينيو"""
+    try:
+        url = f"{ROUTER_BASE_URL}/cache/refresh/{restaurant_id}"
+        resp = _requests.post(url, timeout=8)
+        if resp.status_code == 200:
+            st.toast(f"✅ تم تحديث المينيو — الصور ستظهر الآن فوراً", icon="🔄")
+        else:
+            st.toast(f"⚠️ لم يتم تحديث cache الـ API (كود {resp.status_code})", icon="⚠️")
+    except Exception as e:
+        # لا نوقف العملية إذا فشل الـ cache refresh
+        st.toast(f"⚠️ تعذّر الاتصال بالـ API لتحديث الـ cache: {e}", icon="⚠️")
 
 def load_sheet_items(sheet_id: str, tab: str) -> list[dict]:
     """يجلب الأكلات من الشيت مع cache لتفادي quota exceeded"""
@@ -210,10 +225,11 @@ def page_images(restaurants: list):
     # ── اختيار المطعم والـ Tab
     c1, c2 = st.columns(2)
     with c1:
-        opts     = {f"#{r.get('restaurant_id','?')} — {r.get('name','مطعم')}": r for r in restaurants}
-        sel      = st.selectbox("🏪 المطعم", list(opts.keys()))
-        r        = opts[sel]
-        sheet_id = r.get("sheet_id","")
+        opts          = {f"#{r.get('restaurant_id','?')} — {r.get('name','مطعم')}": r for r in restaurants}
+        sel           = st.selectbox("🏪 المطعم", list(opts.keys()))
+        r             = opts[sel]
+        sheet_id      = r.get("sheet_id","")
+        restaurant_id = str(r.get("restaurant_id","")).strip()
     with c2:
         tab_opts = ["الأطباق الرئيسية","المقبلات","الحلويات","المشروبات"]
         sel_tab  = st.selectbox("📂 الصنف (Tab)", tab_opts)
@@ -707,6 +723,9 @@ def page_images(restaurants: list):
                 if updated:
                     size_kb = result.get("size_kb", 0)
                     st.success(f"✅ صورة '{sel_item}' محفوظة في الشيت ({size_kb}KB)")
+                    # ✅ تحديث cache الـ API فوراً حتى تظهر الصورة في المينيو
+                    if restaurant_id:
+                        _refresh_menu_cache(restaurant_id)
                     st.balloons()
                 else:
                     st.warning(f"⚠️ الصورة معالجة لكن لم تُحدَّث في الشيت — تأكد من اسم الأكلة")
@@ -757,6 +776,9 @@ def page_images(restaurants: list):
             if uploaded_items:
                 total = update_images_in_sheet(sheet_id, final_tab, uploaded_items)
                 st.success(f"✅ {total} صورة محفوظة في الشيت")
+                # ✅ تحديث cache الـ API فوراً حتى تظهر الصور في المينيو
+                if restaurant_id:
+                    _refresh_menu_cache(restaurant_id)
                 st.session_state["pending_items"]    = uploaded_items
                 st.session_state["pending_sheet_id"] = sheet_id
                 st.session_state["pending_tab"]      = final_tab
@@ -815,6 +837,9 @@ def page_images(restaurants: list):
                 with st.spinner("💾 جاري التحديث..."):
                     updated = update_images_in_sheet(pending_sid, pending_tab, pending)
                 st.success(f"🎉 تم تحديث **{updated}** أكلة في Google Sheet")
+                # ✅ تحديث cache الـ API فوراً حتى تظهر الصور في المينيو
+                if restaurant_id:
+                    _refresh_menu_cache(restaurant_id)
                 st.balloons()
                 # Clear
                 for k in ["pending_items","pending_sheet_id","pending_tab"]:
