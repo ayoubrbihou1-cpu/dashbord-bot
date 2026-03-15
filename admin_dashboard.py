@@ -874,6 +874,32 @@ def main():
             "⚙️ إدارة",
         ], label_visibility="hidden")
         st.markdown("---")
+        # زر الليل/النهار
+        if "dark_mode" not in st.session_state:
+            st.session_state.dark_mode = True
+        mode_label = "☀️ وضع النهار" if st.session_state.dark_mode else "🌙 وضع الليل"
+        if st.button(mode_label, use_container_width=True, key="btn_theme"):
+            st.session_state.dark_mode = not st.session_state.dark_mode
+            st.rerun()
+        # تطبيق الثيم
+        if not st.session_state.dark_mode:
+            st.markdown("""<style>
+            .stApp, [data-testid="stAppViewContainer"]{background:#f5f0e8 !important}
+            [data-testid="stSidebar"]{background:#ede8dc !important}
+            .stApp, .stMarkdown, p, div, label, span{color:#1a1208 !important}
+            .stButton button{border-color:#C9A84C !important}
+            h1,h2,h3{color:#b8860b !important}
+            code{background:#e8e0d0 !important;color:#1a1208 !important}
+            [data-testid="stTextInput"] input,
+            [data-testid="stSelectbox"] div,
+            [data-testid="stNumberInput"] input{
+                background:#fff !important;color:#1a1208 !important;
+                border-color:#d5c9a8 !important}
+            </style>""", unsafe_allow_html=True)
+        else:
+            st.markdown("""<style>
+            .stApp{background:#0a0804 !important}
+            </style>""", unsafe_allow_html=True)
         if st.button("🚪 خروج", use_container_width=True, key="btn_logout"):
             st.session_state.ok = False; st.rerun()
 
