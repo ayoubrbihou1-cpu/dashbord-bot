@@ -184,28 +184,16 @@ def save_to_master(data):
         client = _gs()
         ws = _get_or_create_master_tab(client)
 
-        # التحقق من الـ headers
+        # التحقق من الـ headers وإنشاؤها إذا لم تكن موجودة
         existing_headers = ws.row_values(1) if ws.row_count > 0 else []
         if not existing_headers:
             ws.append_row(MASTER_HEADERS)
+            existing_headers = MASTER_HEADERS
 
-        ws.append_row([
-            data.get("restaurant_id",""),
-            data.get("name",""),
-            data.get("sheet_id",""),
-            data.get("telegram_chat_id",""),
-            data.get("wifi_ssid",""),
-            data.get("wifi_password",""),
-            data.get("primary_color","#0a0804"),
-            data.get("accent_color","#C9A84C"),
-            data.get("style","luxury"),
-            data.get("num_tables",10),
-            data.get("logo_url",""),
-            data.get("owner_email",""),
-            data.get("status","pending_telegram"),
-            data.get("created_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-        ])
-        log.info(f"✅ محفوظ في Master_DB tab")
+        # ✅ كتابة الصف بنفس ترتيب الـ headers الموجودة — يضمن كل قيمة في عمودها الصحيح
+        row = [str(data.get(h, "")) for h in existing_headers]
+        ws.append_row(row)
+        log.info(f"✅ محفوظ في Master_DB tab: {data.get('name','')}")
         return True
     except Exception as e:
         log.error(f"Master DB: {e}")
