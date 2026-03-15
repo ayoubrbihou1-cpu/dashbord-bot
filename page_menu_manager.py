@@ -643,23 +643,55 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
                             raw = raw.split("```json")[1].split("```")[0].strip()
                         elif "```" in raw:
                             raw = raw.split("```")[1].split("```")[0].strip()
-                        # أحياناً يضيف نصاً قبل الـ JSON
-                        start = raw.find("{")
-                        if start != -1:
+
+                        # نحدد نوع الـ JSON: object أو array
+                        first_char = ""
+                        for ch in raw:
+                            if ch in "{[":
+                                first_char = ch
+                                break
+
+                        if first_char == "[":
+                            # رجع array مباشرة — ابحث عنه
+                            start = raw.find("[")
                             raw = raw[start:]
-                        # استخدام raw_decode لتجاهل أي نص بعد الـ JSON
-                        try:
-                            parsed, _ = json.JSONDecoder().raw_decode(raw)
-                        except json.JSONDecodeError:
-                            # محاولة أخيرة: اقطع عند آخر }
-                            end = raw.rfind("}")
-                            if end != -1:
-                                raw = raw[:end+1]
-                            parsed = json.loads(raw)
-                        items_found = parsed.get("items", [])
+                            try:
+                                items_found, _ = json.JSONDecoder().raw_decode(raw)
+                            except json.JSONDecodeError:
+                                end = raw.rfind("]")
+                                items_found = json.loads(raw[:end+1] if end != -1 else raw)
+                        else:
+                            # رجع object — ابحث عنه
+                            start = raw.find("{")
+                            if start != -1:
+                                raw = raw[start:]
+                            try:
+                                parsed, _ = json.JSONDecoder().raw_decode(raw)
+                            except json.JSONDecodeError:
+                                end = raw.rfind("}")
+                                if end != -1:
+                                    raw = raw[:end+1]
+                                parsed = json.loads(raw)
+                            # جرب كل المفاتيح الممكنة
+                            items_found = (
+                                parsed.get("items") or
+                                parsed.get("dishes") or
+                                parsed.get("menu") or
+                                parsed.get("data") or
+                                (list(parsed.values())[0] if parsed and isinstance(list(parsed.values())[0], list) else [])
+                            )
+
+                        # تأكد أن النتيجة list of dicts
+                        if not isinstance(items_found, list):
+                            items_found = []
+                        items_found = [i for i in items_found if isinstance(i, dict) and i.get("name","").strip()]
                         st.session_state["_analyzed_items"] = items_found
                         st.session_state["_analyzed_edits"] = {i: dict(item) for i, item in enumerate(items_found)}
-                        st.success(f"✅ تم استخراج {len(items_found)} أكلة!")
+                        if items_found:
+                            st.success(f"✅ تم استخراج {len(items_found)} أكلة!")
+                        else:
+                            st.warning("⚠️ لم يتم استخراج أي أكلة — رد الذكاء الاصطناعي:")
+                            st.code(raw[:800])
                     except json.JSONDecodeError as e:
                         st.error(f"❌ خطأ في قراءة JSON: {e}")
                         st.code(raw[:500] if 'raw' in dir() else "لا يوجد رد")
