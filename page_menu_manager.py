@@ -803,6 +803,8 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
                                 added += n
 
                         if added > 0:
+                            # ✅ مسح cache الـ API — الأكلات تظهر فوراً في المينيو
+                            _refresh_api_cache(rid)
                             st.success(f"✅ تم حفظ {added} أكلة في Google Sheet! تظهر في المينيو فوراً 🎉")
                             st.session_state.pop("_analyzed_items", None)
                             st.session_state.pop("_analyzed_edits", None)
