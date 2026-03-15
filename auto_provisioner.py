@@ -184,16 +184,24 @@ def save_to_master(data):
         client = _gs()
         ws = _get_or_create_master_tab(client)
 
-        # التحقق من الـ headers وإنشاؤها إذا لم تكن موجودة
         existing_headers = ws.row_values(1) if ws.row_count > 0 else []
         if not existing_headers:
             ws.append_row(MASTER_HEADERS)
             existing_headers = MASTER_HEADERS
+        else:
+            # ✅ أضف أي عمود ناقص في الـ headers تلقائياً
+            missing = [h for h in MASTER_HEADERS if h not in existing_headers]
+            if missing:
+                for h in missing:
+                    existing_headers.append(h)
+                # حدّث صف الـ headers في الشيت
+                ws.update("A1", [existing_headers])
+                log.info(f"✅ أضفت أعمدة جديدة: {missing}")
 
-        # ✅ كتابة الصف بنفس ترتيب الـ headers الموجودة — يضمن كل قيمة في عمودها الصحيح
+        # كتابة الصف بنفس ترتيب الـ headers
         row = [str(data.get(h, "")) for h in existing_headers]
         ws.append_row(row)
-        log.info(f"✅ محفوظ في Master_DB tab: {data.get('name','')}")
+        log.info(f"✅ محفوظ في Master_DB: {data.get('name','')}")
         return True
     except Exception as e:
         log.error(f"Master DB: {e}")
@@ -228,11 +236,8 @@ def update_telegram_chat_id(restaurant_id, chat_id):
 # ══════════════════════════════════════════════════════════
 def send_welcome_email(to_email: str, restaurant_name: str,
                        sheet_url: str, menu_url: str,
-                       wifi_ssid: str, reg_link: str = "") -> bool:
-    """
-    إرسال إيميل ترحيب لصاحب المطعم
-    يحتاج: GMAIL_USER + GMAIL_APP_PASSWORD في المتغيرات البيئية
-    """
+                       wifi_ssid: str, reg_link: str = "",
+                       kitchen_url: str = "", kitchen_password: str = "") -> bool:
     if not GMAIL_USER or not GMAIL_PASSWORD:
         log.warning("⚠️ GMAIL_USER أو GMAIL_APP_PASSWORD غير محدد — تخطي الإيميل")
         return False
@@ -247,13 +252,23 @@ def send_welcome_email(to_email: str, restaurant_name: str,
 
         tg_section = f"""
         <tr>
-          <td style="padding:12px;background:#0d1a24;border-radius:8px;margin-top:12px">
-            <b style="color:#29b6f6">📨 رابط Telegram:</b><br>
-            <a href="{reg_link}" style="color:#29b6f6">{reg_link}</a><br>
-            <small style="color:#888">اضغط مرة واحدة لربط الطلبات بـ Telegram</small>
+          <td style="color:#C9A84C;font-weight:bold;padding:8px">📨 رابط Telegram:</td>
+          <td style="padding:8px"><a href="{reg_link}" style="color:#29b6f6">{reg_link}</a><br>
+          <small style="color:#888">اضغط مرة واحدة لربط الطلبات</small></td>
+        </tr>""" if reg_link else ""
+
+        kitchen_section = f"""
+        <tr>
+          <td colspan="2" style="padding:12px;background:#1a0d00;border-radius:8px;margin-top:8px">
+            <b style="color:#ff9800">🍳 شاشة الكوزينة:</b><br>
+            <a href="{kitchen_url}" style="color:#ff9800;font-size:.85rem">{kitchen_url}</a><br>
+            <b style="color:#ff9800">🔑 كلمة مرور الكوزينة:</b>
+            <code style="background:#2a1500;color:#ffcc80;padding:2px 8px;border-radius:4px;font-size:1rem">
+              {kitchen_password}
+            </code><br>
+            <small style="color:#888">📌 احفظها على التابليت في الكوزينة</small>
           </td>
-        </tr>
-        """ if reg_link else ""
+        </tr>""" if kitchen_url else ""
 
         html = f"""
         <html><body style="font-family:Arial,sans-serif;background:#0a0a0a;color:#eee;padding:20px">
@@ -283,6 +298,7 @@ def send_welcome_email(to_email: str, restaurant_name: str,
                   <td>{wifi_ssid}</td>
                 </tr>
                 {tg_section}
+                {kitchen_section}
               </table>
               <hr style="border-color:#222;margin:16px 0">
               <p style="color:#555;font-size:.85rem;text-align:center">
@@ -294,11 +310,9 @@ def send_welcome_email(to_email: str, restaurant_name: str,
         """
 
         msg.attach(MIMEText(html, "html", "utf-8"))
-
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(GMAIL_USER, GMAIL_PASSWORD)
             server.sendmail(GMAIL_USER, to_email, msg.as_string())
-
         log.info(f"✅ إيميل أُرسل إلى: {to_email}")
         return True
     except Exception as e:
@@ -329,12 +343,20 @@ def build_reg_link(restaurant_id):
     except: pass
     return ""
 
-def send_welcome(chat_id, name, sheet_url, menu_url, wifi):
+def send_welcome(chat_id, name, sheet_url, menu_url, wifi,
+                 kitchen_url="", kitchen_password=""):
+    kitchen_part = (
+        f"\n━━━━━━━━━━━━\n"
+        f"🍳 *شاشة الكوزينة:*\n`{kitchen_url}`\n"
+        f"🔑 *كلمة مرور الكوزينة:* `{kitchen_password}`\n"
+        f"📌 احفظها على التابليت"
+    ) if kitchen_url else ""
     return _tg(chat_id,
         f"🎉 *مرحباً في QR Menu!*\n🏪 *{name}*\n\n"
         f"📊 [قائمتك الآن]({sheet_url})\n"
         f"📱 رابط الزبائن: `{menu_url}`\n"
-        f"📶 WiFi: `{wifi}`\n\n"
+        f"📶 WiFi: `{wifi}`\n"
+        f"{kitchen_part}\n\n"
         f"✏️ عدّل الأسعار مباشرة في الشيت — تظهر فوراً للزبائن!\n"
         f"⚡ الطلبات ستصلك هنا.")
 
@@ -412,15 +434,20 @@ def provision_restaurant(
     else:
         steps.append("⚠️ تحقق من TELEGRAM_BOT_TOKEN")
 
+    # رابط الكوزينة
+    kitchen_url = f"{KITCHEN_URL}?api={ROUTER_BASE_URL}&rid={restaurant_id}" if KITCHEN_URL else ""
+
     # إرسال رسالة Telegram
     if telegram_chat_id:
-        ok = send_welcome(telegram_chat_id, name, url, menu_url, wifi_ssid)
+        ok = send_welcome(telegram_chat_id, name, url, menu_url, wifi_ssid,
+                          kitchen_url=kitchen_url, kitchen_password=kitchen_password)
         steps.append("✅ رسالة Telegram أُرسلت" if ok else "⚠️ Telegram فشل")
 
     # ✅ إرسال إيميل Gmail
     if owner_email:
         email_ok = send_welcome_email(
-            owner_email, name, url, menu_url, wifi_ssid, reg
+            owner_email, name, url, menu_url, wifi_ssid, reg,
+            kitchen_url=kitchen_url, kitchen_password=kitchen_password
         )
         steps.append("✅ إيميل أُرسل" if email_ok else "⚠️ إيميل فشل (تحقق من GMAIL_USER/GMAIL_APP_PASSWORD)")
 
