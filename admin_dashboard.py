@@ -868,103 +868,105 @@ def main():
 
     if not st.session_state.dark_mode:
         st.markdown("""<style>
-:root {
-  --primary-color: #b8860b !important;
-  --background-color: #f5f0e8 !important;
-  --secondary-background-color: #ede8dc !important;
-  --text-color: #1a1208 !important;
-}
+:root{--primary-color:#b8860b!important;--background-color:#f5f0e8!important;
+  --secondary-background-color:#ede8dc!important;--text-color:#1a1208!important}
+
+/* ═══ خلفيات ═══ */
 .stApp,[data-testid="stAppViewContainer"],.main,.block-container,
-[data-testid="stHeader"]{background:#f5f0e8 !important}
+[data-testid="stHeader"]{background:#f5f0e8!important}
 section[data-testid="stSidebar"],
-section[data-testid="stSidebar"]>div{background:#ede8dc !important}
-section[data-testid="stSidebar"] *{color:#1a1208 !important}
+section[data-testid="stSidebar"]>div{background:#ede8dc!important}
+section[data-testid="stSidebar"] *{color:#1a1208!important}
 
-/* ══ كل النصوص ══ */
-p,span,label,li,a,td,th,small,
-.stMarkdown *,[data-testid="stText"]
-{color:#1a1208 !important}
-h1,h2,h3,h4{color:#b8860b !important}
+/* ═══ كل النصوص ═══ */
+p,span,label,li,a,td,th,small,.stMarkdown *,
+[data-testid="stText"]{color:#1a1208!important}
+h1,h2,h3,h4{color:#b8860b!important}
 
-/* ══ حقول نصية + number_input ══ */
+/* ═══ كل الحقول بدون استثناء ═══ */
+input,textarea,select,
+input[type="text"],input[type="email"],input[type="tel"],
+input[type="number"],input[type="password"],input[type="url"],
 .stTextInput>div>div>input,
 .stTextArea textarea,
 .stNumberInput>div>div>input,
 .stNumberInput input,
 [data-testid="stNumberInput"] input,
-[data-testid="stNumberInput"]>div>div>input
-{background:#fff !important;color:#1a1208 !important;border-color:#c8b898 !important}
+[data-baseweb="input"] input,
+[data-baseweb="textarea"]
+{background:#fff!important;color:#1a1208!important;
+ border-color:#c8b898!important}
 
-/* أزرار +/- في number_input */
-.stNumberInput button,
-[data-testid="stNumberInput"] button
-{background:#e8e0d0 !important;color:#1a1208 !important;border-color:#c8b898 !important}
+/* ═══ أزرار +/- في number_input ═══ */
+.stNumberInput button,[data-testid="stNumberInput"] button,
+[data-baseweb="input"] button
+{background:#e8e0d0!important;color:#1a1208!important;border-color:#c8b898!important}
 
-/* ══ Selectbox — الجزء الظاهر والـ dropdown ══ */
-.stSelectbox>div>div,
-.stSelectbox>div>div>div,
-.stSelectbox [data-baseweb="select"]>div,
+/* ═══ color picker ═══ */
+[data-testid="stColorPicker"],
+[data-testid="stColorPicker"]>div,
+[data-testid="stColorPicker"]>div>div,
+[data-testid="stColorPicker"] label
+{background:#fff!important;color:#1a1208!important}
+
+/* ═══ selectbox كامل ═══ */
+.stSelectbox>div>div,.stSelectbox>div>div>div,
 [data-baseweb="select"]>div,
 [data-baseweb="select"] [class*="valueContainer"],
 [data-baseweb="select"] [class*="singleValue"],
-[data-baseweb="select"] [class*="placeholder"]
-{background:#fff !important;color:#1a1208 !important;border-color:#c8b898 !important}
+[data-baseweb="select"] [class*="placeholder"],
+[data-baseweb="select"] [class*="control"]
+{background:#fff!important;color:#1a1208!important;border-color:#c8b898!important}
 
-/* القائمة المنسدلة عند الفتح */
-[data-baseweb="popover"],
-[data-baseweb="popover"] *,
-[data-baseweb="menu"],
-[data-baseweb="menu"] *,
-[role="listbox"],
-[role="listbox"] *,
-[role="option"],
-[data-baseweb="list-item"],
-li[data-baseweb="menu-item"]
-{background:#fff !important;color:#1a1208 !important}
+/* قائمة dropdown المنسدلة */
+[data-baseweb="popover"],[data-baseweb="popover"] *,
+[data-baseweb="menu"],[data-baseweb="menu"] *,
+[role="listbox"],[role="listbox"] *,
+[role="option"],[data-baseweb="list-item"]
+{background:#fff!important;color:#1a1208!important}
+[role="option"]:hover,[data-baseweb="list-item"]:hover
+{background:#ede8dc!important}
 
-[role="option"]:hover,
-[data-baseweb="menu-item"]:hover
-{background:#ede8dc !important;color:#1a1208 !important}
+/* ═══ tabs ═══ */
+.stTabs [data-baseweb="tab-list"]{background:#ddd5c0!important}
+.stTabs [data-baseweb="tab"]{color:#5a4020!important}
+.stTabs [aria-selected="true"]{background:#C9A84C!important;color:#000!important}
+[data-baseweb="tab-panel"],[data-baseweb="tab-panel"] *
+{background:#f5f0e8!important;color:#1a1208!important}
 
-/* ══ Tabs ══ */
-.stTabs [data-baseweb="tab-list"]{background:#ddd5c0 !important}
-.stTabs [data-baseweb="tab"]{color:#5a4020 !important}
-.stTabs [aria-selected="true"]{background:#C9A84C !important;color:#000 !important}
-[data-baseweb="tab-panel"]{background:#f5f0e8 !important;color:#1a1208 !important}
-[data-baseweb="tab-panel"] *{color:#1a1208 !important}
-
-/* ══ كروت مخصصة ══ */
+/* ═══ كروت ═══ */
 .s-card,.r-card,.iblk,.tgbox,.info-box
-{background:#e8e0d0 !important;border-color:#c8b898 !important}
-.s-num,.r-name,.iv{color:#b8860b !important}
-.s-lbl,.r-meta,.il{color:#5a4020 !important}
+{background:#e8e0d0!important;border-color:#c8b898!important}
+.s-num,.r-name,.iv{color:#b8860b!important}
+.s-lbl,.r-meta,.il{color:#5a4020!important}
 
-/* ══ Expander ══ */
+/* ═══ expander ═══ */
 [data-testid="stExpander"],[data-testid="stExpander"]>div,
 [data-testid="stExpander"] summary,
 [data-testid="stExpander"] summary p,
 [data-testid="stExpanderDetails"],
 [data-testid="stExpanderDetails"] *
-{background:#ede8dc !important;color:#1a1208 !important}
+{background:#ede8dc!important;color:#1a1208!important}
 
-/* ══ Steps ══ */
-.stp{color:#5a4020 !important;border-color:#c8b898 !important}
-.stp.done{color:#1a6a30 !important;border-color:#1a6a30 !important}
-.stp.now{color:#b8860b !important;border-color:#b8860b !important}
-.prg-out{background:#c8b898 !important}
+/* ═══ steps ═══ */
+.stp{color:#5a4020!important;border-color:#c8b898!important}
+.stp.done{color:#1a6a30!important;border-color:#1a6a30!important}
+.stp.now{color:#b8860b!important;border-color:#b8860b!important}
+.prg-out{background:#c8b898!important}
 
-/* ══ كود ══ */
-code,pre{background:#e0d5c0 !important;color:#3a2000 !important}
+/* ═══ code ═══ */
+code,pre{background:#e0d5c0!important;color:#3a2000!important}
 
-/* ══ radio ══ */
-[data-testid="stRadio"] p,
-[data-testid="stCheckbox"] p
-{color:#1a1208 !important}
+/* ═══ radio & checkbox ═══ */
+[data-testid="stRadio"] p,[data-testid="stCheckbox"] p
+{color:#1a1208!important}
 
-/* ══ Metric ══ */
-[data-testid="stMetricValue"],
-[data-testid="stMetricLabel"]
-{color:#1a1208 !important}
+/* ═══ metric ═══ */
+[data-testid="stMetricValue"],[data-testid="stMetricLabel"]
+{color:#1a1208!important}
+
+/* ═══ label ═══ */
+label{color:#5a4020!important}
 </style>""", unsafe_allow_html=True)
 
     with st.sidebar:
