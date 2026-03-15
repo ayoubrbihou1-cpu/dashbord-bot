@@ -20,6 +20,8 @@ TG_TOKEN        = os.getenv("TELEGRAM_BOT_TOKEN","")
 SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
 FRONTEND_URL    = os.getenv("FRONTEND_URL","https://your-menu.netlify.app")
+KITCHEN_URL     = os.getenv("KITCHEN_URL","https://your-kitchen.netlify.app")
+ROUTER_BASE_URL = os.getenv("ROUTER_BASE_URL","https://restaurant-qr-saas.onrender.com")
 SA_EMAIL        = "restaurant-bot@gen-lang-client-0967477901.iam.gserviceaccount.com"
 
 # Gmail للإرسال (اختياري)
