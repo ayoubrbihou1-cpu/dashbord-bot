@@ -239,6 +239,50 @@ def page_images(restaurants: list):
         final_tab  = custom_tab.strip() if custom_tab.strip() else sel_tab
 
     # ══════════════════════════════════════════════════════
+    # 🚨 زر الطوارئ — تحديث فوري للمينيو
+    # ══════════════════════════════════════════════════════
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#1a0a00,#2a1200);
+         border:1px solid #C9A84C88;border-radius:12px;
+         padding:.8rem 1.2rem;margin:.5rem 0 1rem;
+         display:flex;align-items:center;gap:.8rem">
+      <span style="font-size:1.4rem">🚨</span>
+      <div>
+        <div style="color:#C9A84C;font-weight:700;font-size:.9rem">زر الطوارئ — تحديث فوري</div>
+        <div style="color:#888;font-size:.75rem;margin-top:.2rem">
+          إذا حفظت صورة ولم تظهر في المينيو — اضغط هنا لإجبار التحديث الفوري
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_emergency, col_status = st.columns([2, 3])
+    with col_emergency:
+        if st.button("⚡ تحديث المينيو الآن", use_container_width=True,
+                     key="emergency_refresh", type="primary"):
+            with st.spinner("⏳ جاري مسح الـ cache وإجبار التحديث..."):
+                try:
+                    import time as _time
+                    # 1) مسح cache الـ API
+                    url = f"{ROUTER_BASE_URL}/cache/refresh/{restaurant_id}"
+                    resp = _requests.post(url, timeout=10,
+                                          headers={"X-Admin-Key": ADMIN_PASSWORD})
+                    _time.sleep(0.5)
+                    # 2) مسح cache الـ streamlit
+                    st.cache_data.clear()
+                    if resp.status_code == 200:
+                        with col_status:
+                            st.success("✅ تم! افتح المينيو الآن — الصور ستظهر فوراً")
+                    else:
+                        with col_status:
+                            st.warning(f"⚠️ كود الـ API: {resp.status_code} — جرب مرة أخرى")
+                except Exception as e:
+                    with col_status:
+                        st.error(f"❌ خطأ في الاتصال: {e}")
+
+    st.markdown("---")
+
+    # ══════════════════════════════════════════════════════
     # 🎛️ METHOD SELECTOR — البطاقات الثلاث
     # ══════════════════════════════════════════════════════
     st.markdown('<div style="height:.5rem"></div>', unsafe_allow_html=True)
