@@ -53,50 +53,142 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Outfit:wght@400;600;700&display=swap');
 html,body,[class*="css"]{font-family:'Outfit','Cairo',sans-serif!important}
-.stApp{background:#080808!important;color:#f0f0f0}
-section[data-testid="stSidebar"]{background:#0a0a0a!important;border-right:1px solid #1a1a1a}
-.g-title{font-size:1.8rem;font-weight:900;text-align:center;padding:.4rem 0;
-  background:linear-gradient(135deg,#C9A84C,#E8C97A,#C9A84C);background-size:200%;
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:gs 3s linear infinite}
+
+/* ══════════ المتغيرات — الليل (افتراضي) ══════════ */
+:root{
+  --bg:#080808; --bg2:#101010; --bg3:#1a1a1a;
+  --sidebar:#0a0a0a; --sidebar2:#111;
+  --text:#f0f0f0; --text2:#aaa; --text3:#555;
+  --border:#222; --border2:#1a1a1a;
+  --input-bg:#111; --input-text:#eee; --input-border:#222;
+  --gold:#C9A84C; --gold2:#E8C97A;
+  --card-bg:#101010; --card-border:#1a1a1a;
+  --tab-bg:#0e0e0e; --tab-text:#444;
+  --placeholder:#444;
+}
+
+/* ══════════ المتغيرات — النهار ══════════ */
+body.day-theme{
+  --bg:#f5f0e8; --bg2:#ede8dc; --bg3:#e0d8c8;
+  --sidebar:#ede8dc; --sidebar2:#e0d8c8;
+  --text:#1a1208; --text2:#5a4020; --text3:#8a7050;
+  --border:#c8b898; --border2:#d5c9a8;
+  --input-bg:#ffffff; --input-text:#1a1208; --input-border:#c8b898;
+  --gold:#b8860b; --gold2:#8a6010;
+  --card-bg:#e8e0d0; --card-border:#c8b898;
+  --tab-bg:#ddd5c0; --tab-text:#5a4020;
+  --placeholder:#a09070;
+}
+
+/* ══════════ تطبيق المتغيرات ══════════ */
+.stApp,[data-testid="stAppViewContainer"],[data-testid="stAppViewBlockContainer"],
+.main,.block-container,[data-testid="stHeader"]
+{background:var(--bg)!important;color:var(--text)!important}
+
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"]>div
+{background:var(--sidebar)!important}
+section[data-testid="stSidebar"] *{color:var(--text)!important}
+
+/* ══ كل الحقول ══ */
+.stTextInput>div>div>input,
+.stTextArea textarea,
+.stNumberInput>div>div>input,
+.stNumberInput input,
+[data-baseweb="input"] input,
+[data-baseweb="textarea"],
+input[type="text"],input[type="email"],input[type="tel"],
+input[type="number"],input[type="password"],input[type="url"],
+textarea
+{background:var(--input-bg)!important;color:var(--input-text)!important;
+ border-color:var(--input-border)!important;border-radius:8px!important}
+
+/* placeholder */
+::placeholder{color:var(--placeholder)!important;opacity:1!important}
+::-webkit-input-placeholder{color:var(--placeholder)!important}
+::-moz-placeholder{color:var(--placeholder)!important}
+
+/* ══ أزرار number ══ */
+.stNumberInput button,[data-baseweb="input"] button
+{background:var(--bg3)!important;color:var(--text)!important;border-color:var(--border)!important}
+
+/* ══ selectbox ══ */
+.stSelectbox>div>div,.stSelectbox>div>div>div,
+[data-baseweb="select"]>div,
+[data-baseweb="select"] [class*="control"],
+[data-baseweb="select"] [class*="valueContainer"],
+[data-baseweb="select"] [class*="singleValue"],
+[data-baseweb="select"] [class*="placeholder"]
+{background:var(--input-bg)!important;color:var(--input-text)!important;
+ border-color:var(--input-border)!important}
+
+[data-baseweb="popover"],[data-baseweb="popover"] *,
+[data-baseweb="menu"],[data-baseweb="menu"] *,
+[role="listbox"],[role="listbox"] *,[role="option"]
+{background:var(--input-bg)!important;color:var(--input-text)!important}
+[role="option"]:hover{background:var(--bg2)!important}
+
+/* ══ tabs ══ */
+.stTabs [data-baseweb="tab-list"]{background:var(--tab-bg)!important;border-radius:8px;padding:3px}
+.stTabs [data-baseweb="tab"]{color:var(--tab-text)!important;border-radius:6px!important}
+.stTabs [aria-selected="true"]{background:var(--gold)!important;color:#000!important;font-weight:700!important}
+[data-baseweb="tab-panel"]{background:var(--bg)!important}
+[data-baseweb="tab-panel"] *{color:var(--text)!important}
+
+/* ══ labels & text ══ */
+label{color:var(--text2)!important;font-size:.8rem!important}
+p,span,li,td,th,a,.stMarkdown *{color:var(--text)!important}
+h1,h2,h3,h4{color:var(--gold)!important}
+
+/* ══ كروت مخصصة ══ */
+.s-card,.r-card,.iblk,.tgbox,.info-box,.res
+{background:var(--card-bg)!important;border-color:var(--card-border)!important}
+.s-num,.r-name,.iv{color:var(--gold)!important}
+.s-lbl,.r-meta,.il{color:var(--text2)!important}
+.ok{color:#69f0ae!important}
+.err{color:#ef9a9a!important}
+.warn{color:#ffe57f!important}
+
+/* ══ g-title — gradient يبقى دائماً ══ */
+.g-title{background:linear-gradient(135deg,#C9A84C,#E8C97A,#C9A84C)!important;
+  background-size:200%!important;-webkit-background-clip:text!important;
+  -webkit-text-fill-color:transparent!important;animation:gs 3s linear infinite!important}
 @keyframes gs{0%{background-position:0%}100%{background-position:200%}}
-.gdiv{height:1px;background:linear-gradient(90deg,transparent,#C9A84C22,transparent);margin:.8rem 0}
-.s-card{background:#101010;border:1px solid #1a1a1a;border-radius:12px;padding:1.1rem;text-align:center}
-.s-num{font-size:2.2rem;font-weight:900;color:#C9A84C;line-height:1}
-.s-lbl{font-size:.75rem;color:#444;margin-top:.2rem}
-.r-card{background:#101010;border:1px solid #1a1a1a;border-left:3px solid #C9A84C;
-  border-radius:10px;padding:.8rem 1rem;margin-bottom:.5rem}
-.r-name{font-size:.9rem;font-weight:700;color:#E8C97A}
-.r-meta{font-size:.7rem;color:#444;margin-top:.2rem}
-.res{border-radius:10px;padding:1rem 1.2rem;margin:.7rem 0;line-height:1.8}
-.ok{background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);color:#69f0ae}
-.err{background:rgba(229,57,53,.07);border:1px solid rgba(229,57,53,.2);color:#ef9a9a}
-.warn{background:rgba(255,193,7,.07);border:1px solid rgba(255,193,7,.2);color:#ffe57f}
-.info-box{background:rgba(41,182,246,.07);border:1px solid rgba(41,182,246,.2);
-  border-radius:10px;padding:1rem;color:#80d8ff;font-size:.85rem;line-height:1.8}
-.tgbox{background:linear-gradient(135deg,rgba(0,136,204,.1),rgba(0,88,140,.06));
-  border:1px solid rgba(0,136,204,.25);border-radius:12px;padding:1.1rem 1.3rem;margin:.7rem 0}
-.iblk{background:#080818;border:1px solid #14143a;border-radius:10px;padding:.8rem 1rem}
-.il{font-size:.72rem;font-weight:600;color:#3a3a7a;margin-bottom:.1rem}
-.iv{color:#C9A84C;font-family:monospace;font-size:.85rem;word-break:break-all}
-.badge{display:inline-block;padding:.12rem .55rem;border-radius:10px;font-size:.68rem;
-  font-weight:600;background:rgba(201,168,76,.1);color:#C9A84C;border:1px solid rgba(201,168,76,.2)}
-.badge-g{background:rgba(0,230,118,.1);color:#69f0ae;border-color:rgba(0,230,118,.2)}
-.steps{display:flex;margin:1.2rem 0 .8rem;gap:0}
-.stp{flex:1;text-align:center;padding:.5rem .2rem;font-size:.7rem;font-weight:700;
-  color:#222;border-bottom:2px solid #1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.stp.done{color:#00e676;border-color:#00e676}
-.stp.now{color:#C9A84C;border-color:#C9A84C}
-.prg-out{background:#111;border-radius:6px;height:5px;overflow:hidden;margin:.4rem 0}
-.prg-in{height:100%;border-radius:6px;background:linear-gradient(90deg,#C9A84C,#E8C97A)}
+
+/* ══ expander ══ */
+[data-testid="stExpander"],[data-testid="stExpander"]>div,
+[data-testid="stExpander"] summary,
+[data-testid="stExpanderDetails"],
+[data-testid="stExpanderDetails"] *
+{background:var(--bg2)!important;color:var(--text)!important}
+
+/* ══ steps ══ */
+.stp{color:var(--text3)!important;border-color:var(--border)!important}
+.stp.done{color:#00e676!important;border-color:#00e676!important}
+.stp.now{color:var(--gold)!important;border-color:var(--gold)!important}
+.prg-out{background:var(--bg3)!important}
+
+/* ══ radio & checkbox ══ */
+[data-testid="stRadio"] p,[data-testid="stCheckbox"] p{color:var(--text)!important}
+
+/* ══ metric ══ */
+[data-testid="stMetricValue"],[data-testid="stMetricLabel"]{color:var(--text)!important}
+
+/* ══ code ══ */
+code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
+
+/* ══ أزرار ══ */
 .stButton>button{background:linear-gradient(135deg,#C9A84C,#8a6020)!important;
-  color:#000!important;font-weight:700!important;border:none!important;border-radius:8px!important;transition:all .2s!important}
-.stButton>button:hover{transform:translateY(-2px)!important;box-shadow:0 6px 20px rgba(201,168,76,.3)!important}
-.stTextInput>div>div>input,.stTextArea textarea,.stSelectbox>div>div>div,.stNumberInput>div>div>input{
-  background:#111!important;color:#eee!important;border:1px solid #222!important;border-radius:8px!important}
-label{color:#555!important;font-size:.8rem!important}
-.stTabs [data-baseweb="tab-list"]{background:#0e0e0e!important;border-radius:8px;padding:3px}
-.stTabs [data-baseweb="tab"]{color:#444!important;border-radius:6px!important}
-.stTabs [aria-selected="true"]{background:#C9A84C!important;color:#000!important;font-weight:700!important}
+  color:#000!important;font-weight:700!important;border:none!important;
+  border-radius:8px!important;transition:all .2s!important}
+.stButton>button:hover{transform:translateY(-2px)!important;
+  box-shadow:0 6px 20px rgba(201,168,76,.3)!important}
+
+/* ══ color picker — لا نلمسه ══ */
+[data-testid="stColorPicker"] label{color:var(--text2)!important}
+
+/* ══ gdiv ══ */
+.gdiv{height:1px;background:linear-gradient(90deg,transparent,#C9A84C22,transparent);margin:.8rem 0}
 </style>
 """, unsafe_allow_html=True)
 
@@ -868,106 +960,19 @@ def main():
 
     if not st.session_state.dark_mode:
         st.markdown("""<style>
-:root{--primary-color:#b8860b!important;--background-color:#f5f0e8!important;
-  --secondary-background-color:#ede8dc!important;--text-color:#1a1208!important}
-
-/* ═══ خلفيات ═══ */
-.stApp,[data-testid="stAppViewContainer"],.main,.block-container,
-[data-testid="stHeader"]{background:#f5f0e8!important}
-section[data-testid="stSidebar"],
-section[data-testid="stSidebar"]>div{background:#ede8dc!important}
-section[data-testid="stSidebar"] *{color:#1a1208!important}
-
-/* ═══ كل النصوص ═══ */
-p,span,label,li,a,td,th,small,.stMarkdown *,
-[data-testid="stText"]{color:#1a1208!important}
-h1,h2,h3,h4{color:#b8860b!important}
-
-/* ═══ كل الحقول بدون استثناء ═══ */
-input,textarea,select,
-input[type="text"],input[type="email"],input[type="tel"],
-input[type="number"],input[type="password"],input[type="url"],
-.stTextInput>div>div>input,
-.stTextArea textarea,
-.stNumberInput>div>div>input,
-.stNumberInput input,
-[data-testid="stNumberInput"] input,
-[data-baseweb="input"] input,
-[data-baseweb="textarea"]
-{background:#fff!important;color:#1a1208!important;
- border-color:#c8b898!important}
-
-/* ═══ أزرار +/- في number_input ═══ */
-.stNumberInput button,[data-testid="stNumberInput"] button,
-[data-baseweb="input"] button
-{background:#e8e0d0!important;color:#1a1208!important;border-color:#c8b898!important}
-
-/* ═══ color picker ═══ */
-[data-testid="stColorPicker"],
-[data-testid="stColorPicker"]>div,
-[data-testid="stColorPicker"]>div>div,
-[data-testid="stColorPicker"] label
-{background:#fff!important;color:#1a1208!important}
-
-/* ═══ selectbox كامل ═══ */
-.stSelectbox>div>div,.stSelectbox>div>div>div,
-[data-baseweb="select"]>div,
-[data-baseweb="select"] [class*="valueContainer"],
-[data-baseweb="select"] [class*="singleValue"],
-[data-baseweb="select"] [class*="placeholder"],
-[data-baseweb="select"] [class*="control"]
-{background:#fff!important;color:#1a1208!important;border-color:#c8b898!important}
-
-/* قائمة dropdown المنسدلة */
-[data-baseweb="popover"],[data-baseweb="popover"] *,
-[data-baseweb="menu"],[data-baseweb="menu"] *,
-[role="listbox"],[role="listbox"] *,
-[role="option"],[data-baseweb="list-item"]
-{background:#fff!important;color:#1a1208!important}
-[role="option"]:hover,[data-baseweb="list-item"]:hover
-{background:#ede8dc!important}
-
-/* ═══ tabs ═══ */
-.stTabs [data-baseweb="tab-list"]{background:#ddd5c0!important}
-.stTabs [data-baseweb="tab"]{color:#5a4020!important}
-.stTabs [aria-selected="true"]{background:#C9A84C!important;color:#000!important}
-[data-baseweb="tab-panel"],[data-baseweb="tab-panel"] *
-{background:#f5f0e8!important;color:#1a1208!important}
-
-/* ═══ كروت ═══ */
-.s-card,.r-card,.iblk,.tgbox,.info-box
-{background:#e8e0d0!important;border-color:#c8b898!important}
-.s-num,.r-name,.iv{color:#b8860b!important}
-.s-lbl,.r-meta,.il{color:#5a4020!important}
-
-/* ═══ expander ═══ */
-[data-testid="stExpander"],[data-testid="stExpander"]>div,
-[data-testid="stExpander"] summary,
-[data-testid="stExpander"] summary p,
-[data-testid="stExpanderDetails"],
-[data-testid="stExpanderDetails"] *
-{background:#ede8dc!important;color:#1a1208!important}
-
-/* ═══ steps ═══ */
-.stp{color:#5a4020!important;border-color:#c8b898!important}
-.stp.done{color:#1a6a30!important;border-color:#1a6a30!important}
-.stp.now{color:#b8860b!important;border-color:#b8860b!important}
-.prg-out{background:#c8b898!important}
-
-/* ═══ code ═══ */
-code,pre{background:#e0d5c0!important;color:#3a2000!important}
-
-/* ═══ radio & checkbox ═══ */
-[data-testid="stRadio"] p,[data-testid="stCheckbox"] p
-{color:#1a1208!important}
-
-/* ═══ metric ═══ */
-[data-testid="stMetricValue"],[data-testid="stMetricLabel"]
-{color:#1a1208!important}
-
-/* ═══ label ═══ */
-label{color:#5a4020!important}
-</style>""", unsafe_allow_html=True)
+/* تطبيق ثيم النهار عبر class على body */
+body, .stApp { }
+</style>
+<script>
+(function applyDayTheme(){
+  var els = [document.body, document.documentElement];
+  document.querySelectorAll('.stApp,.main').forEach(function(e){ els.push(e); });
+  els.forEach(function(e){ if(e) e.classList.add('day-theme'); });
+  // إعادة التطبيق بعد render
+  setTimeout(applyDayTheme, 300);
+  setTimeout(applyDayTheme, 1000);
+})();
+</script>""", unsafe_allow_html=True)
 
     with st.sidebar:
         st.markdown('<div style="color:#C9A84C;font-size:1.1rem;font-weight:900;'
