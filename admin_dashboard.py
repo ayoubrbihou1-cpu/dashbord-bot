@@ -424,6 +424,11 @@ def pg_add(rs):
         with c1:
             rssid  = st.text_input("📶 اسم الشبكة (SSID) *", placeholder="Resto_WiFi")
             rwpass = st.text_input("🔒 كلمة مرور WiFi", type="password")
+        with c2:
+            st.markdown('<div style="color:#C9A84C;font-size:.85rem;font-weight:700;margin-bottom:.4rem">🍳 كلمة مرور الكوزينة</div>', unsafe_allow_html=True)
+            rkitchen_pass = st.text_input("🔑 كلمة مرور الكوزينة *",
+                type="password", placeholder="كلمة مرور يعرفها الطاهي فقط",
+                help="يحتاجها الطاهي لفتح شاشة الكوزينة — لا يعرفها الزباءن")
 
     st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
 
@@ -457,7 +462,8 @@ def pg_add(rs):
             wifi_ssid=rssid.strip(), wifi_password=rwpass.strip(),
             style=rstyle, primary_color=rprimary, accent_color=raccent,
             num_tables=rtables, logo_url=rlogo.strip(), owner_email=remail.strip(),
-            bg_type=rbg_type, socials=rsocials)
+            bg_type=rbg_type, socials=rsocials,
+            kitchen_password=rkitchen_pass.strip())
 
         done = len([s for s in result.steps if "✅" in s])
         show(min(done, len(steps_lbl)-1), result.steps)
