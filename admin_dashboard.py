@@ -863,48 +863,96 @@ def main():
         st.session_state.dark_mode = True
 
     if not st.session_state.dark_mode:
-        # ثيم النهار — يطبق على كل عناصر Streamlit بما فيها الـ dropdowns
         st.markdown("""<style>
 :root {
-  --primary-color: #b8860b;
-  --background-color: #f5f0e8;
-  --secondary-background-color: #ede8dc;
-  --text-color: #1a1208;
+  --primary-color: #b8860b !important;
+  --background-color: #f5f0e8 !important;
+  --secondary-background-color: #ede8dc !important;
+  --text-color: #1a1208 !important;
 }
 .stApp,[data-testid="stAppViewContainer"],.main,.block-container,
 [data-testid="stHeader"]{background:#f5f0e8 !important}
 section[data-testid="stSidebar"],
 section[data-testid="stSidebar"]>div{background:#ede8dc !important}
-/* نصوص */
-p,span,label,li,a,td,th,.stMarkdown *
-{color:#1a1208 !important}
-h1,h2,h3{color:#b8860b !important}
 section[data-testid="stSidebar"] *{color:#1a1208 !important}
-/* حقول */
-.stTextInput>div>div>input,.stTextArea textarea,
+
+/* ══ كل النصوص ══ */
+p,span,label,li,a,td,th,small,
+.stMarkdown *,[data-testid="stText"]
+{color:#1a1208 !important}
+h1,h2,h3,h4{color:#b8860b !important}
+
+/* ══ حقول نصية ══ */
+.stTextInput>div>div>input,
+.stTextArea textarea,
 .stNumberInput>div>div>input
 {background:#fff !important;color:#1a1208 !important;border-color:#c8b898 !important}
-/* selectbox الظاهر */
-.stSelectbox>div>div>div{background:#fff !important;color:#1a1208 !important}
-/* tabs */
+
+/* ══ Selectbox — الجزء الظاهر والـ dropdown ══ */
+.stSelectbox>div>div,
+.stSelectbox>div>div>div,
+.stSelectbox [data-baseweb="select"]>div,
+[data-baseweb="select"]>div,
+[data-baseweb="select"] [class*="valueContainer"],
+[data-baseweb="select"] [class*="singleValue"],
+[data-baseweb="select"] [class*="placeholder"]
+{background:#fff !important;color:#1a1208 !important;border-color:#c8b898 !important}
+
+/* القائمة المنسدلة عند الفتح */
+[data-baseweb="popover"],
+[data-baseweb="popover"] *,
+[data-baseweb="menu"],
+[data-baseweb="menu"] *,
+[role="listbox"],
+[role="listbox"] *,
+[role="option"],
+[data-baseweb="list-item"],
+li[data-baseweb="menu-item"]
+{background:#fff !important;color:#1a1208 !important}
+
+[role="option"]:hover,
+[data-baseweb="menu-item"]:hover
+{background:#ede8dc !important;color:#1a1208 !important}
+
+/* ══ Tabs ══ */
 .stTabs [data-baseweb="tab-list"]{background:#ddd5c0 !important}
 .stTabs [data-baseweb="tab"]{color:#5a4020 !important}
 .stTabs [aria-selected="true"]{background:#C9A84C !important;color:#000 !important}
-/* كروت */
-.s-card,.r-card,.iblk{background:#e8e0d0 !important;border-color:#c8b898 !important}
+[data-baseweb="tab-panel"]{background:#f5f0e8 !important;color:#1a1208 !important}
+[data-baseweb="tab-panel"] *{color:#1a1208 !important}
+
+/* ══ كروت مخصصة ══ */
+.s-card,.r-card,.iblk,.tgbox,.info-box
+{background:#e8e0d0 !important;border-color:#c8b898 !important}
 .s-num,.r-name,.iv{color:#b8860b !important}
-.s-lbl,.r-meta,.il,.r-card p{color:#5a4020 !important}
-/* steps */
+.s-lbl,.r-meta,.il{color:#5a4020 !important}
+
+/* ══ Expander ══ */
+[data-testid="stExpander"],[data-testid="stExpander"]>div,
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary p,
+[data-testid="stExpanderDetails"],
+[data-testid="stExpanderDetails"] *
+{background:#ede8dc !important;color:#1a1208 !important}
+
+/* ══ Steps ══ */
 .stp{color:#5a4020 !important;border-color:#c8b898 !important}
 .stp.done{color:#1a6a30 !important;border-color:#1a6a30 !important}
 .stp.now{color:#b8860b !important;border-color:#b8860b !important}
 .prg-out{background:#c8b898 !important}
+
+/* ══ كود ══ */
 code,pre{background:#e0d5c0 !important;color:#3a2000 !important}
-label{color:#5a4020 !important}
-[data-testid="stRadio"] p,[data-testid="stCheckbox"] p{color:#1a1208 !important}
-[data-testid="stExpander"] summary,[data-testid="stExpander"] summary p
+
+/* ══ radio ══ */
+[data-testid="stRadio"] p,
+[data-testid="stCheckbox"] p
 {color:#1a1208 !important}
-[data-testid="stMetricValue"],[data-testid="stMetricLabel"]{color:#1a1208 !important}
+
+/* ══ Metric ══ */
+[data-testid="stMetricValue"],
+[data-testid="stMetricLabel"]
+{color:#1a1208 !important}
 </style>""", unsafe_allow_html=True)
 
     with st.sidebar:
