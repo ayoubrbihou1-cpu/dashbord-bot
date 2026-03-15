@@ -638,7 +638,6 @@ def pg_add(rs):
 
             with st.spinner("🎨 توليد البطاقات..."):
                 import random
-                # اختيار query عشوائي من قائمة نوع المطعم
                 _queries = VENUE_QUERIES.get(rvenue_type, [rname])
                 _photo_query = random.choice(_queries)
                 menu_img, wifi_img = generate_table_card(
@@ -661,6 +660,7 @@ def pg_add(rs):
                     "last_rid": rid,
                     "last_rbg_type": rbg_type,
                     "last_rsocials": rsocials,
+                    "last_photo_query": _photo_query,  # ✅ نحفظ الـ query المستخدم
                 })
                 st.session_state.pop("last_pdf_bytes", None)
 
@@ -719,6 +719,8 @@ def _show_cards_and_pdf():
         with st.spinner(f"⏳ {rtables*2} صفحة..."):
             try:
                 from pdf_generator import generate_table_tents_pdf
+                # ✅ استخدام نفس الـ photo_query المحفوظ من عند توليد البطاقة
+                saved_query = st.session_state.get("last_photo_query", rname)
                 pdf = generate_table_tents_pdf(
                     rname, rssid, rwpass, FRONTEND_URL,
                     rid, rtables, rstyle, rp, ra,
@@ -726,7 +728,7 @@ def _show_cards_and_pdf():
                     pexels_key=PEXELS_KEY,
                     unsplash_key=UNSPLASH_KEY,
                     pixabay_key=PIXABAY_KEY,
-                    photo_query=rname)
+                    photo_query=saved_query)
                 st.session_state["last_pdf_bytes"] = pdf
                 st.session_state["last_pdf_name"]  = rname
             except Exception as e:
@@ -812,6 +814,10 @@ def pg_pdf(rs):
                     pixabay_key=PIXABAY_KEY, photo_query=_pdf_query)
                 st.session_state["prev_m"] = card_to_bytes(mi)
                 st.session_state["prev_w"] = card_to_bytes(wi)
+                # ✅ احفظ الـ query المستخدم لإعادة استخدامه في PDF
+                st.session_state["prev_pdf_query"] = _pdf_query
+                st.session_state["prev_pdf_bg"]    = pdf_bg
+                st.session_state["prev_pdf_style"] = pdf_style
             except Exception as e:
                 st.error(f"❌ {e}")
 
@@ -824,19 +830,23 @@ def pg_pdf(rs):
         with st.spinner(f"⏳ {n*2} صفحة..."):
             try:
                 from pdf_generator import generate_table_tents_pdf
+                # ✅ استخدم نفس الـ query والـ style من المعاينة
+                final_query = st.session_state.get("prev_pdf_query", _pdf_query)
+                final_bg    = st.session_state.get("prev_pdf_bg", pdf_bg)
+                final_style = st.session_state.get("prev_pdf_style", pdf_style)
                 pdf = generate_table_tents_pdf(
                     r.get("name","مطعم"), r.get("wifi_ssid","WiFi"),
                     r.get("wifi_password",""), FRONTEND_URL,
                     r.get("restaurant_id","1"), n,
-                    pdf_style,                          # ← الطابع المختار
+                    final_style,
                     r.get("primary_color","#0a0804"),
                     r.get("accent_color","#C9A84C"),
-                    pdf_bg,                             # ← الخلفية المختارة
+                    final_bg,
                     socials,
                     pexels_key=PEXELS_KEY,
                     unsplash_key=UNSPLASH_KEY,
                     pixabay_key=PIXABAY_KEY,
-                    photo_query=r.get("name",""))
+                    photo_query=final_query)
                 st.session_state["pg_pdf"] = pdf
                 st.session_state["pg_pdf_nm"] = r.get("name","")
                 st.session_state["pg_pdf_n"]  = n
