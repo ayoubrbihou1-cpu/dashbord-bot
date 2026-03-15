@@ -97,6 +97,74 @@ label{color:#555!important;font-size:.8rem!important}
 .stTabs [data-baseweb="tab-list"]{background:#0e0e0e!important;border-radius:8px;padding:3px}
 .stTabs [data-baseweb="tab"]{color:#444!important;border-radius:6px!important}
 .stTabs [aria-selected="true"]{background:#C9A84C!important;color:#000!important;font-weight:700!important}
+
+/* ══════════════════════════════════════
+   ☀️ وضع النهار — يتجاوز كل شيء أعلاه
+══════════════════════════════════════ */
+.day-mode .stApp,
+.day-mode [data-testid="stAppViewContainer"],
+.day-mode [data-testid="stAppViewBlockContainer"],
+.day-mode .main .block-container
+  {background:#f5f0e8!important;color:#1a1208!important}
+.day-mode section[data-testid="stSidebar"],
+.day-mode [data-testid="stSidebar"]>div
+  {background:#ede8dc!important;border-color:#d5c9a8!important}
+.day-mode [data-testid="stSidebar"] *
+  {color:#1a1208!important}
+/* كروت وحاويات */
+.day-mode .s-card,.day-mode .r-card,.day-mode .iblk
+  {background:#e8e0d0!important;border-color:#d5c9a8!important}
+.day-mode .s-num,.day-mode .r-name,.day-mode .iv
+  {color:#b8860b!important}
+.day-mode .s-lbl,.day-mode .r-meta,.day-mode .il
+  {color:#6a5030!important}
+.day-mode .tgbox
+  {background:rgba(26,82,118,.06)!important;border-color:rgba(26,82,118,.2)!important}
+.day-mode .ok  {color:#1a7a3a!important}
+.day-mode .err {color:#c0392b!important}
+.day-mode .warn{color:#8a6000!important}
+.day-mode .info-box{color:#1a5276!important}
+/* نصوص */
+.day-mode p,.day-mode span,.day-mode div,.day-mode h1,
+.day-mode h2,.day-mode h3,.day-mode h4,.day-mode li,
+.day-mode td,.day-mode a,.day-mode .stMarkdown *
+  {color:#1a1208!important}
+.day-mode h1,.day-mode h2,.day-mode h3
+  {color:#b8860b!important}
+/* حقول */
+.day-mode .stTextInput>div>div>input,
+.day-mode .stTextArea textarea,
+.day-mode .stSelectbox>div>div>div,
+.day-mode .stNumberInput>div>div>input,
+.day-mode [data-baseweb="input"] input,
+.day-mode input,.day-mode textarea
+  {background:#fff!important;color:#1a1208!important;border-color:#d5c9a8!important}
+.day-mode label{color:#6a5030!important;font-size:.8rem!important}
+/* tabs */
+.day-mode .stTabs [data-baseweb="tab-list"]
+  {background:#e0d8c8!important}
+.day-mode .stTabs [data-baseweb="tab"]
+  {color:#8a7450!important}
+.day-mode .stTabs [aria-selected="true"]
+  {background:#C9A84C!important;color:#000!important}
+/* selectbox dropdown */
+.day-mode [data-baseweb="select"] div,
+.day-mode [data-baseweb="select"] span
+  {background:#fff!important;color:#1a1208!important}
+/* steps */
+.day-mode .stp{color:#6a5030!important;border-color:#d5c9a8!important}
+.day-mode .stp.done{color:#1a7a3a!important;border-color:#1a7a3a!important}
+.day-mode .stp.now{color:#b8860b!important;border-color:#b8860b!important}
+.day-mode .prg-out{background:#d5c9a8!important}
+/* code */
+.day-mode code,.day-mode pre
+  {background:#e8e0d0!important;color:#4a2800!important}
+/* header */
+.day-mode [data-testid="stHeader"]
+  {background:#f5f0e8!important}
+/* color picker label */
+.day-mode [data-testid="stColorPicker"] *
+  {color:#1a1208!important}
 </style>
 """, unsafe_allow_html=True)
 
@@ -884,73 +952,29 @@ def main():
         # تطبيق الثيم
         if not st.session_state.dark_mode:
             st.markdown("""<style>
-            /* ═══ خلفية النهار ═══ */
-            .stApp, [data-testid="stAppViewContainer"],
-            [data-testid="stAppViewBlockContainer"],
-            .main .block-container { background:#f5f0e8 !important; color:#1a1208 !important }
-
-            /* ═══ Sidebar ═══ */
-            section[data-testid="stSidebar"],
-            [data-testid="stSidebar"] > div { background:#ede8dc !important; border-color:#d5c9a8 !important }
-            [data-testid="stSidebar"] label,
-            [data-testid="stSidebar"] span,
-            [data-testid="stSidebar"] p,
-            [data-testid="stSidebar"] div { color:#1a1208 !important }
-
-            /* ═══ كروت المخصصة (.s-card, .r-card) ═══ */
-            .s-card { background:#e8e0d0 !important; border-color:#d5c9a8 !important }
-            .s-num  { color:#b8860b !important }
-            .s-lbl  { color:#6a5030 !important }
-            .r-card { background:#e8e0d0 !important; border-color:#d5c9a8 !important; border-left-color:#C9A84C !important }
-            .r-name { color:#b8860b !important }
-            .r-meta { color:#6a5030 !important }
-            .iblk   { background:#e0d8c8 !important; border-color:#d5c9a8 !important }
-            .il     { color:#6a5030 !important }
-            .iv     { color:#b8860b !important }
-            .tgbox  { background:rgba(26,82,118,.08) !important; border-color:rgba(26,82,118,.3) !important }
-
-            /* ═══ كل النصوص ═══ */
-            p, span, div, label, li, td, th { color:#1a1208 !important }
-            h1, h2, h3, h4 { color:#b8860b !important }
-            a { color:#b8860b !important }
-            code, pre { background:#e8e0d0 !important; color:#4a2800 !important }
-
-            /* ═══ حقول الإدخال ═══ */
-            .stTextInput > div > div > input,
-            .stTextArea textarea,
-            .stNumberInput > div > div > input,
-            [data-baseweb="input"] input,
-            input, textarea {
-                background:#fff !important; color:#1a1208 !important;
-                border-color:#d5c9a8 !important }
-
-            /* ═══ selectbox ═══ */
-            .stSelectbox > div > div > div,
-            [data-baseweb="select"] div { background:#fff !important; color:#1a1208 !important }
-
-            /* ═══ label ═══ */
-            label { color:#6a5030 !important; font-size:.8rem !important }
-
-            /* ═══ tabs ═══ */
-            .stTabs [data-baseweb="tab-list"] { background:#e0d8c8 !important }
-            .stTabs [data-baseweb="tab"]       { color:#8a7450 !important }
-            .stTabs [aria-selected="true"]      { background:#C9A84C !important; color:#000 !important }
-
-            /* ═══ progress bar ═══ */
-            .prg-out { background:#d5c9a8 !important }
-
-            /* ═══ step bar ═══ */
-            .stp { color:#6a5030 !important; border-color:#d5c9a8 !important }
-            .stp.done { color:#1a7a3a !important; border-color:#1a7a3a !important }
-            .stp.now  { color:#b8860b !important; border-color:#b8860b !important }
-
-            /* ═══ header الشفاف ═══ */
-            [data-testid="stHeader"] { background:#f5f0e8 !important }
-            </style>""", unsafe_allow_html=True)
+            .stApp,.main,.block-container,
+            [data-testid="stAppViewContainer"],
+            [data-testid="stAppViewBlockContainer"] { background:#f5f0e8!important }
+            </style>
+            <script>document.querySelectorAll('.stApp,.main').forEach(e=>e.classList.add('day-mode'));</script>
+            """, unsafe_allow_html=True)
+            # inject كلاس day-mode على كل العناصر عبر JS
+            st.components.v1.html("""
+            <script>
+            function applyDay(){
+              var all=document.querySelectorAll('.stApp,.main,.block-container,[data-testid]');
+              all.forEach(function(e){e.classList.add('day-mode');});
+              document.body.classList.add('day-mode');
+            }
+            applyDay();
+            setTimeout(applyDay,500);
+            setTimeout(applyDay,1500);
+            </script>
+            """, height=0)
         else:
             st.markdown("""<style>
-            .stApp { background:#080808 !important }
-            section[data-testid="stSidebar"] { background:#0a0a0a !important }
+            .stApp{background:#080808!important}
+            section[data-testid="stSidebar"]{background:#0a0a0a!important}
             </style>""", unsafe_allow_html=True)
         if st.button("🚪 خروج", use_container_width=True, key="btn_logout"):
             st.session_state.ok = False; st.rerun()
