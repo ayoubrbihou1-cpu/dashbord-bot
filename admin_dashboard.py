@@ -119,7 +119,7 @@ def auth():
 # ══════════════════════════════════════════════════════════
 # GOOGLE SHEETS — قراءة Master_DB
 # ══════════════════════════════════════════════════════════
-@st.cache_resource(ttl=300)
+@st.cache_resource(ttl=600)  # 10 دقائق بدل 5
 def gs():
     try:
         if SA_JSON_CONTENT:
@@ -882,11 +882,19 @@ p,span,label,li,a,td,th,small,
 {color:#1a1208 !important}
 h1,h2,h3,h4{color:#b8860b !important}
 
-/* ══ حقول نصية ══ */
+/* ══ حقول نصية + number_input ══ */
 .stTextInput>div>div>input,
 .stTextArea textarea,
-.stNumberInput>div>div>input
+.stNumberInput>div>div>input,
+.stNumberInput input,
+[data-testid="stNumberInput"] input,
+[data-testid="stNumberInput"]>div>div>input
 {background:#fff !important;color:#1a1208 !important;border-color:#c8b898 !important}
+
+/* أزرار +/- في number_input */
+.stNumberInput button,
+[data-testid="stNumberInput"] button
+{background:#e8e0d0 !important;color:#1a1208 !important;border-color:#c8b898 !important}
 
 /* ══ Selectbox — الجزء الظاهر والـ dropdown ══ */
 .stSelectbox>div>div,
