@@ -21,12 +21,14 @@ SCOPES          = ["https://www.googleapis.com/auth/spreadsheets","https://www.g
 SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
 ROUTER_BASE_URL = os.getenv("ROUTER_BASE_URL","https://restaurant-qr-saas.onrender.com")
+ADMIN_PASSWORD  = os.getenv("ADMIN_PASSWORD","admin_fes_2026")
 
 def _refresh_api_cache(restaurant_id: str):
     """✅ يمسح cache المنيو في الـ API — الصور تظهر فوراً بعد الحفظ"""
     try:
         url = f"{ROUTER_BASE_URL}/cache/refresh/{restaurant_id}"
-        _requests.post(url, timeout=8)
+        _requests.post(url, timeout=8,
+                       headers={"X-Admin-Key": ADMIN_PASSWORD})
     except Exception:
         pass  # لا نوقف العملية إذا فشل الـ cache refresh
 
