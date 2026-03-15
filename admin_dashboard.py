@@ -936,8 +936,6 @@ code,pre{background:#e0d5c0 !important;color:#3a2000 !important}
             st.rerun()
         if st.button("🚪 خروج", use_container_width=True, key="btn_logout"):
             st.session_state.ok = False; st.rerun()
-        if st.button("🚪 خروج", use_container_width=True, key="btn_logout"):
-            st.session_state.ok = False; st.rerun()
 
     if   page == "🏠 Dashboard":      pg_dashboard(rs)
     elif page == "🚀 إضافة مطعم":    pg_add(rs)
