@@ -13,12 +13,22 @@ from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
 from gemini_helper import gemini_text, gemini_vision, gemini_available
 from groq_helper import translate_batch_groq, translate_single_groq, groq_available, groq_vision, groq_vision_available
+import requests as _requests
 
 load_dotenv()
 
 SCOPES          = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
 SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
+ROUTER_BASE_URL = os.getenv("ROUTER_BASE_URL","https://restaurant-qr-saas.onrender.com")
+
+def _refresh_api_cache(restaurant_id: str):
+    """✅ يمسح cache المنيو في الـ API — الصور تظهر فوراً بعد الحفظ"""
+    try:
+        url = f"{ROUTER_BASE_URL}/cache/refresh/{restaurant_id}"
+        _requests.post(url, timeout=8)
+    except Exception:
+        pass  # لا نوقف العملية إذا فشل الـ cache refresh
 
 TABS = ["الأطباق الرئيسية","المقبلات","الحلويات","المشروبات"]
 
@@ -382,6 +392,9 @@ def page_menu_manager(restaurants: list):
     with view_tab:
         if st.button("🔄 تحديث القائمة", key="mm_refresh"):
             st.cache_data.clear()
+            # ✅ مسح cache الـ API أيضاً حتى تظهر آخر التغييرات في المينيو
+            _refresh_api_cache(rid)
+            st.toast("✅ تم تحديث القائمة — الصور ستظهر فوراً في المينيو", icon="🔄")
 
         items = load_items(sheet_id, tab_sel)
 
@@ -442,7 +455,11 @@ def page_menu_manager(restaurants: list):
                                 "description": new_desc,
                                 "image_url":   new_img,
                             })
-                            if ok: st.success("✅ تم الحفظ"); st.rerun()
+                            if ok:
+                                # ✅ مسح cache الـ API حتى تظهر الصورة فوراً في المينيو
+                                if new_img.strip():
+                                    _refresh_api_cache(rid)
+                                st.success("✅ تم الحفظ"); st.rerun()
 
                         # حذف
                         if st.button("🗑️ حذف", key=f"del_{row_num}"):
@@ -515,6 +532,9 @@ def page_menu_manager(restaurants: list):
                     "image_credit": ""
                 })
                 if ok:
+                    # ✅ مسح cache الـ API حتى تظهر الصورة فوراً في المينيو
+                    if n_img.strip():
+                        _refresh_api_cache(rid)
                     st.success(f"✅ تمت إضافة '{n_name}' بسعر {n_price} درهم")
                     st.rerun()
 
