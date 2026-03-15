@@ -858,6 +858,62 @@ def main():
     if not auth(): return
     rs = fetch_all()
 
+    # ══ ثيم النهار/الليل — يجب أن يكون خارج sidebar ليطبق على الصفحة كاملة ══
+    if "dark_mode" not in st.session_state:
+        st.session_state.dark_mode = True
+
+    if not st.session_state.dark_mode:
+        st.markdown("""<style>
+.stApp,[data-testid="stAppViewContainer"],[data-testid="stAppViewBlockContainer"],
+[data-testid="stHeader"],.main,.block-container
+{background:#f5f0e8 !important}
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"]>div,
+section[data-testid="stSidebar"]>div>div
+{background:#ede8dc !important}
+section[data-testid="stSidebar"] *{color:#1a1208 !important}
+/* حقول — نفس specificity الأصل */
+.stTextInput>div>div>input,.stTextArea textarea,
+.stSelectbox>div>div>div,.stNumberInput>div>div>input
+{background:#fff !important;color:#1a1208 !important;border-color:#c8b898 !important}
+/* tabs — نفس specificity الأصل */
+.stTabs [data-baseweb="tab-list"]{background:#ddd5c0 !important}
+.stTabs [data-baseweb="tab"]{color:#5a4020 !important}
+.stTabs [aria-selected="true"]{background:#C9A84C !important;color:#000 !important}
+label{color:#5a4020 !important;font-size:.8rem !important}
+/* نصوص */
+p,span,h1,h2,h3,h4,li,a,td,th,.stMarkdown *
+{color:#1a1208 !important}
+h1,h2,h3{color:#b8860b !important}
+/* كروت */
+.s-card,.r-card,.iblk{background:#e8e0d0 !important;border-color:#c8b898 !important}
+.s-num,.r-name,.iv{color:#b8860b !important}
+.s-lbl,.r-meta,.il{color:#5a4020 !important}
+/* selectbox */
+[data-baseweb="select"]>div,[data-baseweb="select"] div,
+[data-baseweb="select"] span
+{background:#fff !important;color:#1a1208 !important}
+/* steps */
+.stp{color:#5a4020 !important;border-color:#c8b898 !important}
+.stp.done{color:#1a6a30 !important;border-color:#1a6a30 !important}
+.stp.now{color:#b8860b !important;border-color:#b8860b !important}
+.prg-out{background:#c8b898 !important}
+/* code */
+code,pre{background:#e0d5c0 !important;color:#3a2000 !important}
+/* expander */
+[data-testid="stExpander"]>div,
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary p
+{background:#ede8dc !important;color:#1a1208 !important}
+/* radio */
+[data-testid="stRadio"] p,[data-testid="stCheckbox"] p
+{color:#1a1208 !important}
+/* metric */
+[data-testid="stMetric"]{background:#e8e0d0 !important}
+[data-testid="stMetricValue"],[data-testid="stMetricLabel"]
+{color:#1a1208 !important}
+</style>""", unsafe_allow_html=True)
+
     with st.sidebar:
         st.markdown('<div style="color:#C9A84C;font-size:1.1rem;font-weight:900;'
                     'text-align:center;padding:.5rem 0">👑 الإمبراطور</div>',
@@ -874,123 +930,12 @@ def main():
             "⚙️ إدارة",
         ], label_visibility="hidden")
         st.markdown("---")
-        # زر الليل/النهار
-        if "dark_mode" not in st.session_state:
-            st.session_state.dark_mode = True
         mode_label = "☀️ وضع النهار" if st.session_state.dark_mode else "🌙 وضع الليل"
         if st.button(mode_label, use_container_width=True, key="btn_theme"):
             st.session_state.dark_mode = not st.session_state.dark_mode
             st.rerun()
-        # تطبيق الثيم
-        if not st.session_state.dark_mode:
-            st.markdown("""<style>
-/* ══ خلفيات ══ */
-.stApp,[data-testid="stAppViewContainer"],[data-testid="stAppViewBlockContainer"],
-[data-testid="stMain"],.main,.block-container,[data-testid="stHeader"]
-{background:#f5f0e8 !important}
-
-section[data-testid="stSidebar"],
-section[data-testid="stSidebar"]>div,
-section[data-testid="stSidebar"]>div>div,
-section[data-testid="stSidebar"] section
-{background:#ede8dc !important}
-
-/* ══ كل النصوص ══ */
-p,span,div,h1,h2,h3,h4,h5,h6,label,li,td,th,a,small,strong,em,
-[data-testid] *,
-.stMarkdown *,.stText *,.element-container *
-{color:#1a1208 !important}
-
-/* ══ عناوين ══ */
-h1,h2,h3{color:#b8860b !important}
-
-/* ══ كروت ══ */
-.s-card,.r-card,.iblk,.res,.info-box,.tgbox,.gdiv-card
-{background:#e8e0d0 !important; border-color:#c8b898 !important}
-.s-num,.r-name,.iv{color:#b8860b !important}
-.s-lbl,.r-meta,.il{color:#5a4020 !important}
-.ok{color:#1a6a30 !important}
-.err{color:#8b1a1a !important}
-.warn{color:#7a5000 !important}
-.badge{color:#b8860b !important; background:rgba(184,134,11,.15) !important}
-
-/* ══ حقول الإدخال — نفس specificity الأصل بالضبط ══ */
-.stTextInput>div>div>input,
-.stTextArea textarea,
-.stSelectbox>div>div>div,
-.stNumberInput>div>div>input
-{background:#fff !important; color:#1a1208 !important; border-color:#c8b898 !important}
-
-/* + specificity إضافية للحقول المنخفضة */
-input,textarea,
-[data-baseweb="input"]>div,[data-baseweb="input"] input,
-[data-baseweb="textarea"]
-{background:#fff !important; color:#1a1208 !important; border-color:#c8b898 !important}
-
-/* ══ selectbox ══ */
-.stSelectbox>div>div,.stSelectbox>div>div>div,
-[data-baseweb="select"]>div,[data-baseweb="select"] div,
-[data-baseweb="select"] span,[data-baseweb="select"] input,
-[role="listbox"],[role="option"],
-[data-baseweb="popover"],[data-baseweb="menu"]
-{background:#fff !important; color:#1a1208 !important}
-
-/* ══ tabs — نفس specificity الأصل ══ */
-.stTabs [data-baseweb="tab-list"]{background:#ddd5c0 !important}
-.stTabs [data-baseweb="tab"]{color:#5a4020 !important}
-.stTabs [aria-selected="true"]{background:#C9A84C !important; color:#000 !important}
-[data-baseweb="tab-list"],[data-baseweb="tab-list"]>div
-{background:#ddd5c0 !important}
-[data-baseweb="tab"]{color:#5a4020 !important}
-[data-baseweb="tab"][aria-selected="true"]
-{background:#C9A84C !important; color:#000 !important}
-[data-baseweb="tab-panel"],[data-baseweb="tab-panel"]>div
-{background:#f5f0e8 !important}
-
-/* ══ color picker ══ */
-[data-testid="stColorPicker"]>div,[data-testid="stColorPicker"] label
-{color:#5a4020 !important}
-
-/* ══ radio & checkbox ══ */
-[data-testid="stRadio"]>div>label,[data-testid="stRadio"] p,
-[data-testid="stCheckbox"]>label,[data-testid="stCheckbox"] p,
-[role="radiogroup"] label,[role="group"] label
-{color:#1a1208 !important}
-
-/* ══ expander ══ */
-[data-testid="stExpander"]>div,[data-testid="stExpander"] summary,
-[data-testid="stExpander"] summary p,
-.streamlit-expanderHeader,.streamlit-expanderContent
-{background:#ede8dc !important; color:#1a1208 !important}
-
-/* ══ steps & progress ══ */
-.stp{color:#5a4020 !important; border-color:#c8b898 !important}
-.stp.done{color:#1a6a30 !important; border-color:#1a6a30 !important}
-.stp.now {color:#b8860b !important; border-color:#b8860b !important}
-.prg-out {background:#c8b898 !important}
-
-/* ══ code ══ */
-code,pre,.stCodeBlock{background:#e0d5c0 !important; color:#3a2000 !important}
-
-/* ══ columns & containers ══ */
-[data-testid="column"],[data-testid="stVerticalBlock"],
-[data-testid="stHorizontalBlock"]
-{background:transparent !important}
-
-/* ══ metric ══ */
-[data-testid="stMetric"]{background:#e8e0d0 !important; border-radius:8px}
-[data-testid="stMetricValue"],[data-testid="stMetricLabel"]
-{color:#1a1208 !important}
-
-/* ══ notifications ══ */
-[data-testid="stAlert"],[data-testid="stAlert"] *
-{color:#1a1208 !important}
-</style>""", unsafe_allow_html=True)
-        else:
-            st.markdown("""<style>
-.stApp{background:#080808 !important}
-section[data-testid="stSidebar"]{background:#0a0a0a !important}
-</style>""", unsafe_allow_html=True)
+        if st.button("🚪 خروج", use_container_width=True, key="btn_logout"):
+            st.session_state.ok = False; st.rerun()
         if st.button("🚪 خروج", use_container_width=True, key="btn_logout"):
             st.session_state.ok = False; st.rerun()
 
