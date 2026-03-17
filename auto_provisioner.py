@@ -244,7 +244,8 @@ def update_telegram_chat_id(restaurant_id, chat_id):
 def send_welcome_email(to_email: str, restaurant_name: str,
                        sheet_url: str, menu_url: str,
                        wifi_ssid: str, reg_link: str = "",
-                       kitchen_url: str = "", kitchen_password: str = "") -> bool:
+                       kitchen_url: str = "", kitchen_password: str = "",
+                       group_links: dict = None) -> bool:
     if not GMAIL_USER or not GMAIL_PASSWORD:
         log.warning("⚠️ GMAIL_USER أو GMAIL_APP_PASSWORD غير محدد — تخطي الإيميل")
         return False
@@ -263,6 +264,38 @@ def send_welcome_email(to_email: str, restaurant_name: str,
           <td style="padding:8px"><a href="{reg_link}" style="color:#29b6f6">{reg_link}</a><br>
           <small style="color:#888">اضغط مرة واحدة لربط الطلبات</small></td>
         </tr>""" if reg_link else ""
+
+        # ✅ قسم روابط المجموعات (boss / waiters / delivery)
+        gl = group_links or {}
+        groups_section = f"""
+        <tr>
+          <td colspan="2" style="padding:12px;background:#0a0a1a;border-radius:8px;margin-top:8px">
+            <b style="color:#7986cb">📲 روابط ربط مجموعات Telegram</b><br><br>
+            <table width="100%">
+              <tr>
+                <td style="padding:6px 0">
+                  <b style="color:#ffd54f">👑 المدير (أنت):</b><br>
+                  <a href="{gl.get('boss','#')}" style="color:#29b6f6;font-size:.85rem">{gl.get('boss','—')}</a><br>
+                  <small style="color:#666">اضغط لربط حسابك وتلقي إشعارات الأرباح</small>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0">
+                  <b style="color:#a5d6a7">🍽️ مجموعة النوادل:</b><br>
+                  <a href="{gl.get('waiters','#')}" style="color:#29b6f6;font-size:.85rem">{gl.get('waiters','—')}</a><br>
+                  <small style="color:#666">أضف هذا الرابط في مجموعة النوادل على Telegram</small>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0">
+                  <b style="color:#80deea">🛵 مجموعة التوصيل:</b><br>
+                  <a href="{gl.get('delivery','#')}" style="color:#29b6f6;font-size:.85rem">{gl.get('delivery','—')}</a><br>
+                  <small style="color:#666">أضف هذا الرابط في مجموعة عمال التوصيل</small>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>""" if gl else ""
 
         kitchen_section = f"""
         <tr>
@@ -306,6 +339,7 @@ def send_welcome_email(to_email: str, restaurant_name: str,
                 </tr>
                 {tg_section}
                 {kitchen_section}
+                {groups_section}
               </table>
               <hr style="border-color:#222;margin:16px 0">
               <p style="color:#555;font-size:.85rem;text-align:center">
@@ -350,20 +384,47 @@ def build_reg_link(restaurant_id):
     except: pass
     return ""
 
+def build_group_links(restaurant_id):
+    """يبني روابط Deep Linking لـ boss / waiters / delivery"""
+    if not TG_TOKEN: return {}
+    try:
+        r = requests.get(f"https://api.telegram.org/bot{TG_TOKEN}/getMe", timeout=5)
+        if r.status_code == 200:
+            username = r.json()["result"]["username"]
+            return {
+                "boss":     f"https://t.me/{username}?start=boss_{restaurant_id}",
+                "waiters":  f"https://t.me/{username}?startgroup=waiters_{restaurant_id}",
+                "delivery": f"https://t.me/{username}?startgroup=delivery_{restaurant_id}",
+            }
+    except: pass
+    return {}
+
 def send_welcome(chat_id, name, sheet_url, menu_url, wifi,
-                 kitchen_url="", kitchen_password=""):
+                 kitchen_url="", kitchen_password="", group_links=None):
     kitchen_part = (
         f"\n━━━━━━━━━━━━\n"
         f"🍳 *شاشة الكوزينة:*\n`{kitchen_url}`\n"
         f"🔑 *كلمة مرور الكوزينة:* `{kitchen_password}`\n"
         f"📌 احفظها على التابليت"
     ) if kitchen_url else ""
+
+    gl = group_links or {}
+    groups_part = ""
+    if gl:
+        groups_part = (
+            f"\n━━━━━━━━━━━━\n"
+            f"📲 *روابط ربط المجموعات:*\n"
+            f"👑 المدير: {gl.get('boss','')}\n"
+            f"🍽️ النوادل: {gl.get('waiters','')}\n"
+            f"🛵 التوصيل: {gl.get('delivery','')}"
+        )
     return _tg(chat_id,
         f"🎉 *مرحباً في QR Menu!*\n🏪 *{name}*\n\n"
         f"📊 [قائمتك الآن]({sheet_url})\n"
         f"📱 رابط الزبائن: `{menu_url}`\n"
         f"📶 WiFi: `{wifi}`\n"
-        f"{kitchen_part}\n\n"
+        f"{kitchen_part}"
+        f"{groups_part}\n\n"
         f"✏️ عدّل الأسعار مباشرة في الشيت — تظهر فوراً للزبائن!\n"
         f"⚡ الطلبات ستصلك هنا.")
 
@@ -377,7 +438,8 @@ def provision_restaurant(
     sheet_id="",
     style="luxury", primary_color="#0a0804", accent_color="#C9A84C",
     num_tables=10, logo_url="", owner_email="", telegram_chat_id="",
-    bg_type="minimal", socials=None, kitchen_password=""
+    bg_type="minimal", socials=None, kitchen_password="",
+    delivery_active=False
 ):
     res = ProvisionResult()
     steps = []
@@ -426,6 +488,10 @@ def provision_restaurant(
         "owner_email":      owner_email,
         "status":           "active" if telegram_chat_id else "pending_telegram",
         "created_at":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "delivery_active":  "true" if delivery_active else "false",
+        "boss_chat_id":     "",
+        "waiters_chat_id":  "",
+        "delivery_chat_id": "",
     })
     if not saved:
         res.error = "فشل حفظ في Master_DB"
@@ -447,14 +513,19 @@ def provision_restaurant(
     # إرسال رسالة Telegram
     if telegram_chat_id:
         ok = send_welcome(telegram_chat_id, name, url, menu_url, wifi_ssid,
-                          kitchen_url=kitchen_url, kitchen_password=kitchen_password)
+                          kitchen_url=kitchen_url, kitchen_password=kitchen_password,
+                          group_links=gl)
         steps.append("✅ رسالة Telegram أُرسلت" if ok else "⚠️ Telegram فشل")
+
+    # ✅ بناء روابط المجموعات
+    gl = build_group_links(restaurant_id)
 
     # ✅ إرسال إيميل Gmail
     if owner_email:
         email_ok = send_welcome_email(
             owner_email, name, url, menu_url, wifi_ssid, reg,
-            kitchen_url=kitchen_url, kitchen_password=kitchen_password
+            kitchen_url=kitchen_url, kitchen_password=kitchen_password,
+            group_links=gl
         )
         steps.append("✅ إيميل أُرسل" if email_ok else "⚠️ إيميل فشل (تحقق من GMAIL_USER/GMAIL_APP_PASSWORD)")
 
