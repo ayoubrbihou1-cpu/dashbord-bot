@@ -1043,36 +1043,57 @@ def pg_manage(rs):
                 # ✅ زر تفعيل/إلغاء التوصيل
                 delivery_on = str(r.get("delivery_active","")).lower() == "true"
                 delivery_label = "🛵 إلغاء التوصيل" if delivery_on else "🛵 تفعيل التوصيل"
-                if st.button(delivery_label, key=f"del_tog_{uid}"):
-                    new_val = "false" if delivery_on else "true"
-                    try:
-                        # تحديث في Master_DB مباشرة
-                        import gspread as _gs_mod
-                        from google.oauth2.service_account import Credentials as _Creds
-                        import json as _json
-                        _SA = os.getenv("GOOGLE_SA_JSON_CONTENT","")
-                        _SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-                        _MASTER = os.getenv("MASTER_SHEET_ID","")
-                        if _SA and _MASTER:
-                            _creds = _Creds.from_service_account_info(_json.loads(_SA), scopes=_SCOPES)
-                            _client = _gs_mod.authorize(_creds)
-                            _ws = _client.open_by_key(_MASTER).worksheet("Master_DB")
-                            _headers = _ws.row_values(1)
-                            if "delivery_active" not in _headers:
-                                _ws.update_cell(1, len(_headers)+1, "delivery_active")
-                                _headers.append("delivery_active")
-                            _col = _headers.index("delivery_active") + 1
-                            for _i, _row in enumerate(_ws.get_all_records()):
-                                if str(_row.get("restaurant_id","")) == rid:
-                                    _ws.update_cell(_i+2, _col, new_val)
-                                    break
-                            # مسح cache API
-                            try: requests.post(f"{ROUTER_URL}/cache/refresh", timeout=5)
-                            except: pass
-                            st.success(f"✅ التوصيل {'مفعّل' if new_val=='true' else 'ألغي'}")
-                            st.rerun()
-                    except Exception as _e:
-                        st.error(f"❌ {_e}")
+                col1d, col2d = st.columns([2,1])
+                with col1d:
+                    if st.button(delivery_label, key=f"del_tog_{uid}", use_container_width=True):
+                        new_val = "false" if delivery_on else "true"
+                        try:
+                            import gspread as _gs_mod
+                            from google.oauth2.service_account import Credentials as _Creds
+                            import json as _json
+                            _SA     = os.getenv("GOOGLE_SA_JSON_CONTENT","")
+                            _MASTER = os.getenv("MASTER_SHEET_ID","")
+                            _SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+                            if _SA and _MASTER:
+                                _creds  = _Creds.from_service_account_info(_json.loads(_SA), scopes=_SCOPES)
+                                _client = _gs_mod.authorize(_creds)
+                                _ws     = _client.open_by_key(_MASTER).worksheet("Master_DB")
+                                _headers = _ws.row_values(1)
+                                # أضف العمود إذا ناقص
+                                if "delivery_active" not in _headers:
+                                    _ws.update_cell(1, len(_headers)+1, "delivery_active")
+                                    _headers.append("delivery_active")
+                                _col = _headers.index("delivery_active") + 1
+                                # ✅ نستخدم get_all_values بدل get_all_records
+                                _all = _ws.get_all_values()
+                                _rid_col = _headers.index("restaurant_id") if "restaurant_id" in _headers else 0
+                                for _i, _row in enumerate(_all[1:], start=2):
+                                    if len(_row) > _rid_col and str(_row[_rid_col]).strip() == rid:
+                                        _ws.update_cell(_i, _col, new_val)
+                                        break
+                                # ✅ مسح cache الـ API فوراً + مسح cache الداشبورد
+                                try:
+                                    requests.post(f"{ROUTER_URL}/cache/refresh/{rid}", timeout=8)
+                                    requests.post(f"{ROUTER_URL}/cache/refresh", timeout=8)
+                                except: pass
+                                st.cache_data.clear()
+                                lbl = 'مفعّل 🛵' if new_val=='true' else 'ملغى ✅'
+                                st.success(f"التوصيل {lbl} — تطبّق فوراً على المينيو")
+                                st.rerun()
+                        except Exception as _e:
+                            st.error(f"❌ {_e}")
+                with col2d:
+                    # ✅ زر Refresh فوري منفصل
+                    if st.button("🔄 تطبيق فوري", key=f"ref_del_{uid}",
+                                 help="اضغط بعد أي تعديل لتطبيق التغييرات فوراً على المينيو",
+                                 use_container_width=True):
+                        try:
+                            requests.post(f"{ROUTER_URL}/cache/refresh/{rid}", timeout=8)
+                            requests.post(f"{ROUTER_URL}/cache/refresh", timeout=8)
+                        except: pass
+                        st.cache_data.clear()
+                        st.success("✅ تم تطبيق التغييرات فوراً!")
+                        st.rerun()
 
                 if st.button("🔴 تعطيل" if status=="active" else "🟢 تفعيل",
                              key=f"tog_{uid}"):
