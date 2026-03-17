@@ -76,7 +76,12 @@ MASTER_HEADERS = [
     "restaurant_id","name","sheet_id","telegram_chat_id",
     "wifi_ssid","wifi_password","primary_color","accent_color",
     "style","bg_type","socials","num_tables","logo_url",
-    "kitchen_password","owner_email","status","created_at"
+    "kitchen_password","owner_email","status","created_at",
+    # ✅ حقول جديدة للتوصيل والمجموعات
+    "delivery_active",    # true/false — تفعيل خيار التوصيل
+    "boss_chat_id",       # chat_id مدير المطعم (للأرباح والإشعارات)
+    "waiters_chat_id",    # chat_id مجموعة النوادل (dine_in جاهز)
+    "delivery_chat_id",   # chat_id مجموعة التوصيل
 ]
 
 def _fmt_header(spread, ws, color):
