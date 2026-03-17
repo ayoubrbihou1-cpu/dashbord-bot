@@ -281,7 +281,7 @@ def _sanitize_record(rec: dict) -> dict:
 
     return rec
 
-@st.cache_data(ttl=120)   # ✅ cache 2 دقيقة — يقلل طلبات Sheets بـ 95%
+@st.cache_data(ttl=30)   # ✅ إصلاح: 30 ثانية بدل 120 — تحديث أسرع بعد أي تغيير
 def fetch_all():
     """
     ✅ يقرأ من tab 'Master_DB' حصراً
@@ -422,10 +422,12 @@ def pg_dashboard(rs):
             try:
                 requests.post(f"{ROUTER_URL}/cache/refresh", timeout=5)
                 st.success("✅ Cache محدّث")
-                st.cache_resource.clear()
-                st.rerun()
             except:
-                st.warning("API غير متاح")
+                st.warning("⚠️ API غير متاح")
+            # ✅ إصلاح: مسح كل الـ cache — st.cache_data + st.cache_resource
+            st.cache_data.clear()
+            st.cache_resource.clear()
+            st.rerun()
 
 # ══════════════════════════════════════════════════════════
 # صفحة: إضافة مطعم
@@ -677,7 +679,33 @@ def pg_add(rs):
                 st.session_state.pop("last_pdf_bytes", None)
 
             _show_cards_and_pdf()
+            # ✅ إصلاح: مسح cache_data + cache_resource بعد الإنشاء
+            st.cache_data.clear()
             st.cache_resource.clear()
+
+            # ✅ عرض روابط المجموعات بعد الإنشاء مباشرة
+            try:
+                _tg_me = requests.get(
+                    f"https://api.telegram.org/bot{TG_TOKEN}/getMe", timeout=5)
+                _bot_user = _tg_me.json().get("result",{}).get("username","") if _tg_me.ok else ""
+            except:
+                _bot_user = ""
+
+            if _bot_user:
+                _boss_lnk     = f"https://t.me/{_bot_user}?start=boss_{rid}"
+                _waiters_lnk  = f"https://t.me/{_bot_user}?startgroup=waiters_{rid}"
+                _delivery_lnk = f"https://t.me/{_bot_user}?startgroup=delivery_{rid}"
+                st.markdown(f"""<div style="background:rgba(0,136,204,.07);border:1px solid rgba(0,136,204,.2);
+                  border-radius:12px;padding:1rem 1.2rem;margin:.5rem 0">
+                  <b style="color:#29b6f6">📲 روابط ربط المجموعات:</b><br><br>
+                  👑 <b>المدير (يفتحه المدير في محادثته الخاصة):</b><br>
+                  <code style="color:#29b6f6">{_boss_lnk}</code><br><br>
+                  🍽️ <b>النوادل (أضف البوت للمجموعة ثم أرسل الرابط):</b><br>
+                  <code style="color:#29b6f6">{_waiters_lnk}</code><br><br>
+                  🛵 <b>التوصيل (أضف البوت للمجموعة ثم أرسل الرابط):</b><br>
+                  <code style="color:#29b6f6">{_delivery_lnk}</code><br><br>
+                  <small style="color:#555">💡 للمجموعات: أضف البوت أولاً → ثم أرسل الرابط في المجموعة</small>
+                </div>""", unsafe_allow_html=True)
 
             # خطوات ما بعد الإنشاء
             st.markdown("""<div class="res warn" style="margin-top:1rem">
@@ -893,7 +921,11 @@ def pg_manage(rs):
                 try:
                     resp = requests.post(
                         f"https://api.telegram.org/bot{TG_TOKEN}/setWebhook",
-                        json={"url": wh_url}, timeout=10)
+                        json={
+                            "url": wh_url,
+                            # ✅ إصلاح: callback_query لأزرار التسليم + message للأوامر
+                            "allowed_updates": ["message", "callback_query"]
+                        }, timeout=10)
                     d = resp.json()
                     if d.get("ok"):
                         st.success(f"✅ مسجل: {wh_url}")
@@ -930,10 +962,19 @@ def pg_manage(rs):
             with c1:
                 sid = r.get("sheet_id","")
                 su  = f"https://docs.google.com/spreadsheets/d/{sid}/edit" if sid else "#"
+                boss_id     = r.get("boss_chat_id","") or "⏳ لم يُربط"
+                waiters_id  = r.get("waiters_chat_id","") or "⏳ لم تُربط"
+                delivery_id = r.get("delivery_chat_id","") or "⏳ لم تُربط"
                 st.markdown(f"""
                 **📊 Sheet:** [{sid[:28] if sid else 'لا يوجد'}]({su})
 
-                **📨 Telegram:** `{r.get('telegram_chat_id','⏳ لم يُربط بعد')}`
+                **📨 Telegram (رئيسي):** `{r.get('telegram_chat_id','⏳ لم يُربط بعد')}`
+
+                **👑 Boss chat_id:** `{boss_id}`
+
+                **🍽️ النوادل chat_id:** `{waiters_id}`
+
+                **🛵 التوصيل chat_id:** `{delivery_id}`
 
                 **📶 WiFi:** `{r.get('wifi_ssid','')}` | `{r.get('wifi_password','')}`
 
@@ -948,7 +989,7 @@ def pg_manage(rs):
                 st.code(mu)
                 reg = build_reg_link(rid)
                 if reg:
-                    st.markdown("**🔗 رابط Telegram (المطعم):**")
+                    st.markdown("**🔗 رابط Telegram (ربط المطعم):**")
                     st.code(reg)
                 if r.get("owner_email"):
                     st.markdown(f"**📧** {r.get('owner_email')}")
@@ -956,26 +997,48 @@ def pg_manage(rs):
                 st.markdown("**🍳 شاشة الكوزينة:**")
                 st.code(kitchen_link)
 
-                # ✅ روابط Deep Linking للمجموعات
-                bot_username = os.getenv("TELEGRAM_BOT_USERNAME","")
+                # ✅ إصلاح: جلب اسم البوت ديناميكياً من API Telegram
+                try:
+                    _tg_me = requests.get(
+                        f"https://api.telegram.org/bot{TG_TOKEN}/getMe", timeout=5)
+                    bot_username = _tg_me.json().get("result",{}).get("username","") if _tg_me.ok else ""
+                except:
+                    bot_username = os.getenv("TELEGRAM_BOT_USERNAME","")
+
                 if bot_username:
-                    st.markdown("**📲 روابط ربط المجموعات:**")
-                    st.markdown(f"👑 المدير: `https://t.me/{bot_username}?start=boss_{rid}`")
-                    st.markdown(f"🍽️ النوادل: `https://t.me/{bot_username}?startgroup=waiters_{rid}`")
-                    st.markdown(f"🛵 التوصيل: `https://t.me/{bot_username}?startgroup=delivery_{rid}`")
+                    st.markdown("**📲 روابط ربط المجموعات/الأشخاص:**")
+                    boss_link     = f"https://t.me/{bot_username}?start=boss_{rid}"
+                    waiters_link  = f"https://t.me/{bot_username}?startgroup=waiters_{rid}"
+                    delivery_link = f"https://t.me/{bot_username}?startgroup=delivery_{rid}"
+                    st.markdown(f"""
+                    👑 **المدير (خاص):** `{boss_link}`
+
+                    🍽️ **النوادل (مجموعة):** `{waiters_link}`
+
+                    🛵 **التوصيل (مجموعة):** `{delivery_link}`
+
+                    > 💡 **كيف يعمل:**
+                    > - رابط المدير: يفتحه المدير في محادثته الخاصة مع البوت
+                    > - روابط المجموعات: يُضاف البوت للمجموعة أولاً ثم يُرسل الأمر
+                    """)
+                else:
+                    st.warning("⚠️ أضف TELEGRAM_BOT_USERNAME في المتغيرات لعرض روابط الربط")
 
             with c3:
                 if st.button("🗑️ حذف", key=f"del_{uid}"):
                     if del_r(rid):
                         st.success("تم!")
+                        st.cache_data.clear()
                         st.cache_resource.clear()
                         st.rerun()
                 if st.button("🔄 Cache", key=f"cache_{uid}"):
                     try:
-                        requests.post(f"{ROUTER_URL}/cache/refresh", timeout=5)
-                        st.success("✅")
+                        requests.post(f"{ROUTER_URL}/cache/refresh/{rid}", timeout=5)
+                        st.success("✅ Cache مُحدَّث")
                     except:
                         st.warning("API غير متاح")
+                    st.cache_data.clear()
+                    st.rerun()
 
                 # ✅ زر تفعيل/إلغاء التوصيل
                 delivery_on = str(r.get("delivery_active","")).lower() == "true"
