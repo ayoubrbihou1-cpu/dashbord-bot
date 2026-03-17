@@ -512,7 +512,7 @@ def provision_restaurant(
         steps.append("⚠️ تحقق من TELEGRAM_BOT_TOKEN")
 
     # رابط الكوزينة
-    kitchen_url = f"{KITCHEN_URL}?api={ROUTER_BASE_URL}&rid={restaurant_id}" if KITCHEN_URL else ""
+    kitchen_url = f"{KITCHEN_URL}?api={ROUTER_BASE_URL}&rid={restaurant_id}&name={requests.utils.quote(name)}" if KITCHEN_URL else ""
 
     # ✅ إصلاح: بناء روابط المجموعات قبل send_welcome (كانت بعده — خطأ كبير!)
     gl = build_group_links(restaurant_id)
