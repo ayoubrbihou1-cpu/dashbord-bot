@@ -634,8 +634,8 @@ def pg_add(rs):
                 </div>""", unsafe_allow_html=True)
                 st.code(result.reg_link, language=None)
 
-            # ✅ رابط شاشة الكوزينة
-            kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid}"
+            # ✅ رابط شاشة الكوزينة — يتضمن اسم المطعم في URL لعرضه فوراً
+            kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid.strip()}&name={requests.utils.quote(rname.strip())}"
             st.markdown(f"""<div style="background:rgba(255,152,0,.07);border:1px solid rgba(255,152,0,.2);
               border-radius:12px;padding:1rem 1.2rem;margin:.5rem 0">
               <b style="color:#ff9800">🍳 رابط شاشة الكوزينة — ضعه على التابليت:</b><br>
@@ -923,8 +923,8 @@ def pg_manage(rs):
                         f"https://api.telegram.org/bot{TG_TOKEN}/setWebhook",
                         json={
                             "url": wh_url,
-                            # ✅ إصلاح: callback_query لأزرار التسليم + message للأوامر
-                            "allowed_updates": ["message", "callback_query"]
+                            # ✅ message + callback_query + my_chat_member (ربط تلقائي)
+                            "allowed_updates": ["message", "callback_query", "my_chat_member"]
                         }, timeout=10)
                     d = resp.json()
                     if d.get("ok"):
@@ -993,7 +993,7 @@ def pg_manage(rs):
                     st.code(reg)
                 if r.get("owner_email"):
                     st.markdown(f"**📧** {r.get('owner_email')}")
-                kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid}"
+                kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid}&name={requests.utils.quote(r.get('name',''))}"
                 st.markdown("**🍳 شاشة الكوزينة:**")
                 st.code(kitchen_link)
 
@@ -1006,23 +1006,23 @@ def pg_manage(rs):
                     bot_username = os.getenv("TELEGRAM_BOT_USERNAME","")
 
                 if bot_username:
-                    st.markdown("**📲 روابط ربط المجموعات/الأشخاص:**")
-                    boss_link     = f"https://t.me/{bot_username}?start=boss_{rid}"
-                    waiters_link  = f"https://t.me/{bot_username}?startgroup=waiters_{rid}"
-                    delivery_link = f"https://t.me/{bot_username}?startgroup=delivery_{rid}"
-                    st.markdown(f"""
-                    👑 **المدير (خاص):** `{boss_link}`
+                    boss_link = f"https://t.me/{bot_username}?start=boss_{rid}"
+                    st.markdown("**📲 ربط Telegram:**")
+                    st.markdown(f"👑 **المدير** — يفتح هذا الرابط في محادثته الخاصة مع البوت:")
+                    st.code(boss_link)
 
-                    🍽️ **النوادل (مجموعة):** `{waiters_link}`
+                    st.markdown(f"""**🍽️ مجموعة النوادل** — خطوتين:
+1. أضف البوت `@{bot_username}` للمجموعة
+2. أرسل في المجموعة: `/ربط waiters_{rid}`""")
 
-                    🛵 **التوصيل (مجموعة):** `{delivery_link}`
+                    st.markdown(f"""**🛵 مجموعة التوصيل** — خطوتين:
+1. أضف البوت `@{bot_username}` للمجموعة
+2. أرسل في المجموعة: `/ربط delivery_{rid}`""")
 
-                    > 💡 **كيف يعمل:**
-                    > - رابط المدير: يفتحه المدير في محادثته الخاصة مع البوت
-                    > - روابط المجموعات: يُضاف البوت للمجموعة أولاً ثم يُرسل الأمر
-                    """)
+                    st.code(f"/ربط waiters_{rid}", language=None)
+                    st.code(f"/ربط delivery_{rid}", language=None)
                 else:
-                    st.warning("⚠️ أضف TELEGRAM_BOT_USERNAME في المتغيرات لعرض روابط الربط")
+                    st.warning("⚠️ TELEGRAM_BOT_TOKEN غير محدد")
 
             with c3:
                 if st.button("🗑️ حذف", key=f"del_{uid}"):
