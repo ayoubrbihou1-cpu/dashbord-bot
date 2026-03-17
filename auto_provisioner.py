@@ -385,7 +385,11 @@ def build_reg_link(restaurant_id):
     return ""
 
 def build_group_links(restaurant_id):
-    """يبني روابط Deep Linking لـ boss / waiters / delivery"""
+    """
+    يبني روابط Deep Linking لـ boss / waiters / delivery
+    ✅ إصلاح: boss يستخدم ?start= (خاص) — waiters/delivery يستخدمان ?startgroup= (مجموعة)
+    كلاهما يُسجّل chat_id في Google Sheet عبر webhook /webhook/telegram
+    """
     if not TG_TOKEN: return {}
     try:
         r = requests.get(f"https://api.telegram.org/bot{TG_TOKEN}/getMe", timeout=5)
@@ -510,15 +514,19 @@ def provision_restaurant(
     # رابط الكوزينة
     kitchen_url = f"{KITCHEN_URL}?api={ROUTER_BASE_URL}&rid={restaurant_id}" if KITCHEN_URL else ""
 
-    # إرسال رسالة Telegram
+    # ✅ إصلاح: بناء روابط المجموعات قبل send_welcome (كانت بعده — خطأ كبير!)
+    gl = build_group_links(restaurant_id)
+    if gl:
+        steps.append("✅ روابط المجموعات جاهزة (Boss / نوادل / توصيل)")
+    else:
+        steps.append("⚠️ روابط المجموعات: تحقق من TELEGRAM_BOT_TOKEN")
+
+    # إرسال رسالة Telegram — الآن gl معرّف
     if telegram_chat_id:
         ok = send_welcome(telegram_chat_id, name, url, menu_url, wifi_ssid,
                           kitchen_url=kitchen_url, kitchen_password=kitchen_password,
                           group_links=gl)
         steps.append("✅ رسالة Telegram أُرسلت" if ok else "⚠️ Telegram فشل")
-
-    # ✅ بناء روابط المجموعات
-    gl = build_group_links(restaurant_id)
 
     # ✅ إرسال إيميل Gmail
     if owner_email:
