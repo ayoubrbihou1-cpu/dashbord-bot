@@ -634,8 +634,12 @@ def pg_add(rs):
                 </div>""", unsafe_allow_html=True)
                 st.code(result.reg_link, language=None)
 
-            # ✅ رابط شاشة الكوزينة — يتضمن اسم المطعم في URL لعرضه فوراً
-            kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid.strip()}&name={requests.utils.quote(rname.strip())}"
+            _slug_k = r.get("slug","").strip()
+            kitchen_link = (
+                f"{KITCHEN_URL}?api={ROUTER_URL}&slug={_slug_k}&name={requests.utils.quote(rname.strip())}"
+                if _slug_k else
+                f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid.strip()}&name={requests.utils.quote(rname.strip())}"
+            )
             st.markdown(f"""<div style="background:rgba(255,152,0,.07);border:1px solid rgba(255,152,0,.2);
               border-radius:12px;padding:1rem 1.2rem;margin:.5rem 0">
               <b style="color:#ff9800">🍳 رابط شاشة الكوزينة — ضعه على التابليت:</b><br>
@@ -1094,6 +1098,116 @@ def pg_manage(rs):
                         st.cache_data.clear()
                         st.success("✅ تم تطبيق التغييرات فوراً!")
                         st.rerun()
+
+            # ══ خانة الـ Slug (رابط نظيف) ══
+            st.markdown("---")
+            current_slug = r.get("slug","").strip()
+            FRONTEND = os.getenv("FRONTEND_URL","")
+            st.markdown("**🔗 Slug (رابط نظيف):**")
+            st.caption(
+                f"الرابط الحالي: `{FRONTEND}/{current_slug}`" if current_slug
+                else "أضف slug للحصول على رابط نظيف مثل: menu.netlify.app/nakhil"
+            )
+            col_sl1, col_sl2 = st.columns([3,1])
+            with col_sl1:
+                new_slug = st.text_input(
+                    "Slug", value=current_slug,
+                    placeholder="nakhil (بدون مسافات أو رموز خاصة)",
+                    key=f"slug_{uid}", label_visibility="collapsed"
+                )
+            with col_sl2:
+                if st.button("💾 حفظ", key=f"save_slug_{uid}", use_container_width=True):
+                    clean_slug = new_slug.strip().lower().replace(" ","-")
+                    if clean_slug != current_slug:
+                        try:
+                            import gspread as _gsp_s
+                            from google.oauth2.service_account import Credentials as _Cr_s
+                            import json as _jj_s
+                            _SA_s  = os.getenv("GOOGLE_SA_JSON_CONTENT","")
+                            _MSI_s = os.getenv("MASTER_SHEET_ID","")
+                            if _SA_s and _MSI_s:
+                                _cr_s  = _Cr_s.from_service_account_info(
+                                    _jj_s.loads(_SA_s),
+                                    scopes=["https://www.googleapis.com/auth/spreadsheets"])
+                                _cl_s  = _gsp_s.authorize(_cr_s)
+                                _ws_s  = _cl_s.open_by_key(_MSI_s).worksheet("Master_DB")
+                                _hd_s  = _ws_s.row_values(1)
+                                if "slug" not in _hd_s:
+                                    _ws_s.update_cell(1, len(_hd_s)+1, "slug")
+                                    _hd_s.append("slug")
+                                _sc_s  = _hd_s.index("slug") + 1
+                                _rc_s  = _hd_s.index("restaurant_id") if "restaurant_id" in _hd_s else 0
+                                for _i_s, _row_s in enumerate(_ws_s.get_all_values()[1:], start=2):
+                                    if len(_row_s) > _rc_s and str(_row_s[_rc_s]).strip() == rid:
+                                        _ws_s.update_cell(_i_s, _sc_s, clean_slug)
+                                        break
+                                try:
+                                    requests.post(f"{ROUTER_URL}/cache/refresh",
+                                                  headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
+                                except: pass
+                                st.cache_data.clear()
+                                new_url = f"{FRONTEND}/{clean_slug}"
+                                st.success(f"✅ الرابط الجديد: {new_url}")
+                                st.rerun()
+                        except Exception as _e_s:
+                            st.error(f"❌ {_e_s}")
+                    else:
+                        st.info("لم يتغير الـ slug")
+
+            # ══ خانة الدومين الخاص (مستقبلاً) ══
+            st.markdown("---")
+            current_domain = r.get("custom_domain","").strip()
+            st.markdown("**🌐 دومين خاص (اختياري):**")
+            st.caption("إذا كان للمطعم دومين خاص مثل menu.restaurant.com — ضعه هنا")
+            col_dom1, col_dom2 = st.columns([3,1])
+            with col_dom1:
+                new_domain = st.text_input(
+                    "الدومين",
+                    value=current_domain,
+                    placeholder="https://menu.restaurant.ma",
+                    key=f"dom_{uid}",
+                    label_visibility="collapsed"
+                )
+            with col_dom2:
+                if st.button("💾 حفظ", key=f"save_dom_{uid}", use_container_width=True):
+                    if new_domain != current_domain:
+                        try:
+                            import gspread as _gsp_d
+                            from google.oauth2.service_account import Credentials as _Cr_d
+                            import json as _jj_d
+                            _SA_d  = os.getenv("GOOGLE_SA_JSON_CONTENT","")
+                            _MSI_d = os.getenv("MASTER_SHEET_ID","")
+                            if _SA_d and _MSI_d:
+                                _cr_d  = _Cr_d.from_service_account_info(
+                                    _jj_d.loads(_SA_d),
+                                    scopes=["https://www.googleapis.com/auth/spreadsheets"])
+                                _cl_d  = _gsp_d.authorize(_cr_d)
+                                _ws_d  = _cl_d.open_by_key(_MSI_d).worksheet("Master_DB")
+                                _hd_d  = _ws_d.row_values(1)
+                                # أضف عمود custom_domain إذا ناقص
+                                if "custom_domain" not in _hd_d:
+                                    _ws_d.update_cell(1, len(_hd_d)+1, "custom_domain")
+                                    _hd_d.append("custom_domain")
+                                _dc_d  = _hd_d.index("custom_domain") + 1
+                                _rc_d  = _hd_d.index("restaurant_id") if "restaurant_id" in _hd_d else 0
+                                for _i_d, _row_d in enumerate(_ws_d.get_all_values()[1:], start=2):
+                                    if len(_row_d) > _rc_d and str(_row_d[_rc_d]).strip() == rid:
+                                        _ws_d.update_cell(_i_d, _dc_d, new_domain.strip())
+                                        break
+                                # مسح cache فوراً
+                                try:
+                                    requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
+                                                  headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
+                                    requests.post(f"{ROUTER_URL}/cache/refresh",
+                                                  headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
+                                except: pass
+                                st.cache_data.clear()
+                                st.success("✅ تم حفظ الدومين وتطبيقه فوراً!")
+                                st.rerun()
+                        except Exception as _e_d:
+                            st.error(f"❌ {_e_d}")
+                    else:
+                        st.info("لم يتغير الدومين")
 
                 if st.button("🔴 تعطيل" if status=="active" else "🟢 تفعيل",
                              key=f"tog_{uid}"):
