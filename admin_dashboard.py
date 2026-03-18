@@ -281,7 +281,7 @@ def _sanitize_record(rec: dict) -> dict:
 
     return rec
 
-@st.cache_data(ttl=30)   # ✅ إصلاح: 30 ثانية بدل 120 — تحديث أسرع بعد أي تغيير
+@st.cache_data(ttl=120)   # ✅ cache 2 دقيقة — يقلل طلبات Sheets بـ 95%
 def fetch_all():
     """
     ✅ يقرأ من tab 'Master_DB' حصراً
@@ -422,12 +422,10 @@ def pg_dashboard(rs):
             try:
                 requests.post(f"{ROUTER_URL}/cache/refresh", timeout=5)
                 st.success("✅ Cache محدّث")
+                st.cache_resource.clear()
+                st.rerun()
             except:
-                st.warning("⚠️ API غير متاح")
-            # ✅ إصلاح: مسح كل الـ cache — st.cache_data + st.cache_resource
-            st.cache_data.clear()
-            st.cache_resource.clear()
-            st.rerun()
+                st.warning("API غير متاح")
 
 # ══════════════════════════════════════════════════════════
 # صفحة: إضافة مطعم
@@ -623,261 +621,519 @@ def pg_add(rs):
             c3.markdown(f'<div class="iblk"><div class="il">🔢 رقم المطعم</div>'
                         f'<div class="iv">{rid}</div></div>', unsafe_allow_html=True)
 
+            if result.reg_link:
+                st.markdown(f"""<div class="tgbox">
+                  <b style="color:#29b6f6">📨 رابط Telegram — أرسله لصاحب المطعم (مرة واحدة فقط):</b><br>
+                  <div style="background:#0d1a24;border:1px solid rgba(0,136,204,.3);border-radius:8px;
+                       padding:.6rem 1rem;font-family:monospace;color:#29b6f6;margin:.5rem 0">
+                    {result.reg_link}
+                  </div>
+                  <small style="color:#555">صاحب المطعم يضغطه مرة واحدة → يتفعل تلقائياً</small>
+                </div>""", unsafe_allow_html=True)
+                st.code(result.reg_link, language=None)
 
-            # ✅ نتيجة إنشاء المطعم
-            if result.kitchen_url:
-                st.markdown("**🍳 بشاشة الكوزينة:**")
-                st.code(result.kitchen_url)
+            # ✅ رابط شاشة الكوزينة
+            kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid}"
+            st.markdown(f"""<div style="background:rgba(255,152,0,.07);border:1px solid rgba(255,152,0,.2);
+              border-radius:12px;padding:1rem 1.2rem;margin:.5rem 0">
+              <b style="color:#ff9800">🍳 رابط شاشة الكوزينة — ضعه على التابليت:</b><br>
+              <div style="background:#0a0800;border:1px solid rgba(255,152,0,.2);border-radius:8px;
+                   padding:.6rem 1rem;font-family:monospace;font-size:.78rem;color:#ff9800;
+                   word-break:break-all;margin:.5rem 0">{kitchen_link}</div>
+              <small style="color:#555">📌 Bookmark على التابليت في الكوزينة</small>
+            </div>""", unsafe_allow_html=True)
+            st.code(kitchen_link, language=None)
 
-            if result.sheet_url:
-                st.markdown(f"**📊 Google Sheet:** [افتح الشيت]({result.sheet_url})")
+            # توليد البطاقات
+            st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
+            st.markdown("### 🔲 بطاقات الطاولات")
 
-            if result.error:
-                st.error(result.error)
+            with st.spinner("🎨 توليد البطاقات..."):
+                import random
+                _queries = VENUE_QUERIES.get(rvenue_type, [rname])
+                _photo_query = random.choice(_queries)
+                menu_img, wifi_img = generate_table_card(
+                    rname, rssid, rwpass, 1, f"{mu}&table=1",
+                    rstyle, rprimary, raccent, rbg_type, rsocials,
+                    pexels_key=PEXELS_KEY,
+                    unsplash_key=UNSPLASH_KEY,
+                    pixabay_key=PIXABAY_KEY,
+                    photo_query=_photo_query,
+                )
+                mb = io.BytesIO(); menu_img.save(mb,"PNG"); mb.seek(0)
+                wb = io.BytesIO(); wifi_img.save(wb,"PNG"); wb.seek(0)
+                st.session_state.update({
+                    "last_menu_bytes": mb.getvalue(),
+                    "last_wifi_bytes": wb.getvalue(),
+                    "last_rname": rname, "last_rssid": rssid,
+                    "last_rwpass": rwpass, "last_mu": mu,
+                    "last_rstyle": rstyle, "last_rprimary": rprimary,
+                    "last_raccent": raccent, "last_rtables": rtables,
+                    "last_rid": rid,
+                    "last_rbg_type": rbg_type,
+                    "last_rsocials": rsocials,
+                    "last_photo_query": _photo_query,  # ✅ نحفظ الـ query المستخدم
+                })
+                st.session_state.pop("last_pdf_bytes", None)
 
-            if result.steps:
-                with st.expander("📋 تفاصيل الإنشاء"):
-                    for step in result.steps:
-                        st.write(step)
+            _show_cards_and_pdf()
+            st.cache_resource.clear()
+
+            # خطوات ما بعد الإنشاء
+            st.markdown("""<div class="res warn" style="margin-top:1rem">
+            <b>✅ خطوات ما بعد الإنشاء:</b><br>
+            1️⃣ أرسل رابط Telegram لصاحب المطعم → يضغطه مرة واحدة<br>
+            2️⃣ اذهب لـ <b>🍽️ إدارة القائمة</b> → أضف الأكلات والأسعار<br>
+            3️⃣ اذهب لـ <b>🖼️ صور الأكلات</b> → أضف الصور تلقائياً<br>
+            4️⃣ اطبع PDF البطاقات من <b>🖨️ بطاقات PDF</b>
+            </div>""", unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="res err"><b>❌ {result.error}</b><br>'
+                        f'{"<br>".join(result.steps)}</div>', unsafe_allow_html=True)
+
+    elif st.session_state.get("last_menu_bytes"):
+        st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
+        st.markdown("### 🔲 بطاقات الطاولات (آخر إنشاء)")
+        _show_cards_and_pdf()
 
 
+def _show_cards_and_pdf():
+    mb      = st.session_state.get("last_menu_bytes")
+    wb      = st.session_state.get("last_wifi_bytes")
+    rname   = st.session_state.get("last_rname","المطعم")
+    rssid   = st.session_state.get("last_rssid","WiFi")
+    rwpass  = st.session_state.get("last_rwpass","")
+    rstyle  = st.session_state.get("last_rstyle","luxury")
+    rp      = st.session_state.get("last_rprimary","#0a0804")
+    ra      = st.session_state.get("last_raccent","#C9A84C")
+    rtables = st.session_state.get("last_rtables",10)
+    rid     = st.session_state.get("last_rid","1")
+    rbg     = st.session_state.get("last_rbg_type","minimal")
+    rsoc    = st.session_state.get("last_rsocials",{})
+    if not mb or not wb: return
+
+    qc1,qc2 = st.columns(2)
+    with qc1:
+        st.image(mb, caption="📱 QR المينيو — للطلب", use_container_width=True)
+        st.download_button("⬇️ تحميل QR المينيو", mb,
+            f"Menu_QR_{rname}.png","image/png",
+            use_container_width=True, key="dl_menu_qr")
+    with qc2:
+        st.image(wb, caption="📶 QR WiFi — اتصال تلقائي", use_container_width=True)
+        st.download_button("⬇️ تحميل QR WiFi", wb,
+            f"WiFi_QR_{rname}.png","image/png",
+            use_container_width=True, key="dl_wifi_qr")
+
+    st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
+
+    if st.button(f"📄 توليد PDF كامل ({rtables} طاولة = {rtables*2} صفحة)",
+                 use_container_width=True, key="btn_gen_pdf"):
+        with st.spinner(f"⏳ {rtables*2} صفحة..."):
+            try:
+                from pdf_generator import generate_table_tents_pdf
+                # ✅ استخدام نفس الـ photo_query المحفوظ من عند توليد البطاقة
+                saved_query = st.session_state.get("last_photo_query", rname)
+                pdf = generate_table_tents_pdf(
+                    rname, rssid, rwpass, FRONTEND_URL,
+                    rid, rtables, rstyle, rp, ra,
+                    bg_type=rbg, socials=rsoc,
+                    pexels_key=PEXELS_KEY,
+                    unsplash_key=UNSPLASH_KEY,
+                    pixabay_key=PIXABAY_KEY,
+                    photo_query=saved_query)
+                st.session_state["last_pdf_bytes"] = pdf
+                st.session_state["last_pdf_name"]  = rname
+            except Exception as e:
+                st.error(f"❌ PDF: {e}")
+
+    if st.session_state.get("last_pdf_bytes"):
+        st.success(f"✅ PDF جاهز — {rtables} طاولة | {rtables*2} صفحة")
+        st.download_button(
+            f"⬇️ تحميل PDF ({rtables*2} صفحة)",
+            st.session_state["last_pdf_bytes"],
+            f"Tents_{st.session_state.get('last_pdf_name',rname)}.pdf",
+            "application/pdf",
+            use_container_width=True, key="dl_pdf_final")
 
 # ══════════════════════════════════════════════════════════
+# صفحة: بطاقات PDF
+# ══════════════════════════════════════════════════════════
+def pg_pdf(rs):
+    st.markdown("## 🖨️ بطاقات الطاولات — PDF")
+    if not rs: st.info("📭 أضف مطعماً أولاً"); return
+
+    opts = {f"#{r.get('restaurant_id','?')} — {r.get('name','مطعم')}": r for r in rs}
+    sel  = st.selectbox("🏪 المطعم", list(opts.keys()))
+    r    = opts[sel]
+
+    c1,c2 = st.columns(2)
+    with c1:
+        _nt = int(r.get("num_tables", 10))
+        n  = st.number_input("عدد الطاولات", min_value=1, max_value=200, value=_nt)
+        pv = st.number_input("معاينة طاولة رقم", min_value=1, max_value=int(n), value=1)
+    with c2:
+        saved_bg  = r.get("bg_type","") or "minimal"
+        bg_opts   = list(BG_LABELS.keys())
+        bg_def    = bg_opts.index(saved_bg) if saved_bg in bg_opts else 0
+        pdf_bg    = st.selectbox("🖼️ خلفية البطاقة", bg_opts,
+                                 index=bg_def,
+                                 format_func=lambda x: BG_LABELS.get(x,x),
+                                 key="pdf_bg_sel")
+        saved_style = r.get("style","luxury") or "luxury"
+        style_opts  = list(STYLE_LABELS.keys())
+        style_def   = style_opts.index(saved_style) if saved_style in style_opts else 0
+        pdf_style   = st.selectbox("🎭 الطابع", style_opts,
+                                   index=style_def,
+                                   format_func=lambda x: STYLE_LABELS.get(x,x),
+                                   key="pdf_style_sel")
+        VENUE_TYPES_PDF = {
+            "restaurant":"🍽️ مطعم","cafe":"☕ مقهى","fastfood":"🍔 وجبات سريعة",
+            "pizza":"🍕 بيتزا","seafood":"🦞 بحري","moroccan":"🍲 مغربي",
+            "grill":"🔥 مشويات","sushi":"🍣 سوشي","pastry":"🥐 حلويات","juice":"🥤 عصائر"
+        }
+        VENUE_QUERIES_PDF = {
+            "restaurant":["fine dining food elegant","gourmet restaurant plating","restaurant food photography"],
+            "cafe":["coffee shop cozy latte","cafe interior coffee","barista coffee art"],
+            "fastfood":["burger fast food crispy","fries hamburger meal","fast food restaurant"],
+            "pizza":["pizza wood fired","italian pizza cheese","pizza restaurant"],
+            "seafood":["seafood fresh platter","grilled fish lemon","seafood restaurant"],
+            "moroccan":["moroccan tagine food","couscous moroccan dish","moroccan cuisine"],
+            "grill":["bbq grilled meat smoke","steakhouse grill","charcoal grilled"],
+            "sushi":["sushi platter fresh","japanese food restaurant","sushi rolls"],
+            "pastry":["pastry bakery croissant","cake patisserie sweet","bakery bread"],
+            "juice":["fresh juice tropical","smoothie colorful fruits","juice bar drinks"],
+        }
+        pdf_venue = st.selectbox("🏪 نوع المطعم",
+            list(VENUE_TYPES_PDF.keys()),
+            format_func=lambda x: VENUE_TYPES_PDF.get(x,x),
+            key="pdf_venue_sel")
+
+    socials = r.get("socials", {}) or {}
+    import random as _rand
+    _pdf_query = _rand.choice(VENUE_QUERIES_PDF.get(pdf_venue, [r.get("name","food")]))
+
+    if st.button("👁️ معاينة", use_container_width=True, key="btn_preview"):
+        with st.spinner("🎨..."):
+            try:
+                mi, wi = generate_single_table_preview(
+                    r.get("name","مطعم"), r.get("wifi_ssid","WiFi"),
+                    r.get("wifi_password",""), FRONTEND_URL,
+                    r.get("restaurant_id","1"), pv,
+                    pdf_style, r.get("primary_color","#0a0804"),
+                    r.get("accent_color","#C9A84C"),
+                    pdf_bg, socials,
+                    pexels_key=PEXELS_KEY, unsplash_key=UNSPLASH_KEY,
+                    pixabay_key=PIXABAY_KEY, photo_query=_pdf_query)
+                st.session_state["prev_m"] = card_to_bytes(mi)
+                st.session_state["prev_w"] = card_to_bytes(wi)
+                # ✅ احفظ الـ query المستخدم لإعادة استخدامه في PDF
+                st.session_state["prev_pdf_query"] = _pdf_query
+                st.session_state["prev_pdf_bg"]    = pdf_bg
+                st.session_state["prev_pdf_style"] = pdf_style
+            except Exception as e:
+                st.error(f"❌ {e}")
+
+    if st.session_state.get("prev_m"):
+        ca,cb = st.columns(2)
+        ca.image(st.session_state["prev_m"], caption=f"📱 QR المينيو T{pv}", use_container_width=True)
+        cb.image(st.session_state["prev_w"], caption=f"📶 QR WiFi T{pv}", use_container_width=True)
+
+    if st.button("📄 توليد PDF كامل", use_container_width=True, key="btn_pdf_pg"):
+        with st.spinner(f"⏳ {n*2} صفحة..."):
+            try:
+                from pdf_generator import generate_table_tents_pdf
+                # ✅ استخدم نفس الـ query والـ style من المعاينة
+                final_query = st.session_state.get("prev_pdf_query", _pdf_query)
+                final_bg    = st.session_state.get("prev_pdf_bg", pdf_bg)
+                final_style = st.session_state.get("prev_pdf_style", pdf_style)
+                pdf = generate_table_tents_pdf(
+                    r.get("name","مطعم"), r.get("wifi_ssid","WiFi"),
+                    r.get("wifi_password",""), FRONTEND_URL,
+                    r.get("restaurant_id","1"), n,
+                    final_style,
+                    r.get("primary_color","#0a0804"),
+                    r.get("accent_color","#C9A84C"),
+                    final_bg,
+                    socials,
+                    pexels_key=PEXELS_KEY,
+                    unsplash_key=UNSPLASH_KEY,
+                    pixabay_key=PIXABAY_KEY,
+                    photo_query=final_query)
+                st.session_state["pg_pdf"] = pdf
+                st.session_state["pg_pdf_nm"] = r.get("name","")
+                st.session_state["pg_pdf_n"]  = n
+            except Exception as e:
+                st.error(f"❌ PDF: {e}")
+
+    if st.session_state.get("pg_pdf"):
+        _n = st.session_state.get("pg_pdf_n",n)
+        st.success(f"✅ {_n} طاولة | {_n*2} صفحة جاهزة")
+        st.download_button("⬇️ تحميل PDF",
+            st.session_state["pg_pdf"],
+            f"Tents_{st.session_state.get('pg_pdf_nm','')}.pdf",
+            "application/pdf", use_container_width=True, key="dl_pg_pdf")
+
+# ══════════════════════════════════════════════════════════
+# صفحة: إدارة
+# ══════════════════════════════════════════════════════════
 def pg_manage(rs):
-    """⚙️ إدارة المطاعم — الأصلية"""
     st.markdown("## ⚙️ إدارة المطاعم")
 
-    # ── Telegram Webhook ──
-    with st.expander("🤖 Telegram Webhook", expanded=False):
-        wh_url = f"{ROUTER_URL}/webhook/telegram"
-        col_wh1, col_wh2 = st.columns(2)
-        with col_wh1:
-            if st.button("📡 تسجيل Webhook", use_container_width=True,
-                         help=wh_url):
+    # Telegram Webhook
+    st.markdown("### 🤖 Telegram Webhook")
+    wh_url = f"{ROUTER_URL}/webhook/telegram"
+    st.code(f"Webhook URL: {wh_url}")
+
+    c1,c2 = st.columns(2)
+    with c1:
+        if st.button("🔗 تسجيل Webhook", key="reg_wh"):
+            if not TG_TOKEN:
+                st.error("❌ TELEGRAM_BOT_TOKEN غير محدد")
+            else:
                 try:
                     resp = requests.post(
                         f"https://api.telegram.org/bot{TG_TOKEN}/setWebhook",
-                        json={"url": wh_url,
-                              "allowed_updates": ["message","callback_query","my_chat_member"]},
-                        timeout=10)
+                        json={"url": wh_url}, timeout=10)
                     d = resp.json()
-                    if d.get("ok"): st.success("✅ Webhook مسجل!")
-                    else:           st.error(f"❌ {d.get('description')}")
-                except Exception as e: st.error(f"❌ {e}")
-        with col_wh2:
-            if st.button("🔍 اختبار البوت", use_container_width=True):
+                    if d.get("ok"):
+                        st.success(f"✅ مسجل: {wh_url}")
+                    else:
+                        st.error(f"❌ {d.get('description')}")
+                except Exception as e:
+                    st.error(str(e))
+    with c2:
+        if st.button("🧪 اختبار البوت", key="test_bot"):
+            if TG_TOKEN:
                 try:
-                    r = requests.get(f"https://api.telegram.org/bot{TG_TOKEN}/getMe", timeout=8)
+                    r = requests.get(f"https://api.telegram.org/bot{TG_TOKEN}/getMe", timeout=5)
                     d = r.json()
                     if d.get("ok"):
                         b = d["result"]
                         st.success(f"✅ @{b.get('username')} — {b.get('first_name')}")
-                    else: st.error("❌ Token خاطئ")
-                except Exception as e: st.error(f"❌ {e}")
+                    else:
+                        st.error(str(d))
+                except Exception as e:
+                    st.error(str(e))
 
-    st.markdown("---")
+    st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
+    st.markdown("### 🍽️ قائمة المطاعم")
+    if not rs: st.info("لا توجد مطاعم"); return
 
-    # ── قائمة المطاعم ──
-    # rs هي list من fetch_all()
-    if not rs:
-        st.info("لا يوجد مطاعم بعد — أضف مطعماً من 'إضافة مطعم'")
-        return
+    for idx, r in enumerate(rs):
+        rid    = str(r.get("restaurant_id", f"r{idx}"))
+        uid    = f"{idx}_{rid}"
+        status = r.get("status","active")
+        icon   = "🟢" if status == "active" else "⏳"
 
-    for r in rs:
-        rid   = str(r.get("restaurant_id","?")).strip()
-        rname = r.get("name","مطعم")
-
-        with st.expander(f"🍽️ #{rid} — {rname}", expanded=False):
-            c1, c2 = st.columns(2)
-
+        with st.expander(f"{icon} #{rid} — {r.get('name','?')}"):
+            c1,c2,c3 = st.columns([2,2,1])
             with c1:
-                # ── معلومات ──
                 sid = r.get("sheet_id","")
-                if sid:
-                    st.markdown(f"**📊 Sheet:** [{sid[:20]}...](https://docs.google.com/spreadsheets/d/{sid}/edit)")
-                st.markdown(f"**📟 Telegram (رئيسي):** `{r.get('telegram_chat_id','') or 'لم يُربط'}`")
-                st.markdown(f"**👑 Boss chat_id:** `{r.get('boss_chat_id','') or '❌ لم يُربط'}`")
-                st.markdown(f"**🍽️ النوادل chat_id:** `{r.get('waiters_chat_id','') or '❌ لم يُربط'}`")
-                st.markdown(f"**🛵 التوصيل chat_id:** `{r.get('delivery_chat_id','') or '❌ لم يُربط'}`")
-                st.markdown(f"**📶 WiFi:** {r.get('wifi_ssid','')} | {r.get('wifi_password','')}")
-                st.markdown(f"**🎨 طابع:** {r.get('style','')} | 🪑 {r.get('num_tables','')} طاولة")
-                st.markdown(f"**🔑 كلمة سر الكوزينة:** `{r.get('kitchen_password','')}`")
-                delivery_on = str(r.get("delivery_active","")).lower() in ("true","1","yes")
-                st.markdown(f"**🛵 التوصيل:** {'✅ مفعّل' if delivery_on else '❌ مغلق'}")
+                su  = f"https://docs.google.com/spreadsheets/d/{sid}/edit" if sid else "#"
+                st.markdown(f"""
+                **📊 Sheet:** [{sid[:28] if sid else 'لا يوجد'}]({su})
 
+                **📨 Telegram:** `{r.get('telegram_chat_id','⏳ لم يُربط بعد')}`
+
+                **📶 WiFi:** `{r.get('wifi_ssid','')}` | `{r.get('wifi_password','')}`
+
+                **🎨 طابع:** {r.get('style','')} | 🪑 {r.get('num_tables','')} طاولة
+
+                **🔑 كلمة سر الكوزينة:** `{r.get('kitchen_password','⚠️ غير محددة')}`
+
+                **🛵 التوصيل:** {'✅ مفعّل' if str(r.get('delivery_active','')).lower()=='true' else '❌ غير مفعّل'}
+                """)
             with c2:
-                # ── روابط ──
                 mu = f"{FRONTEND_URL}?rest_id={rid}"
-                st.markdown(f"**🌐 رابط المينيو:**")
                 st.code(mu)
-
-                bot_username = os.getenv("TELEGRAM_BOT_USERNAME","Ayoub_Resto_bot")
-                kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid}&name={requests.utils.quote(rname)}"
-                st.markdown("**🍳 بشاشة الكوزينة:**")
+                reg = build_reg_link(rid)
+                if reg:
+                    st.markdown("**🔗 رابط Telegram (المطعم):**")
+                    st.code(reg)
+                if r.get("owner_email"):
+                    st.markdown(f"**📧** {r.get('owner_email')}")
+                kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid}"
+                st.markdown("**🍳 شاشة الكوزينة:**")
                 st.code(kitchen_link)
 
-                st.markdown("**🔗 رابط Telegram:**")
-                st.markdown(f"""
-👑 **المدير (أنت)** — يفتح هذا الرابط في محادثته مع البوت:
-`https://t.me/{bot_username}?start=boss_{rid}`
+                # ✅ روابط Deep Linking للمجموعات
+                bot_username = os.getenv("TELEGRAM_BOT_USERNAME","")
+                if bot_username:
+                    st.markdown("**📲 روابط ربط المجموعات:**")
+                    st.markdown(f"👑 المدير: `https://t.me/{bot_username}?start=boss_{rid}`")
+                    st.markdown(f"🍽️ النوادل: `https://t.me/{bot_username}?startgroup=waiters_{rid}`")
+                    st.markdown(f"🛵 التوصيل: `https://t.me/{bot_username}?startgroup=delivery_{rid}`")
 
-🍽️ **مجموعة السيرفورات** — خطوتين:
-1. أضف البوت `@{bot_username}` للمجموعة
-2. أرسل في المجموعة: `/ربط waiters_{rid}`
+            with c3:
+                if st.button("🗑️ حذف", key=f"del_{uid}"):
+                    if del_r(rid):
+                        st.success("تم!")
+                        st.cache_resource.clear()
+                        st.rerun()
+                if st.button("🔄 Cache", key=f"cache_{uid}"):
+                    try:
+                        requests.post(f"{ROUTER_URL}/cache/refresh", timeout=5)
+                        st.success("✅")
+                    except:
+                        st.warning("API غير متاح")
 
-🛵 **مجموعة التوصيل** — خطوتين:
-1. أضف البوت `@{bot_username}` للمجموعة
-2. أرسل في المجموعة: `/ربط delivery_{rid}`
-""")
-                st.code(f"/ربط waiters_{rid}", language=None)
-                st.code(f"/ربط delivery_{rid}", language=None)
-
-            # ── أزرار الإجراءات ──
-            uid = f"{rid}_{rname}"
-            col_a, col_b, col_c = st.columns(3)
-
-            with col_a:
-                # تفعيل/إلغاء التوصيل
-                dlv_label = "🛵 إلغاء التوصيل" if delivery_on else "🛵 تفعيل التوصيل"
-                if st.button(dlv_label, key=f"del_tog_{uid}", use_container_width=True):
+                # ✅ زر تفعيل/إلغاء التوصيل
+                delivery_on = str(r.get("delivery_active","")).lower() == "true"
+                delivery_label = "🛵 إلغاء التوصيل" if delivery_on else "🛵 تفعيل التوصيل"
+                if st.button(delivery_label, key=f"del_tog_{uid}"):
                     new_val = "false" if delivery_on else "true"
                     try:
-                        import gspread as _gsp
-                        from google.oauth2.service_account import Credentials as _Cr
-                        import json as _jj
-                        _SA  = os.getenv("GOOGLE_SA_JSON_CONTENT","")
-                        _MSI = os.getenv("MASTER_SHEET_ID","")
-                        if _SA and _MSI:
-                            _cr  = _Cr.from_service_account_info(_jj.loads(_SA),
-                                       scopes=["https://www.googleapis.com/auth/spreadsheets"])
-                            _cl  = _gsp.authorize(_cr)
-                            _ws  = _cl.open_by_key(_MSI).worksheet("Master_DB")
-                            _hd  = _ws.row_values(1)
-                            if "delivery_active" not in _hd:
-                                _ws.update_cell(1, len(_hd)+1, "delivery_active")
-                                _hd.append("delivery_active")
-                            _dc  = _hd.index("delivery_active") + 1
-                            _rc  = _hd.index("restaurant_id")   if "restaurant_id" in _hd else 0
-                            for _i, _row in enumerate(_ws.get_all_values()[1:], start=2):
-                                if len(_row) > _rc and str(_row[_rc]).strip() == rid:
-                                    _ws.update_cell(_i, _dc, new_val); break
-                        requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
-                                      headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
-                        requests.post(f"{ROUTER_URL}/cache/refresh",
-                                      headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
-                        st.cache_data.clear()
-                        st.success(f"التوصيل {'مفعّل ✅' if new_val=='true' else 'ملغى ✅'}")
-                        st.rerun()
-                    except Exception as _e: st.error(f"❌ {_e}")
+                        # تحديث في Master_DB مباشرة
+                        import gspread as _gs_mod
+                        from google.oauth2.service_account import Credentials as _Creds
+                        import json as _json
+                        _SA = os.getenv("GOOGLE_SA_JSON_CONTENT","")
+                        _SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+                        _MASTER = os.getenv("MASTER_SHEET_ID","")
+                        if _SA and _MASTER:
+                            _creds = _Creds.from_service_account_info(_json.loads(_SA), scopes=_SCOPES)
+                            _client = _gs_mod.authorize(_creds)
+                            _ws = _client.open_by_key(_MASTER).worksheet("Master_DB")
+                            _headers = _ws.row_values(1)
+                            if "delivery_active" not in _headers:
+                                _ws.update_cell(1, len(_headers)+1, "delivery_active")
+                                _headers.append("delivery_active")
+                            _col = _headers.index("delivery_active") + 1
+                            for _i, _row in enumerate(_ws.get_all_records()):
+                                if str(_row.get("restaurant_id","")) == rid:
+                                    _ws.update_cell(_i+2, _col, new_val)
+                                    break
+                            # مسح cache API
+                            try: requests.post(f"{ROUTER_URL}/cache/refresh", timeout=5)
+                            except: pass
+                            st.success(f"✅ التوصيل {'مفعّل' if new_val=='true' else 'ألغي'}")
+                            st.rerun()
+                    except Exception as _e:
+                        st.error(f"❌ {_e}")
 
-            with col_b:
-                if st.button("🔄 تطبيق فوري", key=f"ref_del_{uid}", use_container_width=True):
-                    try:
-                        requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
-                                      headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=10)
-                        requests.post(f"{ROUTER_URL}/cache/refresh",
-                                      headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=10)
-                    except: pass
-                    st.cache_data.clear()
-                    st.success("✅ تم التطبيق الفوري!")
-                    st.rerun()
-
-            with col_c:
-                if st.button("🗑️ حذف", key=f"del_{uid}", use_container_width=True):
-                    st.session_state[f"confirm_del_{uid}"] = True
-
-            if st.session_state.get(f"confirm_del_{uid}"):
-                st.warning(f"⚠️ حذف {rname}؟ لا يمكن التراجع!")
-                cc1, cc2 = st.columns(2)
-                with cc1:
-                    if st.button("✅ تأكيد الحذف", key=f"conf_{uid}"):
-                        try:
-                            requests.delete(f"{ROUTER_URL}/restaurants/{rid}",
-                                            headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=10)
-                        except: pass
-                        st.cache_data.clear()
-                        st.session_state.pop(f"confirm_del_{uid}", None)
-                        st.rerun()
-                with cc2:
-                    if st.button("❌ إلغاء", key=f"canc_{uid}"):
-                        st.session_state.pop(f"confirm_del_{uid}", None)
-                        st.rerun()
-
-
-def pg_main():
-    """الصفحة الرئيسية — إحصائيات سريعة"""
-    st.markdown("## 📊 Dashboard")
-    records = fetch_all()  # list of dicts
-    if not records:
-        st.info("لا يوجد مطاعم — أضف مطعماً أولاً")
-        return
-    total  = len(records)
-    active = sum(1 for r in records if r.get("status","") == "active")
-    st.metric("إجمالي المطاعم", total)
-    st.metric("المطاعم النشطة", active)
-    for r in records:
-        rid = r.get("restaurant_id","?")
-        st.markdown(f"**#{rid}** — {r.get('name','')} | {r.get('status','')}")
-
+                if st.button("🔴 تعطيل" if status=="active" else "🟢 تفعيل",
+                             key=f"tog_{uid}"):
+                    st.info("ميزة قريباً")
 
 # ══════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════
 def main():
-    if "auth" not in st.session_state:
-        st.session_state.auth = False
+    if not auth(): return
+    rs = fetch_all()
 
-    if not st.session_state.auth:
-        st.markdown("## 👑 الإمبراطور — تسجيل الدخول")
-        pwd = st.text_input("كلمة المرور", type="password")
-        if st.button("دخول"):
-            if pwd == ADMIN_PASSWORD:
-                st.session_state.auth = True
-                st.rerun()
-            else:
-                st.error("❌ كلمة المرور خاطئة")
-        return
+    # ══ ثيم النهار/الليل — يجب أن يكون خارج sidebar ليطبق على الصفحة كاملة ══
+    if "dark_mode" not in st.session_state:
+        st.session_state.dark_mode = True
 
-    # Sidebar
+    if not st.session_state.dark_mode:
+        st.markdown("""<style>
+/* وضع النهار — يُطبَّق مباشرة بدون JavaScript */
+.stApp,.main,.block-container,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewBlockContainer"],
+[data-testid="stHeader"]
+{background:var(--bg)!important;color:var(--text)!important}
+
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"]>div
+{background:var(--sidebar)!important}
+section[data-testid="stSidebar"] *{color:var(--text)!important}
+
+.stTextInput>div>div>input,.stTextArea textarea,
+.stNumberInput>div>div>input,.stNumberInput input,
+[data-baseweb="input"] input,input,textarea
+{background:var(--input-bg)!important;color:var(--input-text)!important;
+ border-color:var(--input-border)!important}
+::placeholder{color:var(--placeholder)!important;opacity:1!important}
+
+.stNumberInput button,[data-baseweb="input"] button
+{background:var(--bg3)!important;color:var(--text)!important}
+
+.stSelectbox>div>div,.stSelectbox>div>div>div,
+[data-baseweb="select"]>div,[data-baseweb="select"] [class*="control"],
+[data-baseweb="select"] [class*="singleValue"],
+[data-baseweb="select"] [class*="placeholder"]
+{background:var(--input-bg)!important;color:var(--input-text)!important;
+ border-color:var(--input-border)!important}
+[data-baseweb="popover"],[data-baseweb="popover"] *,
+[data-baseweb="menu"],[data-baseweb="menu"] *,
+[role="listbox"] *,[role="option"]
+{background:var(--input-bg)!important;color:var(--input-text)!important}
+[role="option"]:hover{background:var(--bg2)!important}
+
+.stTabs [data-baseweb="tab-list"]{background:var(--tab-bg)!important}
+.stTabs [data-baseweb="tab"]{color:var(--tab-text)!important}
+.stTabs [aria-selected="true"]{background:var(--gold)!important;color:#000!important}
+[data-baseweb="tab-panel"],[data-baseweb="tab-panel"] *
+{background:var(--bg)!important;color:var(--text)!important}
+
+p,span,label,li,a,td,th,small,.stMarkdown *{color:var(--text)!important}
+h1,h2,h3,h4{color:var(--gold)!important}
+label{color:var(--text2)!important}
+
+.s-card,.r-card,.iblk,.tgbox,.info-box,.res
+{background:var(--card-bg)!important;border-color:var(--card-border)!important}
+.s-num,.r-name,.iv{color:var(--gold)!important}
+.s-lbl,.r-meta,.il{color:var(--text2)!important}
+
+[data-testid="stExpander"],[data-testid="stExpander"]>div,
+[data-testid="stExpander"] summary,
+[data-testid="stExpanderDetails"],[data-testid="stExpanderDetails"] *
+{background:var(--bg2)!important;color:var(--text)!important}
+
+.stp{color:var(--text3)!important;border-color:var(--border)!important}
+.stp.done{color:#00e676!important;border-color:#00e676!important}
+.stp.now{color:var(--gold)!important;border-color:var(--gold)!important}
+.prg-out{background:var(--bg3)!important}
+code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
+[data-testid="stRadio"] p,[data-testid="stCheckbox"] p{color:var(--text)!important}
+[data-testid="stMetricValue"],[data-testid="stMetricLabel"]{color:var(--text)!important}
+</style>
+<style>
+/* تعريف قيم النهار على :root مباشرة */
+:root{
+  --bg:#f5f0e8!important;--bg2:#ede8dc!important;--bg3:#e0d8c8!important;
+  --sidebar:#ede8dc!important;--sidebar2:#e0d8c8!important;
+  --text:#1a1208!important;--text2:#5a4020!important;--text3:#8a7050!important;
+  --border:#c8b898!important;--border2:#d5c9a8!important;
+  --input-bg:#ffffff!important;--input-text:#1a1208!important;--input-border:#c8b898!important;
+  --gold:#b8860b!important;--gold2:#8a6010!important;
+  --card-bg:#e8e0d0!important;--card-border:#c8b898!important;
+  --tab-bg:#ddd5c0!important;--tab-text:#5a4020!important;
+  --placeholder:#a09070!important;
+}
+</style>""", unsafe_allow_html=True)
+
     with st.sidebar:
-        st.markdown(f"### 👑 الإمبراطور")
-        rs = fetch_all()
-        st.caption(f"مطعم مسجّل {len(rs)}")
+        st.markdown('<div style="color:#C9A84C;font-size:1.1rem;font-weight:900;'
+                    'text-align:center;padding:.5rem 0">👑 الإمبراطور</div>',
+                    unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center;color:#444;font-size:.75rem">'
+                    f'{len(rs)} مطعم مسجّل</div>', unsafe_allow_html=True)
         st.markdown("---")
-        pages = {
-            "📊 Dashboard":        "main",
-            "➕ إضافة مطعم":      "add",
-            "⚙️ إدارة القائمة":   "manage",
-            "🖼️ صور الأكلات":     "images",
-            "📋 إدارة القائمة":   "menu",
-            "🖨️ بطاقات PDF":       "pdf",
-            "⚙️ إدارة":            "settings",
-        }
-        if "page" not in st.session_state:
-            st.session_state.page = "main"
-        for label, key in pages.items():
-            if st.button(label, key=f"nav_{key}", use_container_width=True):
-                st.session_state.page = key
-                st.rerun()
+        page = st.radio("التنقل", [
+            "🏠 Dashboard",
+            "🚀 إضافة مطعم",
+            "🍽️ إدارة القائمة",
+            "🖼️ صور الأكلات",
+            "🖨️ بطاقات PDF",
+            "⚙️ إدارة",
+        ], label_visibility="hidden")
         st.markdown("---")
-        if st.button("🌙 وضع الليل" if st.session_state.get("theme","dark")=="dark" else "☀️ النهار",
-                     use_container_width=True):
-            st.session_state.theme = "light" if st.session_state.get("theme","dark")=="dark" else "dark"
-        if st.button("📤 خروج", use_container_width=True):
-            st.session_state.auth = False
+        mode_label = "☀️ وضع النهار" if st.session_state.dark_mode else "🌙 وضع الليل"
+        if st.button(mode_label, use_container_width=True, key="btn_theme"):
+            st.session_state.dark_mode = not st.session_state.dark_mode
             st.rerun()
+        if st.button("🚪 خروج", use_container_width=True, key="btn_logout"):
+            st.session_state.ok = False; st.rerun()
 
-    page = st.session_state.get("page","main")
-    rs   = fetch_all()
-
-    if page == "main":       pg_dashboard(rs)
-    elif page == "add":      pg_add(rs)
-    elif page == "manage":   pg_manage(rs)
-    elif page == "images":   show("صور الأكلات", "images")
-    elif page == "menu":     show("إدارة القائمة", "menu")
-    elif page == "pdf":      show("بطاقات PDF", "pdf")
-    elif page == "settings": show("إدارة", "settings")
-
+    if   page == "🏠 Dashboard":      pg_dashboard(rs)
+    elif page == "🚀 إضافة مطعم":    pg_add(rs)
+    elif page == "🍽️ إدارة القائمة": page_menu_manager(rs)
+    elif page == "🖼️ صور الأكلات":   page_images(rs)
+    elif page == "🖨️ بطاقات PDF":    pg_pdf(rs)
+    elif page == "⚙️ إدارة":          pg_manage(rs)
 
 if __name__ == "__main__":
     main()
