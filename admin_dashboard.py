@@ -871,7 +871,7 @@ def main():
     rs   = fetch_all()
 
     if page == "main":       pg_dashboard(rs)
-    elif page == "add":      pg_add()
+    elif page == "add":      pg_add(rs)
     elif page == "manage":   pg_manage(rs)
     elif page == "images":   show("صور الأكلات", "images")
     elif page == "menu":     show("إدارة القائمة", "menu")
