@@ -258,12 +258,7 @@ def send_welcome_email(to_email: str, restaurant_name: str,
         msg["From"]    = GMAIL_USER
         msg["To"]      = to_email
 
-        tg_section = f"""
-        <tr>
-          <td style="color:#C9A84C;font-weight:bold;padding:8px">📨 رابط Telegram:</td>
-          <td style="padding:8px"><a href="{reg_link}" style="color:#29b6f6">{reg_link}</a><br>
-          <small style="color:#888">اضغط مرة واحدة لربط الطلبات</small></td>
-        </tr>""" if reg_link else ""
+        tg_section = ""  # رابط Telegram أُزيل — البوس يستخدم boss_link
 
         # ✅ قسم روابط المجموعات (boss / waiters / delivery)
         gl = group_links or {}
@@ -337,7 +332,6 @@ def send_welcome_email(to_email: str, restaurant_name: str,
                   <td style="color:#C9A84C;font-weight:bold">📶 WiFi:</td>
                   <td>{wifi_ssid}</td>
                 </tr>
-                {tg_section}
                 {kitchen_section}
                 {groups_section}
               </table>
