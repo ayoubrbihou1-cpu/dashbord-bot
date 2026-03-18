@@ -635,11 +635,13 @@ def pg_add(rs):
                 st.code(result.reg_link, language=None)
 
             _slug_k = r.get("slug","").strip()
+            # ✅ رابط نظيف للكوزينة مثل المينيو: /farah بدل ?rid=1
             kitchen_link = (
-                f"{KITCHEN_URL}?api={ROUTER_URL}&slug={_slug_k}&name={requests.utils.quote(rname.strip())}"
+                f"{KITCHEN_URL}/{_slug_k}?api={ROUTER_URL}"
                 if _slug_k else
                 f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid.strip()}&name={requests.utils.quote(rname.strip())}"
             )
+            kitchen_link_old = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid.strip()}&name={requests.utils.quote(rname.strip())}"
             st.markdown(f"""<div style="background:rgba(255,152,0,.07);border:1px solid rgba(255,152,0,.2);
               border-radius:12px;padding:1rem 1.2rem;margin:.5rem 0">
               <b style="color:#ff9800">🍳 رابط شاشة الكوزينة — ضعه على التابليت:</b><br>
