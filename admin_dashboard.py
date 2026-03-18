@@ -624,159 +624,153 @@ def pg_add(rs):
                         f'<div class="iv">{rid}</div></div>', unsafe_allow_html=True)
 
 
+            # ✅ نتيجة إنشاء المطعم
+            if result.kitchen_url:
+                st.markdown("**🍳 بشاشة الكوزينة:**")
+                st.code(result.kitchen_url)
+
+            if result.sheet_url:
+                st.markdown(f"**📊 Google Sheet:** [افتح الشيت]({result.sheet_url})")
+
+            if result.error:
+                st.error(result.error)
+
+            if result.steps:
+                with st.expander("📋 تفاصيل الإنشاء"):
+                    for step in result.steps:
+                        st.write(step)
+
+
 
 # ══════════════════════════════════════════════════════════
 def pg_manage(rs):
+    """⚙️ إدارة المطاعم — الأصلية"""
     st.markdown("## ⚙️ إدارة المطاعم")
 
-    # Telegram Webhook
-    st.markdown("### 🤖 Telegram Webhook")
-    wh_url = f"{ROUTER_URL}/webhook/telegram"
-    st.code(f"Webhook URL: {wh_url}")
-    c_wh1, c_wh2 = st.columns(2)
-    with c_wh1:
-        if st.button("📡 تسجيل Webhook", use_container_width=True):
-            try:
-                resp = requests.post(
-                    f"https://api.telegram.org/bot{TG_TOKEN}/setWebhook",
-                    json={
-                        "url": wh_url,
-                        "allowed_updates": ["message", "callback_query", "my_chat_member"]
-                    }, timeout=10)
-                d = resp.json()
-                if d.get("ok"):
-                    st.success("✅ Webhook مسجل!")
-                else:
-                    st.error(f"❌ {d.get('description')}")
-            except Exception as e:
-                st.error(f"❌ {e}")
-    with c_wh2:
-        if st.button("🔍 اختبار البوت", use_container_width=True):
-            try:
-                r = requests.get(f"https://api.telegram.org/bot{TG_TOKEN}/getMe", timeout=8)
-                d = r.json()
-                if d.get("ok"):
-                    b = d["result"]
-                    st.success(f"✅ @{b.get('username')} — {b.get('first_name')}")
-                else:
-                    st.error("❌ Token خاطئ")
-            except Exception as e:
-                st.error(f"❌ {e}")
+    # ── Telegram Webhook ──
+    with st.expander("🤖 Telegram Webhook", expanded=False):
+        wh_url = f"{ROUTER_URL}/webhook/telegram"
+        col_wh1, col_wh2 = st.columns(2)
+        with col_wh1:
+            if st.button("📡 تسجيل Webhook", use_container_width=True,
+                         help=wh_url):
+                try:
+                    resp = requests.post(
+                        f"https://api.telegram.org/bot{TG_TOKEN}/setWebhook",
+                        json={"url": wh_url,
+                              "allowed_updates": ["message","callback_query","my_chat_member"]},
+                        timeout=10)
+                    d = resp.json()
+                    if d.get("ok"): st.success("✅ Webhook مسجل!")
+                    else:           st.error(f"❌ {d.get('description')}")
+                except Exception as e: st.error(f"❌ {e}")
+        with col_wh2:
+            if st.button("🔍 اختبار البوت", use_container_width=True):
+                try:
+                    r = requests.get(f"https://api.telegram.org/bot{TG_TOKEN}/getMe", timeout=8)
+                    d = r.json()
+                    if d.get("ok"):
+                        b = d["result"]
+                        st.success(f"✅ @{b.get('username')} — {b.get('first_name')}")
+                    else: st.error("❌ Token خاطئ")
+                except Exception as e: st.error(f"❌ {e}")
 
     st.markdown("---")
-    st.markdown("### 🏪 قائمة المطاعم")
 
+    # ── قائمة المطاعم ──
+    # rs هي list من fetch_all()
     if not rs:
         st.info("لا يوجد مطاعم بعد — أضف مطعماً من 'إضافة مطعم'")
         return
 
-    # rs هي list of dicts من fetch_all()
-    rs_dict = {r.get("restaurant_id","?"): r for r in rs if isinstance(r, dict)}
-    for rid, r in rs_dict.items():
+    for r in rs:
+        rid   = str(r.get("restaurant_id","?")).strip()
         rname = r.get("name","مطعم")
-        with st.expander(f"🍽️ #{rid} — {rname}"):
-            c1, c2 = st.columns([1,1])
+
+        with st.expander(f"🍽️ #{rid} — {rname}", expanded=False):
+            c1, c2 = st.columns(2)
+
             with c1:
+                # ── معلومات ──
                 sid = r.get("sheet_id","")
                 if sid:
-                    st.markdown(f"**📊 Sheet:** [{sid}](https://docs.google.com/spreadsheets/d/{sid}/edit)")
-                st.markdown(f"**📟 Telegram (رئيسي):** `{r.get('telegram_chat_id','لم يُربط')}`")
-                st.markdown(f"**👑 Boss chat_id:** {'✅ '+r.get('boss_chat_id') if r.get('boss_chat_id') else '❌ لم يُربط'}")
-                st.markdown(f"**🍽️ النوادل chat_id:** {'✅ '+r.get('waiters_chat_id') if r.get('waiters_chat_id') else '❌ لم يُربط'}")
-                st.markdown(f"**🛵 التوصيل chat_id:** {'✅ '+r.get('delivery_chat_id') if r.get('delivery_chat_id') else '❌ لم يُربط'}")
+                    st.markdown(f"**📊 Sheet:** [{sid[:20]}...](https://docs.google.com/spreadsheets/d/{sid}/edit)")
+                st.markdown(f"**📟 Telegram (رئيسي):** `{r.get('telegram_chat_id','') or 'لم يُربط'}`")
+                st.markdown(f"**👑 Boss chat_id:** `{r.get('boss_chat_id','') or '❌ لم يُربط'}`")
+                st.markdown(f"**🍽️ النوادل chat_id:** `{r.get('waiters_chat_id','') or '❌ لم يُربط'}`")
+                st.markdown(f"**🛵 التوصيل chat_id:** `{r.get('delivery_chat_id','') or '❌ لم يُربط'}`")
                 st.markdown(f"**📶 WiFi:** {r.get('wifi_ssid','')} | {r.get('wifi_password','')}")
                 st.markdown(f"**🎨 طابع:** {r.get('style','')} | 🪑 {r.get('num_tables','')} طاولة")
-                st.markdown(f"**🔑 كلمة سر الكوزينة:** {r.get('kitchen_password','')}")
-                delivery_on = str(r.get("delivery_active","")).lower() == "true"
+                st.markdown(f"**🔑 كلمة سر الكوزينة:** `{r.get('kitchen_password','')}`")
+                delivery_on = str(r.get("delivery_active","")).lower() in ("true","1","yes")
                 st.markdown(f"**🛵 التوصيل:** {'✅ مفعّل' if delivery_on else '❌ مغلق'}")
 
             with c2:
+                # ── روابط ──
                 mu = f"{FRONTEND_URL}?rest_id={rid}"
+                st.markdown(f"**🌐 رابط المينيو:**")
                 st.code(mu)
-                # رابط Telegram للمدير
-                st.markdown(f"**🔗 رابط Telegram المطعم:**")
-                st.code(f"https://t.me/Ayoub_Resto_bot?start=reg_{rid}")
 
-                kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid}&name={requests.utils.quote(r.get('name',''))}"
-                st.markdown("**🔍 بشاشة الكوزينة:**")
+                bot_username = os.getenv("TELEGRAM_BOT_USERNAME","Ayoub_Resto_bot")
+                kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid}&name={requests.utils.quote(rname)}"
+                st.markdown("**🍳 بشاشة الكوزينة:**")
                 st.code(kitchen_link)
 
-                st.markdown(f"**📧** {r.get('owner_email','')}")
+                st.markdown("**🔗 رابط Telegram:**")
+                st.markdown(f"""
+👑 **المدير (أنت)** — يفتح هذا الرابط في محادثته مع البوت:
+`https://t.me/{bot_username}?start=boss_{rid}`
 
-                # روابط Telegram
-                bot_username = os.getenv("TELEGRAM_BOT_USERNAME","Ayoub_Resto_bot")
-                st.markdown("**📲 ربط Telegram:**")
-                boss_link = f"https://t.me/{bot_username}?start=boss_{rid}"
-                st.markdown(f"👑 **المدير** — يفتح هذا الرابط:")
-                st.code(boss_link)
-                st.markdown(f"""**🍽️ مجموعة النوادل** — خطوتين:
+🍽️ **مجموعة السيرفورات** — خطوتين:
 1. أضف البوت `@{bot_username}` للمجموعة
-2. أرسل في المجموعة: `/ربط waiters_{rid}`""")
-                st.markdown(f"""**🛵 مجموعة التوصيل** — خطوتين:
+2. أرسل في المجموعة: `/ربط waiters_{rid}`
+
+🛵 **مجموعة التوصيل** — خطوتين:
 1. أضف البوت `@{bot_username}` للمجموعة
-2. أرسل في المجموعة: `/ربط delivery_{rid}`""")
+2. أرسل في المجموعة: `/ربط delivery_{rid}`
+""")
                 st.code(f"/ربط waiters_{rid}", language=None)
                 st.code(f"/ربط delivery_{rid}", language=None)
 
-            # أزرار الإجراءات
+            # ── أزرار الإجراءات ──
             uid = f"{rid}_{rname}"
-            col_cache, col_del, col_toggle, col_ref = st.columns(4)
+            col_a, col_b, col_c = st.columns(3)
 
-            with col_cache:
-                if st.button("🔄 Cache", key=f"cache_{uid}", use_container_width=True):
-                    try:
-                        requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
-                                      headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
-                    except: pass
-                    st.cache_data.clear()
-                    st.success("✅ Cache مُحدَّث")
-                    st.rerun()
-
-            with col_del:
-                if st.button("🗑️ حذف", key=f"del_{uid}", use_container_width=True):
-                    st.session_state[f"confirm_del_{uid}"] = True
-
-            # تفعيل/إلغاء التوصيل
-            delivery_label = "🛵 إلغاء التوصيل" if delivery_on else "🛵 تفعيل التوصيل"
-            col1d, col2d = st.columns([2,1])
-            with col1d:
-                if st.button(delivery_label, key=f"del_tog_{uid}", use_container_width=True):
+            with col_a:
+                # تفعيل/إلغاء التوصيل
+                dlv_label = "🛵 إلغاء التوصيل" if delivery_on else "🛵 تفعيل التوصيل"
+                if st.button(dlv_label, key=f"del_tog_{uid}", use_container_width=True):
                     new_val = "false" if delivery_on else "true"
                     try:
-                        import gspread as _gs_mod
-                        from google.oauth2.service_account import Credentials as _Creds
-                        import json as _json
-                        _SA     = os.getenv("GOOGLE_SA_JSON_CONTENT","")
-                        _MASTER = os.getenv("MASTER_SHEET_ID","")
-                        _SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-                        if _SA and _MASTER:
-                            _creds  = _Creds.from_service_account_info(_json.loads(_SA), scopes=_SCOPES)
-                            _client = _gs_mod.authorize(_creds)
-                            _ws     = _client.open_by_key(_MASTER).worksheet("Master_DB")
-                            _headers = _ws.row_values(1)
-                            if "delivery_active" not in _headers:
-                                _ws.update_cell(1, len(_headers)+1, "delivery_active")
-                                _headers.append("delivery_active")
-                            _col = _headers.index("delivery_active") + 1
-                            _all = _ws.get_all_values()
-                            _rid_col = _headers.index("restaurant_id") if "restaurant_id" in _headers else 0
-                            for _i, _row in enumerate(_all[1:], start=2):
-                                if len(_row) > _rid_col and str(_row[_rid_col]).strip() == rid:
-                                    _ws.update_cell(_i, _col, new_val)
-                                    break
-                            try:
-                                requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
-                                              headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
-                                requests.post(f"{ROUTER_URL}/cache/refresh",
-                                              headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
-                            except: pass
-                            st.cache_data.clear()
-                            lbl = 'مفعّل 🛵' if new_val=='true' else 'ملغى ✅'
-                            st.success(f"التوصيل {lbl}")
-                            st.rerun()
-                    except Exception as _e:
-                        st.error(f"❌ {_e}")
-            with col2d:
+                        import gspread as _gsp
+                        from google.oauth2.service_account import Credentials as _Cr
+                        import json as _jj
+                        _SA  = os.getenv("GOOGLE_SA_JSON_CONTENT","")
+                        _MSI = os.getenv("MASTER_SHEET_ID","")
+                        if _SA and _MSI:
+                            _cr  = _Cr.from_service_account_info(_jj.loads(_SA),
+                                       scopes=["https://www.googleapis.com/auth/spreadsheets"])
+                            _cl  = _gsp.authorize(_cr)
+                            _ws  = _cl.open_by_key(_MSI).worksheet("Master_DB")
+                            _hd  = _ws.row_values(1)
+                            if "delivery_active" not in _hd:
+                                _ws.update_cell(1, len(_hd)+1, "delivery_active")
+                                _hd.append("delivery_active")
+                            _dc  = _hd.index("delivery_active") + 1
+                            _rc  = _hd.index("restaurant_id")   if "restaurant_id" in _hd else 0
+                            for _i, _row in enumerate(_ws.get_all_values()[1:], start=2):
+                                if len(_row) > _rc and str(_row[_rc]).strip() == rid:
+                                    _ws.update_cell(_i, _dc, new_val); break
+                        requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
+                                      headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
+                        requests.post(f"{ROUTER_URL}/cache/refresh",
+                                      headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
+                        st.cache_data.clear()
+                        st.success(f"التوصيل {'مفعّل ✅' if new_val=='true' else 'ملغى ✅'}")
+                        st.rerun()
+                    except Exception as _e: st.error(f"❌ {_e}")
+
+            with col_b:
                 if st.button("🔄 تطبيق فوري", key=f"ref_del_{uid}", use_container_width=True):
                     try:
                         requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
@@ -788,15 +782,18 @@ def pg_manage(rs):
                     st.success("✅ تم التطبيق الفوري!")
                     st.rerun()
 
-            # تأكيد الحذف
+            with col_c:
+                if st.button("🗑️ حذف", key=f"del_{uid}", use_container_width=True):
+                    st.session_state[f"confirm_del_{uid}"] = True
+
             if st.session_state.get(f"confirm_del_{uid}"):
-                st.warning(f"⚠️ حذف {rname}؟ هذا لا يمكن التراجع عنه!")
+                st.warning(f"⚠️ حذف {rname}؟ لا يمكن التراجع!")
                 cc1, cc2 = st.columns(2)
                 with cc1:
                     if st.button("✅ تأكيد الحذف", key=f"conf_{uid}"):
                         try:
                             requests.delete(f"{ROUTER_URL}/restaurants/{rid}",
-                                           headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=10)
+                                            headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=10)
                         except: pass
                         st.cache_data.clear()
                         st.session_state.pop(f"confirm_del_{uid}", None)
@@ -873,7 +870,7 @@ def main():
     page = st.session_state.get("page","main")
     rs   = fetch_all()
 
-    if page == "main":       pg_main()
+    if page == "main":       pg_dashboard(rs)
     elif page == "add":      pg_add()
     elif page == "manage":   pg_manage(rs)
     elif page == "images":   show("صور الأكلات", "images")
