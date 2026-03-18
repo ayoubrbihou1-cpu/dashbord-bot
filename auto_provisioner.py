@@ -258,7 +258,12 @@ def send_welcome_email(to_email: str, restaurant_name: str,
         msg["From"]    = GMAIL_USER
         msg["To"]      = to_email
 
-        tg_section = ""  # رابط Telegram أُزيل — البوس يستخدم boss_link
+        tg_section = f"""
+        <tr>
+          <td style="color:#C9A84C;font-weight:bold;padding:8px">📨 رابط Telegram:</td>
+          <td style="padding:8px"><a href="{reg_link}" style="color:#29b6f6">{reg_link}</a><br>
+          <small style="color:#888">اضغط مرة واحدة لربط الطلبات</small></td>
+        </tr>""" if reg_link else ""
 
         # ✅ قسم روابط المجموعات (boss / waiters / delivery)
         gl = group_links or {}
@@ -332,6 +337,7 @@ def send_welcome_email(to_email: str, restaurant_name: str,
                   <td style="color:#C9A84C;font-weight:bold">📶 WiFi:</td>
                   <td>{wifi_ssid}</td>
                 </tr>
+                {tg_section}
                 {kitchen_section}
                 {groups_section}
               </table>
@@ -379,11 +385,7 @@ def build_reg_link(restaurant_id):
     return ""
 
 def build_group_links(restaurant_id):
-    """
-    يبني روابط Deep Linking لـ boss / waiters / delivery
-    ✅ إصلاح: boss يستخدم ?start= (خاص) — waiters/delivery يستخدمان ?startgroup= (مجموعة)
-    كلاهما يُسجّل chat_id في Google Sheet عبر webhook /webhook/telegram
-    """
+    """يبني روابط Deep Linking لـ boss / waiters / delivery"""
     if not TG_TOKEN: return {}
     try:
         r = requests.get(f"https://api.telegram.org/bot{TG_TOKEN}/getMe", timeout=5)
@@ -506,21 +508,17 @@ def provision_restaurant(
         steps.append("⚠️ تحقق من TELEGRAM_BOT_TOKEN")
 
     # رابط الكوزينة
-    kitchen_url = f"{KITCHEN_URL}?api={ROUTER_BASE_URL}&rid={restaurant_id}&name={requests.utils.quote(name)}" if KITCHEN_URL else ""
+    kitchen_url = f"{KITCHEN_URL}?api={ROUTER_BASE_URL}&rid={restaurant_id}" if KITCHEN_URL else ""
 
-    # ✅ إصلاح: بناء روابط المجموعات قبل send_welcome (كانت بعده — خطأ كبير!)
-    gl = build_group_links(restaurant_id)
-    if gl:
-        steps.append("✅ روابط المجموعات جاهزة (Boss / نوادل / توصيل)")
-    else:
-        steps.append("⚠️ روابط المجموعات: تحقق من TELEGRAM_BOT_TOKEN")
-
-    # إرسال رسالة Telegram — الآن gl معرّف
+    # إرسال رسالة Telegram
     if telegram_chat_id:
         ok = send_welcome(telegram_chat_id, name, url, menu_url, wifi_ssid,
                           kitchen_url=kitchen_url, kitchen_password=kitchen_password,
                           group_links=gl)
         steps.append("✅ رسالة Telegram أُرسلت" if ok else "⚠️ Telegram فشل")
+
+    # ✅ بناء روابط المجموعات
+    gl = build_group_links(restaurant_id)
 
     # ✅ إرسال إيميل Gmail
     if owner_email:
