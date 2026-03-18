@@ -1196,7 +1196,7 @@ code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
         st.markdown(f'<div style="text-align:center;color:#444;font-size:.75rem">'
                     f'{len(rs)} مطعم مسجّل</div>', unsafe_allow_html=True)
         st.markdown("---")
-        # ✅ أزرار تنقل جميلة
+        # ✅ أزرار تنقل نظيفة — زر واحد فقط
         nav_items = [
             ("🏠 Dashboard",      "🏠 Dashboard"),
             ("🚀 إضافة مطعم",    "🚀 إضافة مطعم"),
@@ -1207,25 +1207,37 @@ code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
         ]
         if "page" not in st.session_state:
             st.session_state["page"] = "🏠 Dashboard"
+        active = st.session_state.get("page","🏠 Dashboard")
+
+        # CSS: كل أزرار الـ sidebar ذهبية، النشط أغمق
+        active_idx = [k for _,k in nav_items].index(active) if active in [k for _,k in nav_items] else 0
+        css_btns = ""
+        for i,(lbl,key) in enumerate(nav_items):
+            if key == active:
+                css_btns += f"""
+        div[data-testid="stSidebar"] .stButton:nth-of-type({i+1})>button {{
+            background:linear-gradient(135deg,#C9A84C,#e8c96a)!important;
+            color:#000!important; font-weight:800!important;
+            border:none!important;
+        }}"""
+        st.markdown(f"""<style>
+        div[data-testid="stSidebar"] .stButton>button {{
+            width:100%; border-radius:10px; padding:.5rem .8rem;
+            background:rgba(201,168,76,.1); color:#C9A84C;
+            border:1px solid rgba(201,168,76,.25); font-size:.88rem;
+            margin:.1rem 0; transition:all .2s;
+        }}
+        div[data-testid="stSidebar"] .stButton>button:hover {{
+            background:rgba(201,168,76,.2)!important; color:#e8c96a!important;
+        }}
+        {css_btns}
+        </style>""", unsafe_allow_html=True)
+
         for label, key in nav_items:
-            is_active = st.session_state.get("page","🏠 Dashboard") == key
-            btn_style = (
-                "background:linear-gradient(135deg,#C9A84C,#e8c96a)!important;"
-                "color:#000!important;border:none!important;font-weight:800!important;"
-            ) if is_active else (
-                "background:rgba(201,168,76,.08)!important;"
-                "color:#C9A84C!important;border:1px solid rgba(201,168,76,.2)!important;"
-            )
-            st.markdown(
-                f'<button onclick="" style="width:100%;padding:.55rem .8rem;'
-                f'border-radius:10px;cursor:pointer;font-family:inherit;'
-                f'font-size:.88rem;margin:.15rem 0;text-align:right;{btn_style}">'
-                f'{label}</button>',
-                unsafe_allow_html=True)
-            if st.button(label, key=f"nav_{key}", use_container_width=True,
-                         help=label):
+            if st.button(label, key=f"nav_{key}", use_container_width=True):
                 st.session_state["page"] = key
                 st.rerun()
+
         page = st.session_state.get("page", "🏠 Dashboard")
         st.markdown("---")
         mode_label = "☀️ وضع النهار" if st.session_state.dark_mode else "🌙 وضع الليل"
