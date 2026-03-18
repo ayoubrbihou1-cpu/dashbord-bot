@@ -1196,14 +1196,37 @@ code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
         st.markdown(f'<div style="text-align:center;color:#444;font-size:.75rem">'
                     f'{len(rs)} مطعم مسجّل</div>', unsafe_allow_html=True)
         st.markdown("---")
-        page = st.radio("التنقل", [
-            "🏠 Dashboard",
-            "🚀 إضافة مطعم",
-            "🍽️ إدارة القائمة",
-            "🖼️ صور الأكلات",
-            "🖨️ بطاقات PDF",
-            "⚙️ إدارة",
-        ], label_visibility="hidden")
+        # ✅ أزرار تنقل جميلة
+        nav_items = [
+            ("🏠 Dashboard",      "🏠 Dashboard"),
+            ("🚀 إضافة مطعم",    "🚀 إضافة مطعم"),
+            ("🍽️ إدارة القائمة", "🍽️ إدارة القائمة"),
+            ("🖼️ صور الأكلات",   "🖼️ صور الأكلات"),
+            ("🖨️ بطاقات PDF",    "🖨️ بطاقات PDF"),
+            ("⚙️ إدارة",          "⚙️ إدارة"),
+        ]
+        if "page" not in st.session_state:
+            st.session_state["page"] = "🏠 Dashboard"
+        for label, key in nav_items:
+            is_active = st.session_state.get("page","🏠 Dashboard") == key
+            btn_style = (
+                "background:linear-gradient(135deg,#C9A84C,#e8c96a)!important;"
+                "color:#000!important;border:none!important;font-weight:800!important;"
+            ) if is_active else (
+                "background:rgba(201,168,76,.08)!important;"
+                "color:#C9A84C!important;border:1px solid rgba(201,168,76,.2)!important;"
+            )
+            st.markdown(
+                f'<button onclick="" style="width:100%;padding:.55rem .8rem;'
+                f'border-radius:10px;cursor:pointer;font-family:inherit;'
+                f'font-size:.88rem;margin:.15rem 0;text-align:right;{btn_style}">'
+                f'{label}</button>',
+                unsafe_allow_html=True)
+            if st.button(label, key=f"nav_{key}", use_container_width=True,
+                         help=label):
+                st.session_state["page"] = key
+                st.rerun()
+        page = st.session_state.get("page", "🏠 Dashboard")
         st.markdown("---")
         mode_label = "☀️ وضع النهار" if st.session_state.dark_mode else "🌙 وضع الليل"
         if st.button(mode_label, use_container_width=True, key="btn_theme"):
