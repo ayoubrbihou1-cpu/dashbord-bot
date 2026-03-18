@@ -670,7 +670,9 @@ def pg_manage(rs):
         st.info("لا يوجد مطاعم بعد — أضف مطعماً من 'إضافة مطعم'")
         return
 
-    for rid, r in rs.items():
+    # rs هي list of dicts من fetch_all()
+    rs_dict = {r.get("restaurant_id","?"): r for r in rs if isinstance(r, dict)}
+    for rid, r in rs_dict.items():
         rname = r.get("name","مطعم")
         with st.expander(f"🍽️ #{rid} — {rname}"):
             c1, c2 = st.columns([1,1])
@@ -808,15 +810,16 @@ def pg_manage(rs):
 def pg_main():
     """الصفحة الرئيسية — إحصائيات سريعة"""
     st.markdown("## 📊 Dashboard")
-    rs = fetch_all()
-    if not rs:
+    records = fetch_all()  # list of dicts
+    if not records:
         st.info("لا يوجد مطاعم — أضف مطعماً أولاً")
         return
-    total = len(rs)
-    active = sum(1 for r in rs.values() if r.get("status","") == "active")
+    total  = len(records)
+    active = sum(1 for r in records if r.get("status","") == "active")
     st.metric("إجمالي المطاعم", total)
     st.metric("المطاعم النشطة", active)
-    for rid, r in rs.items():
+    for r in records:
+        rid = r.get("restaurant_id","?")
         st.markdown(f"**#{rid}** — {r.get('name','')} | {r.get('status','')}")
 
 
