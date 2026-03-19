@@ -251,14 +251,41 @@ def _gs():
         c = Credentials.from_service_account_file(SA_JSON_PATH, scopes=SCOPES)
     return gspread.authorize(c)
 
-def _get_ws(sheet_id: str, tab: str):
-    return _gs().open_by_key(sheet_id).worksheet(tab)
+def _gs_for_restaurant(rid: str = ""):
+    """يستخدم SA الخاص بالمطعم من Master_DB — Fallback للـ SA الرئيسي"""
+    if not rid:
+        return _gs()
+    try:
+        sa_cache_key = f"_sa_mm_{rid}"
+        if sa_cache_key in st.session_state:
+            return st.session_state[sa_cache_key]
+        master_client = _gs()
+        ws = master_client.open_by_key(MASTER_SHEET_ID).worksheet("Master_DB")
+        headers = ws.row_values(1)
+        if "sa_json" not in headers or "restaurant_id" not in headers:
+            return _gs()
+        rid_col = headers.index("restaurant_id") + 1
+        sa_col  = headers.index("sa_json") + 1
+        for row in ws.get_all_values()[1:]:
+            if len(row) >= rid_col and str(row[rid_col-1]).strip() == str(rid).strip():
+                sa_str = row[sa_col-1].strip() if len(row) >= sa_col else ""
+                if sa_str and sa_str.startswith("{"):
+                    c = Credentials.from_service_account_info(json.loads(sa_str), scopes=SCOPES)
+                    client = gspread.authorize(c)
+                    st.session_state[sa_cache_key] = client
+                    return client
+    except Exception as e:
+        pass
+    return _gs()
+
+def _get_ws(sheet_id: str, tab: str, rid: str = ""):
+    return _gs_for_restaurant(rid).open_by_key(sheet_id).worksheet(tab)
 
 @st.cache_data(ttl=120)  # cache القائمة 2 دقيقة — يقلل طلبات Sheets API بـ 90%
-def load_items(sheet_id: str, tab: str) -> list:
+def load_items(sheet_id: str, tab: str, rid: str = "") -> list:
     """تحميل أكلات tab معين"""
     try:
-        ws = _get_ws(sheet_id, tab)
+        ws = _get_ws(sheet_id, tab, rid)
         all_vals = ws.get_all_values()
         if len(all_vals) < 2:
             return []
@@ -289,7 +316,7 @@ def add_items_batch(sheet_id: str, tab: str, items: list) -> int:
     if not items:
         return 0
     try:
-        ws = _get_ws(sheet_id, tab)
+        ws = _get_ws(sheet_id, tab, rid)
         headers = ws.row_values(1)
         if not headers:
             ws.append_row(HEADERS)
@@ -307,9 +334,9 @@ def add_items_batch(sheet_id: str, tab: str, items: list) -> int:
         st.error(f"❌ إضافة الأكلات: {e}")
         return 0
 
-def update_item(sheet_id: str, tab: str, row_num: int, data: dict) -> bool:
+def update_item(sheet_id: str, tab: str, row_num: int, data: dict, rid: str = "") -> bool:
     try:
-        ws = _get_ws(sheet_id, tab)
+        ws = _get_ws(sheet_id, tab, rid)
         headers = ws.row_values(1)
         for col_idx, h in enumerate(headers, start=1):
             if h in data:
@@ -319,18 +346,18 @@ def update_item(sheet_id: str, tab: str, row_num: int, data: dict) -> bool:
         st.error(f"❌ تحديث الأكلة: {e}")
         return False
 
-def delete_item(sheet_id: str, tab: str, row_num: int) -> bool:
+def delete_item(sheet_id: str, tab: str, row_num: int, rid: str = "") -> bool:
     try:
-        ws = _get_ws(sheet_id, tab)
+        ws = _get_ws(sheet_id, tab, rid)
         ws.delete_rows(row_num)
         return True
     except Exception as e:
         st.error(f"❌ حذف الأكلة: {e}")
         return False
 
-def toggle_available(sheet_id: str, tab: str, row_num: int, current: str) -> bool:
+def toggle_available(sheet_id: str, tab: str, row_num: int, current: str, rid: str = "") -> bool:
     new_val = "FALSE" if current.upper() == "TRUE" else "TRUE"
-    return update_item(sheet_id, tab, row_num, {"available": new_val})
+    return update_item(sheet_id, tab, row_num, {"available": new_val}, rid=rid)
 
 
 # ══════════════════════════════════════════════════════════
@@ -398,7 +425,7 @@ def page_menu_manager(restaurants: list):
             _refresh_api_cache(rid)
             st.toast("✅ تم تحديث القائمة — الصور ستظهر فوراً في المينيو", icon="🔄")
 
-        items = load_items(sheet_id, tab_sel)
+        items = load_items(sheet_id, tab_sel, rid)
 
         if not items:
             st.info(f"📭 لا توجد أكلات في '{tab_sel}' بعد — أضف من التبويب التالي")
@@ -456,7 +483,7 @@ def page_menu_manager(restaurants: list):
                                 "price":       str(new_price),
                                 "description": new_desc,
                                 "image_url":   new_img,
-                            })
+                            }, rid=rid)
                             if ok:
                                 # ✅ مسح cache الـ API حتى تظهر الصورة فوراً في المينيو
                                 if new_img.strip():
@@ -465,7 +492,7 @@ def page_menu_manager(restaurants: list):
 
                         # حذف
                         if st.button("🗑️ حذف", key=f"del_{row_num}"):
-                            if delete_item(sheet_id, tab_sel, row_num):
+                            if delete_item(sheet_id, tab_sel, row_num, rid=rid):
                                 st.success("🗑️ تم الحذف"); st.rerun()
 
     # ══ إضافة أكلة ════════════════════════════════════════
