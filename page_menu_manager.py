@@ -20,6 +20,7 @@ load_dotenv()
 SCOPES          = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
 SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
+MASTER_SHEET_ID = os.getenv("MASTER_SHEET_ID","")
 ROUTER_BASE_URL = os.getenv("ROUTER_BASE_URL","https://restaurant-qr-saas.onrender.com")
 ADMIN_PASSWORD  = os.getenv("ADMIN_PASSWORD","admin_fes_2026")
 
