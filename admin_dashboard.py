@@ -390,7 +390,8 @@ def pg_dashboard(rs):
             sm = {"luxury":"✨","modern":"⚡","classic":"🏛️"}
             st_cls = "badge-g" if r.get("status","active")=="active" else "badge"
             st_lbl = "🟢 نشط" if r.get("status","active")=="active" else "⏳ انتظار Telegram"
-            mu = f"{FRONTEND_URL}?rest_id={r.get('restaurant_id')}"
+            _slug_r = r.get('slug','').strip()
+            mu = f"{FRONTEND_URL}/{_slug_r}" if _slug_r else f"{FRONTEND_URL}?rest_id={r.get('restaurant_id')}"
             su = f"https://docs.google.com/spreadsheets/d/{r.get('sheet_id','')}/edit"
             st.markdown(f"""<div class="r-card">
               <div class="r-name">#{r.get('restaurant_id')} — {r.get('name','')}</div>
@@ -551,32 +552,6 @@ def pg_add(rs):
         with c1:
             rssid  = st.text_input("📶 اسم الشبكة (SSID) *", placeholder="Resto_WiFi")
             rwpass = st.text_input("🔒 كلمة مرور WiFi", type="password")
-        
-    # ══ خانة Service Account ══
-    st.markdown("---")
-    st.markdown("**🔑 Service Account الخاص بهذا المطعم (موصى به):**")
-    st.caption("أنشئ SA جديد من Google Cloud لكل مطعم — يضمن 60 req/min مستقلة — اتركه فارغاً لاستخدام SA المشترك")
-    
-    col_sa_new1, col_sa_new2 = st.columns([4, 1])
-    with col_sa_new1:
-        rsa_json = st.text_area(
-            "sa_json_new",
-            value="",
-            placeholder='{"type":"service_account","project_id":"...","private_key":"...",...}',
-            height=80,
-            key="new_sa_json",
-            label_visibility="collapsed"
-        )
-    with col_sa_new2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if rsa_json.strip():
-            try:
-                json.loads(rsa_json.strip())
-                st.success("✅ JSON صالح")
-            except:
-                st.error("❌ JSON خاطئ")
-        else:
-            st.info("⚠️ SA مشترك")
         with c2:
             st.markdown('<div style="color:#C9A84C;font-size:.85rem;font-weight:700;margin-bottom:.4rem">🍳 كلمة مرور الكوزينة</div>', unsafe_allow_html=True)
             rkitchen_pass = st.text_input("🔑 كلمة مرور الكوزينة *",
@@ -628,8 +603,7 @@ def pg_add(rs):
             num_tables=rtables, logo_url=rlogo.strip(), owner_email=remail.strip(),
             bg_type=rbg_type, socials=rsocials,
             kitchen_password=rkitchen_pass.strip(),
-            delivery_active=rdelivery,
-            sa_json=rsa_json.strip() if rsa_json.strip() else "")
+            delivery_active=rdelivery)
 
         done = len([s for s in result.steps if "✅" in s])
         show(min(done, len(steps_lbl)-1), result.steps)
@@ -638,7 +612,9 @@ def pg_add(rs):
         if result.success:
             st.markdown(f'<div class="res ok"><b>🎉 تم إنشاء "{rname}" بنجاح!</b><br><br>'
                         f'{"<br>".join(result.steps)}</div>', unsafe_allow_html=True)
-            mu = f"{FRONTEND_URL}?rest_id={rid}"
+            # ✅ الرابط النظيف من الـ slug
+            _slug_new = _clean_slug if _clean_slug else ""
+            mu = f"{FRONTEND_URL}/{_slug_new}" if _slug_new else f"{FRONTEND_URL}?rest_id={rid}"
             su = f"https://docs.google.com/spreadsheets/d/{result.sheet_id}/edit"
             c1,c2,c3 = st.columns(3)
             c1.markdown(f'<div class="iblk"><div class="il">📱 رابط المينيو</div>'
@@ -661,8 +637,14 @@ def pg_add(rs):
                 </div>""", unsafe_allow_html=True)
                 st.code(result.reg_link, language=None)
 
-            # ✅ رابط الكوزينة دائماً بـ ?rid= — لا slug في الـ path
-            kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid.strip()}&name={requests.utils.quote(rname.strip())}"
+            _slug_k = r.get("slug","").strip()
+            # ✅ رابط نظيف للكوزينة مثل المينيو: /farah بدل ?rid=1
+            kitchen_link = (
+                f"{KITCHEN_URL}/{_slug_k}?api={ROUTER_URL}"
+                if _slug_k else
+                f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid.strip()}&name={requests.utils.quote(rname.strip())}"
+            )
+            kitchen_link_old = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid.strip()}&name={requests.utils.quote(rname.strip())}"
             st.markdown(f"""<div style="background:rgba(255,152,0,.07);border:1px solid rgba(255,152,0,.2);
               border-radius:12px;padding:1rem 1.2rem;margin:.5rem 0">
               <b style="color:#ff9800">🍳 رابط شاشة الكوزينة — ضعه على التابليت:</b><br>
@@ -788,8 +770,10 @@ def _show_cards_and_pdf():
                 from pdf_generator import generate_table_tents_pdf
                 # ✅ استخدام نفس الـ photo_query المحفوظ من عند توليد البطاقة
                 saved_query = st.session_state.get("last_photo_query", rname)
+                # ✅ استخدم الرابط النظيف إذا وُجد slug
+                _pdf_base_url = f"{FRONTEND_URL}/{_clean_slug}" if _clean_slug else FRONTEND_URL
                 pdf = generate_table_tents_pdf(
-                    rname, rssid, rwpass, FRONTEND_URL,
+                    rname, rssid, rwpass, _pdf_base_url,
                     rid, rtables, rstyle, rp, ra,
                     bg_type=rbg, socials=rsoc,
                     pexels_key=PEXELS_KEY,
@@ -901,9 +885,12 @@ def pg_pdf(rs):
                 final_query = st.session_state.get("prev_pdf_query", _pdf_query)
                 final_bg    = st.session_state.get("prev_pdf_bg", pdf_bg)
                 final_style = st.session_state.get("prev_pdf_style", pdf_style)
+                # ✅ استخدم الرابط النظيف إذا وُجد slug
+                _r_slug = r.get("slug","").strip()
+                _r_base = f"{FRONTEND_URL}/{_r_slug}" if _r_slug else FRONTEND_URL
                 pdf = generate_table_tents_pdf(
                     r.get("name","مطعم"), r.get("wifi_ssid","WiFi"),
-                    r.get("wifi_password",""), FRONTEND_URL,
+                    r.get("wifi_password",""), _r_base,
                     r.get("restaurant_id","1"), n,
                     final_style,
                     r.get("primary_color","#0a0804"),
@@ -1012,7 +999,8 @@ def pg_manage(rs):
                 **🛵 التوصيل:** {'✅ مفعّل' if str(r.get('delivery_active','')).lower()=='true' else '❌ غير مفعّل'}
                 """)
             with c2:
-                mu = f"{FRONTEND_URL}?rest_id={rid}"
+                _slug_d = r.get("slug","").strip()
+                mu = f"{FRONTEND_URL}/{_slug_d}" if _slug_d else f"{FRONTEND_URL}?rest_id={rid}"
                 st.code(mu)
                 reg = build_reg_link(rid)
                 if reg:
@@ -1235,65 +1223,6 @@ def pg_manage(rs):
                 if st.button("🔴 تعطيل" if status=="active" else "🟢 تفعيل",
                              key=f"tog_{uid}"):
                     st.info("ميزة قريباً")
-
-            # ══ خانة Service Account الخاص بالمطعم ══
-            st.markdown("---")
-            st.markdown("**🔑 Service Account الخاص بهذا المطعم:**")
-            st.caption("أنشئ SA جديد من Google Cloud وألصق JSON هنا — يُطبَّق فوراً بدون restart")
-            current_sa = r.get("sa_json","").strip()
-            sa_status = "✅ SA خاص مُعيَّن" if current_sa else "⚠️ يستخدم SA الافتراضي المشترك"
-            st.info(sa_status)
-            col_sa1, col_sa2 = st.columns([3,1])
-            with col_sa1:
-                new_sa = st.text_area(
-                    "sa_json",
-                    value="",
-                    placeholder='{"type":"service_account","project_id":"...","private_key":"...",...}',
-                    height=80,
-                    key=f"sa_{uid}",
-                    label_visibility="collapsed"
-                )
-            with col_sa2:
-                if st.button("💾 حفظ SA", key=f"save_sa_{uid}", use_container_width=True):
-                    sa_input = new_sa.strip()
-                    if sa_input:
-                        try:
-                            # تحقق أن الـ JSON صالح
-                            json.loads(sa_input)
-                            import gspread as _gsp_sa
-                            from google.oauth2.service_account import Credentials as _Cr_sa
-                            _SA_s  = os.getenv("GOOGLE_SA_JSON_CONTENT","")
-                            _MSI_s = os.getenv("MASTER_SHEET_ID","")
-                            if _SA_s and _MSI_s:
-                                _creds_s = _Cr_sa.from_service_account_info(
-                                    json.loads(_SA_s),
-                                    scopes=["https://www.googleapis.com/auth/spreadsheets",
-                                            "https://www.googleapis.com/auth/drive"])
-                                _gc_s  = _gsp_sa.authorize(_creds_s)
-                                _ws_s  = _gc_s.open_by_key(_MSI_s).worksheet("Master_DB")
-                                _hd_s  = _ws_s.row_values(1)
-                                if "sa_json" not in _hd_s:
-                                    _ws_s.update_cell(1, len(_hd_s)+1, "sa_json")
-                                    _hd_s.append("sa_json")
-                                _sc_s = _hd_s.index("sa_json") + 1
-                                _rc_s = _hd_s.index("restaurant_id") + 1 if "restaurant_id" in _hd_s else 1
-                                for _i_s, _row_s in enumerate(_ws_s.get_all_values()[1:], start=2):
-                                    if len(_row_s) >= _rc_s and str(_row_s[_rc_s-1]).strip() == rid:
-                                        _ws_s.update_cell(_i_s, _sc_s, sa_input)
-                                        break
-                                # مسح SA cache في الـ API
-                                try:
-                                    requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
-                                                  headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
-                                except: pass
-                                st.success("✅ تم حفظ SA وسيُطبَّق فوراً على المطعم!")
-                                st.rerun()
-                        except json.JSONDecodeError:
-                            st.error("❌ JSON غير صالح — تحقق من النص")
-                        except Exception as _e_sa:
-                            st.error(f"❌ {_e_sa}")
-                    else:
-                        st.info("الصق الـ JSON أولاً")
 
 # ══════════════════════════════════════════════════════════
 # MAIN
