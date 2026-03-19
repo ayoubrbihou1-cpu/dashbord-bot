@@ -457,11 +457,13 @@ def provision_restaurant(
     style="luxury", primary_color="#0a0804", accent_color="#C9A84C",
     num_tables=10, logo_url="", owner_email="", telegram_chat_id="",
     bg_type="minimal", socials=None, kitchen_password="",
-    delivery_active=False, sa_json=""
+    delivery_active=False, sa_json="", slug=""
 ):
     res = ProvisionResult()
     steps = []
-    menu_url = f"{FRONTEND_URL}?rest_id={restaurant_id}"
+    # ✅ استخدم الرابط النظيف إذا وُجد slug
+    _slug_clean = slug.strip().lower().replace(" ","-") if slug else ""
+    menu_url = f"{FRONTEND_URL}/{_slug_clean}" if _slug_clean else f"{FRONTEND_URL}?rest_id={restaurant_id}"
 
     if not sheet_id.strip():
         # حدد email الـ SA الصحيح للعرض
@@ -518,6 +520,7 @@ def provision_restaurant(
         "waiters_chat_id":  "",
         "delivery_chat_id": "",
         "sa_json":          sa_json.strip() if sa_json else "",
+        "slug":             _slug_clean,
     })
     if not saved:
         res.error = "فشل حفظ في Master_DB"
