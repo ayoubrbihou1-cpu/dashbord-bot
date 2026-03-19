@@ -1209,6 +1209,65 @@ def pg_manage(rs):
                              key=f"tog_{uid}"):
                     st.info("ميزة قريباً")
 
+            # ══ خانة Service Account الخاص بالمطعم ══
+            st.markdown("---")
+            st.markdown("**🔑 Service Account الخاص بهذا المطعم:**")
+            st.caption("أنشئ SA جديد من Google Cloud وألصق JSON هنا — يُطبَّق فوراً بدون restart")
+            current_sa = r.get("sa_json","").strip()
+            sa_status = "✅ SA خاص مُعيَّن" if current_sa else "⚠️ يستخدم SA الافتراضي المشترك"
+            st.info(sa_status)
+            col_sa1, col_sa2 = st.columns([3,1])
+            with col_sa1:
+                new_sa = st.text_area(
+                    "sa_json",
+                    value="",
+                    placeholder='{"type":"service_account","project_id":"...","private_key":"...",...}',
+                    height=80,
+                    key=f"sa_{uid}",
+                    label_visibility="collapsed"
+                )
+            with col_sa2:
+                if st.button("💾 حفظ SA", key=f"save_sa_{uid}", use_container_width=True):
+                    sa_input = new_sa.strip()
+                    if sa_input:
+                        try:
+                            # تحقق أن الـ JSON صالح
+                            json.loads(sa_input)
+                            import gspread as _gsp_sa
+                            from google.oauth2.service_account import Credentials as _Cr_sa
+                            _SA_s  = os.getenv("GOOGLE_SA_JSON_CONTENT","")
+                            _MSI_s = os.getenv("MASTER_SHEET_ID","")
+                            if _SA_s and _MSI_s:
+                                _creds_s = _Cr_sa.from_service_account_info(
+                                    json.loads(_SA_s),
+                                    scopes=["https://www.googleapis.com/auth/spreadsheets",
+                                            "https://www.googleapis.com/auth/drive"])
+                                _gc_s  = _gsp_sa.authorize(_creds_s)
+                                _ws_s  = _gc_s.open_by_key(_MSI_s).worksheet("Master_DB")
+                                _hd_s  = _ws_s.row_values(1)
+                                if "sa_json" not in _hd_s:
+                                    _ws_s.update_cell(1, len(_hd_s)+1, "sa_json")
+                                    _hd_s.append("sa_json")
+                                _sc_s = _hd_s.index("sa_json") + 1
+                                _rc_s = _hd_s.index("restaurant_id") + 1 if "restaurant_id" in _hd_s else 1
+                                for _i_s, _row_s in enumerate(_ws_s.get_all_values()[1:], start=2):
+                                    if len(_row_s) >= _rc_s and str(_row_s[_rc_s-1]).strip() == rid:
+                                        _ws_s.update_cell(_i_s, _sc_s, sa_input)
+                                        break
+                                # مسح SA cache في الـ API
+                                try:
+                                    requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
+                                                  headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
+                                except: pass
+                                st.success("✅ تم حفظ SA وسيُطبَّق فوراً على المطعم!")
+                                st.rerun()
+                        except json.JSONDecodeError:
+                            st.error("❌ JSON غير صالح — تحقق من النص")
+                        except Exception as _e_sa:
+                            st.error(f"❌ {_e_sa}")
+                    else:
+                        st.info("الصق الـ JSON أولاً")
+
 # ══════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════
