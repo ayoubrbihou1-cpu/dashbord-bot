@@ -40,6 +40,13 @@ def generate_table_tents_pdf(
     c = canvas.Canvas(pdf_buf, pagesize=(PAGE_W, PAGE_H))
 
     for table_num in range(1, num_tables + 1):
+        # ✅ استخدم الرابط النظيف إذا menu_base_url لا يحتوي ? (يعني slug URL)
+        if "?" not in menu_base_url and menu_base_url.rstrip("/") != "":
+            menu_url = f"{menu_base_url}?table={table_num}"
+        else:
+            if "?" not in menu_base_url and menu_base_url.rstrip("/") != "":
+        menu_url = f"{menu_base_url}?table={table_num}"
+    else:
         menu_url = f"{menu_base_url}?rest_id={restaurant_id}&table={table_num}"
 
         # توليد الوجهين (menu_img أولاً، wifi_img ثانياً)
@@ -112,7 +119,10 @@ def generate_single_table_preview(
     pexels_key="", unsplash_key="", pixabay_key="", photo_query=""
 ) -> tuple:
     """معاينة طاولة واحدة — للـ Dashboard"""
-    menu_url = f"{menu_base_url}?rest_id={restaurant_id}&table={table_num}"
+    if "?" not in menu_base_url and menu_base_url.rstrip("/") != "":
+        menu_url = f"{menu_base_url}?table={table_num}"
+    else:
+        menu_url = f"{menu_base_url}?rest_id={restaurant_id}&table={table_num}"
     return generate_table_card(
         restaurant_name=restaurant_name,
         ssid=ssid,
