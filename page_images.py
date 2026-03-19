@@ -110,6 +110,47 @@ def _gs():
         c = Credentials.from_service_account_file(SA_JSON_PATH, scopes=SCOPES)
     return gspread.authorize(c)
 
+def _gs_for_restaurant(rid: str = ""):
+    """
+    يستخدم SA الخاص بالمطعم إذا وُجد في Master_DB
+    Fallback → SA الرئيسي
+    """
+    if not rid:
+        return _gs()
+    try:
+        # ابحث في session_state أولاً (cache محلي)
+        import streamlit as _st
+        sa_cache_key = f"_sa_client_{rid}"
+        if sa_cache_key in _st.session_state:
+            return _st.session_state[sa_cache_key]
+
+        # اقرأ من Master_DB
+        master_client = _gs()
+        master_sheet  = master_client.open_by_key(MASTER_SHEET_ID)
+        try:
+            ws = master_sheet.worksheet("Master_DB")
+        except:
+            ws = master_sheet.sheet1
+        headers = ws.row_values(1)
+        if "sa_json" not in headers or "restaurant_id" not in headers:
+            return _gs()
+        rid_col    = headers.index("restaurant_id") + 1
+        sa_col     = headers.index("sa_json") + 1
+        for row in ws.get_all_values()[1:]:
+            if len(row) >= rid_col and str(row[rid_col-1]).strip() == str(rid).strip():
+                sa_json_str = row[sa_col-1].strip() if len(row) >= sa_col else ""
+                if sa_json_str and sa_json_str.startswith("{"):
+                    c = Credentials.from_service_account_info(
+                        json.loads(sa_json_str), scopes=SCOPES
+                    )
+                    client = gspread.authorize(c)
+                    # خزّن في session_state (يبقى طول جلسة الـ browser)
+                    _st.session_state[sa_cache_key] = client
+                    return client
+    except Exception as e:
+        pass  # fallback
+    return _gs()
+
 ADMIN_PASSWORD  = os.getenv("ADMIN_PASSWORD","admin_fes_2026")
 
 def _refresh_menu_cache(restaurant_id: str):
@@ -125,21 +166,19 @@ def _refresh_menu_cache(restaurant_id: str):
     except Exception as e:
         st.toast(f"⚠️ تعذّر الاتصال بالـ API لتحديث الـ cache: {e}", icon="⚠️")
 
-def load_sheet_items(sheet_id: str, tab: str) -> list[dict]:
+def load_sheet_items(sheet_id: str, tab: str, rid: str = "") -> list[dict]:
     """يجلب الأكلات من الشيت مع cache لتفادي quota exceeded"""
     cache_key = f"_sheet_cache_{sheet_id}_{tab}"
 
-    # إذا البيانات محفوظة في session وعمرها أقل من 60 ثانية — استخدمها مباشرة
     import time
     ts_key = f"_sheet_cache_ts_{sheet_id}_{tab}"
     cached_ts = st.session_state.get(ts_key, 0)
     if st.session_state.get(cache_key) and (time.time() - cached_ts) < 60:
         return st.session_state[cache_key]
 
-    # جلب من الشيت مع retry تلقائي عند 429
     for attempt in range(3):
         try:
-            ws = _gs().open_by_key(sheet_id).worksheet(tab)
+            ws = _gs_for_restaurant(rid).open_by_key(sheet_id).worksheet(tab)
             data = ws.get_all_records()
             st.session_state[cache_key] = data
             st.session_state[ts_key]    = time.time()
@@ -158,10 +197,10 @@ def load_sheet_items(sheet_id: str, tab: str) -> list[dict]:
             return []
     return []
 
-def update_images_in_sheet(sheet_id: str, tab: str, items: list[dict]) -> int:
+def update_images_in_sheet(sheet_id: str, tab: str, items: list[dict], rid: str = "") -> int:
     """يحدث عمود image_url في الشيت — يرجع عدد الصفوف المحدثة"""
     try:
-        client = _gs()
+        client = _gs_for_restaurant(rid)
         spread = client.open_by_key(sheet_id)
         ws     = spread.worksheet(tab)
 
@@ -405,7 +444,7 @@ def page_images(restaurants: list):
                         del st.session_state[k]
         with col_load:
             with st.spinner("📊 جاري قراءة القائمة..."):
-                items_from_sheet = load_sheet_items(sheet_id, final_tab)
+                items_from_sheet = load_sheet_items(sheet_id, final_tab, rid=restaurant_id)
 
     if not items_from_sheet and selected_method != "manual":
         st.warning(f"📭 لا توجد أكلات في Tab '{final_tab}' — أضف الأكلات أولاً أو اختر tab آخر")
@@ -501,7 +540,7 @@ def page_images(restaurants: list):
                                 if st.button(f"✅ اختر", key=f"pick_photo_{row_start+j}", use_container_width=True):
                                     # حفظ الصورة في الشيت
                                     target = {"name": current_item, "image_url": photo["url"], "image_credit": photo["credit"]}
-                                    updated = update_images_in_sheet(sheet_id, final_tab, [target])
+                                    updated = update_images_in_sheet(sheet_id, final_tab, [target], rid=restaurant_id)
                                     if updated:
                                         st.success(f"✅ تم حفظ صورة '{current_item}' من {photo['source']} في الشيت!")
                                         st.session_state.pop("_multi_photos", None)
@@ -576,7 +615,7 @@ def page_images(restaurants: list):
                             target = dict(st.session_state["_poll_item"])
                             target["image_url"]    = photo["url"]
                             target["image_credit"] = photo["credit"]
-                            updated = update_images_in_sheet(sheet_id, final_tab, [target])
+                            updated = update_images_in_sheet(sheet_id, final_tab, [target], rid=restaurant_id)
                             if updated:
                                 st.success(f"✅ تم حفظ الصورة لـ {sel_item}!")
                                 st.session_state.pop("_poll_photos", None)
@@ -820,7 +859,7 @@ def page_images(restaurants: list):
                 pb.progress((i+1)/len(bulk_files))
 
             if uploaded_items:
-                total = update_images_in_sheet(sheet_id, final_tab, uploaded_items)
+                total = update_images_in_sheet(sheet_id, final_tab, uploaded_items, rid=restaurant_id)
                 st.success(f"✅ {total} صورة محفوظة في الشيت")
                 # ✅ تحديث cache الـ API فوراً حتى تظهر الصور في المينيو
                 if restaurant_id:
@@ -881,7 +920,7 @@ def page_images(restaurants: list):
         with c_save:
             if st.button(f"✅ حفظ {with_img} صورة في الشيت", use_container_width=True, type="primary"):
                 with st.spinner("💾 جاري التحديث..."):
-                    updated = update_images_in_sheet(pending_sid, pending_tab, pending)
+                    updated = update_images_in_sheet(pending_sid, pending_tab, pending, rid=restaurant_id)
                 st.success(f"🎉 تم تحديث **{updated}** أكلة في Google Sheet")
                 # ✅ تحديث cache الـ API فوراً حتى تظهر الصور في المينيو
                 if restaurant_id:
