@@ -551,6 +551,32 @@ def pg_add(rs):
         with c1:
             rssid  = st.text_input("📶 اسم الشبكة (SSID) *", placeholder="Resto_WiFi")
             rwpass = st.text_input("🔒 كلمة مرور WiFi", type="password")
+        
+    # ══ خانة Service Account ══
+    st.markdown("---")
+    st.markdown("**🔑 Service Account الخاص بهذا المطعم (موصى به):**")
+    st.caption("أنشئ SA جديد من Google Cloud لكل مطعم — يضمن 60 req/min مستقلة — اتركه فارغاً لاستخدام SA المشترك")
+    
+    col_sa_new1, col_sa_new2 = st.columns([4, 1])
+    with col_sa_new1:
+        rsa_json = st.text_area(
+            "sa_json_new",
+            value="",
+            placeholder='{"type":"service_account","project_id":"...","private_key":"...",...}',
+            height=80,
+            key="new_sa_json",
+            label_visibility="collapsed"
+        )
+    with col_sa_new2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if rsa_json.strip():
+            try:
+                json.loads(rsa_json.strip())
+                st.success("✅ JSON صالح")
+            except:
+                st.error("❌ JSON خاطئ")
+        else:
+            st.info("⚠️ SA مشترك")
         with c2:
             st.markdown('<div style="color:#C9A84C;font-size:.85rem;font-weight:700;margin-bottom:.4rem">🍳 كلمة مرور الكوزينة</div>', unsafe_allow_html=True)
             rkitchen_pass = st.text_input("🔑 كلمة مرور الكوزينة *",
@@ -602,7 +628,8 @@ def pg_add(rs):
             num_tables=rtables, logo_url=rlogo.strip(), owner_email=remail.strip(),
             bg_type=rbg_type, socials=rsocials,
             kitchen_password=rkitchen_pass.strip(),
-            delivery_active=rdelivery)
+            delivery_active=rdelivery,
+            sa_json=rsa_json.strip() if rsa_json.strip() else "")
 
         done = len([s for s in result.steps if "✅" in s])
         show(min(done, len(steps_lbl)-1), result.steps)
