@@ -452,6 +452,9 @@ def pg_add(rs):
         with c1:
             rid      = st.text_input("🔢 رقم المطعم", value=nxt(rs))
             rname    = st.text_input("🏪 اسم المطعم *", placeholder="مطعم النخيل الذهبي")
+            rslug    = st.text_input("🔗 Slug (رابط نظيف) *",
+                        placeholder="nakhil — يُستخدم في الرابط: menu.netlify.app/nakhil",
+                        help="حروف صغيرة بدون مسافات — مثال: nakhil أو najm")
             rsheetid = st.text_input("📊 Sheet ID *",
                                       placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
                                       help="ID من رابط الـ Spreadsheet الذي أنشأه صاحب المطعم")
@@ -569,6 +572,27 @@ def pg_add(rs):
         if rdelivery:
             st.info("✅ عند التفعيل، الزبون سيختار بين الأكل في المطعم أو التوصيل مع تحديد موقعه GPS")
 
+    # ══ Service Account الخاص بالمطعم ══
+    st.markdown("---")
+    st.markdown("**🔑 Service Account الخاص بهذا المطعم (موصى به):**")
+    st.caption("أنشئ SA جديد من Google Cloud لكل مطعم — يضمن 60 req/min مستقلة — اتركه فارغاً لاستخدام SA المشترك")
+    col_sa_new1, col_sa_new2 = st.columns([4, 1])
+    with col_sa_new1:
+        rsa_json = st.text_area(
+            "sa_json_new", value="",
+            placeholder='{"type":"service_account","project_id":"...","private_key":"...",...}',
+            height=80, key="new_sa_json", label_visibility="collapsed"
+        )
+    with col_sa_new2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if rsa_json.strip():
+            try:
+                import json as _jj; _jj.loads(rsa_json.strip())
+                st.success("✅ JSON صالح")
+            except: st.error("❌ JSON خاطئ")
+        else:
+            st.info("⚠️ SA مشترك")
+
     st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
 
     if st.button("🚀 إنشاء المطعم — كل شيء أوتوماتيكي!", use_container_width=True):
@@ -595,6 +619,7 @@ def pg_add(rs):
                         f'{"<br>".join(logs)}</div>', unsafe_allow_html=True)
 
         show(0, ["⏳ جارٍ الإنشاء..."])
+        _clean_slug = rslug.strip().lower().replace(" ","-").replace("_","-") if rslug.strip() else ""
         result: ProvisionResult = provision_restaurant(
             restaurant_id=rid.strip(), name=rname.strip(),
             sheet_id=rsheetid.strip(),
@@ -603,7 +628,9 @@ def pg_add(rs):
             num_tables=rtables, logo_url=rlogo.strip(), owner_email=remail.strip(),
             bg_type=rbg_type, socials=rsocials,
             kitchen_password=rkitchen_pass.strip(),
-            delivery_active=rdelivery)
+            delivery_active=rdelivery,
+            sa_json=rsa_json.strip() if rsa_json.strip() else "",
+            slug=_clean_slug)
 
         done = len([s for s in result.steps if "✅" in s])
         show(min(done, len(steps_lbl)-1), result.steps)
