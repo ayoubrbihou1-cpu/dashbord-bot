@@ -107,9 +107,28 @@ def _freeze(spread, ws):
 # ══════════════════════════════════════════════════════════
 # ✅ تهيئ Sheet موجود
 # ══════════════════════════════════════════════════════════
-def setup_existing_sheet(sheet_id: str, name: str) -> tuple:
+def setup_existing_sheet(sheet_id: str, name: str, sa_json: str = "") -> tuple:
     url    = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
-    client = _gs()
+    
+    # ✅ استخدم SA الخاص بالمطعم إذا وُجد، وإلا SA الرئيسي
+    if sa_json and sa_json.strip().startswith("{"):
+        try:
+            import json as _j
+            from google.oauth2.service_account import Credentials as _Cr
+            _creds_r = _Cr.from_service_account_info(
+                _j.loads(sa_json),
+                scopes=["https://www.googleapis.com/auth/spreadsheets",
+                        "https://www.googleapis.com/auth/drive"]
+            )
+            client = gspread.authorize(_creds_r)
+            sa_email_used = _j.loads(sa_json).get("client_email", SA_EMAIL)
+        except Exception as _e:
+            log.warning(f"SA JSON خاطئ: {_e} — نستخدم SA الرئيسي")
+            client = _gs()
+            sa_email_used = SA_EMAIL
+    else:
+        client = _gs()
+        sa_email_used = SA_EMAIL
 
     try:
         spread = client.open_by_key(sheet_id)
@@ -117,7 +136,7 @@ def setup_existing_sheet(sheet_id: str, name: str) -> tuple:
         raise Exception(
             f"لا يمكن الوصول للـ Sheet!\n\n"
             f"تأكد أن صاحب المطعم شارك الـ Sheet مع:\n"
-            f"📧 {SA_EMAIL}\n\n"
+            f"📧 {sa_email_used}\n\n"
             f"كـ Editor ثم حاول مجدداً.\n\nالخطأ: {e}"
         )
 
@@ -445,21 +464,28 @@ def provision_restaurant(
     menu_url = f"{FRONTEND_URL}?rest_id={restaurant_id}"
 
     if not sheet_id.strip():
+        # حدد email الـ SA الصحيح للعرض
+        _sa_email_show = SA_EMAIL
+        if sa_json and sa_json.strip().startswith("{"):
+            try:
+                import json as _jj
+                _sa_email_show = _jj.loads(sa_json).get("client_email", SA_EMAIL)
+            except: pass
         res.error = (
             "❌ لم يتم إدخال Sheet ID!\n\n"
             "📋 الخطوات:\n"
             "1. صاحب المطعم يفتح sheets.google.com\n"
             "2. ينشئ Spreadsheet جديد\n"
-            f"3. يشاركه مع: {SA_EMAIL} كـ Editor\n"
+            f"3. يشاركه مع: {_sa_email_show} كـ Editor\n"
             "4. ينسخ الـ ID من الرابط\n"
             "5. يلصقه في حقل 'Sheet ID' أعلاه"
         )
         res.steps = steps
         return res
 
-    # تهيئ الـ Sheet
+    # تهيئ الـ Sheet — باستخدام SA الخاص بالمطعم إذا وُجد
     try:
-        sid, url = setup_existing_sheet(sheet_id.strip(), name)
+        sid, url = setup_existing_sheet(sheet_id.strip(), name, sa_json=sa_json)
         res.sheet_id = sid
         res.sheet_url = url
         steps.append("✅ Sheet مهيأ — Tabs وHeaders جاهزة")
