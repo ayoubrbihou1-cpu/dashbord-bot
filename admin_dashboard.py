@@ -881,9 +881,11 @@ def pg_pdf(rs):
     if st.button("👁️ معاينة", use_container_width=True, key="btn_preview"):
         with st.spinner("🎨..."):
             try:
+                _prev_slug = r.get("slug","").strip()
+                _prev_base = f"{FRONTEND_URL}/{_prev_slug}" if _prev_slug else FRONTEND_URL
                 mi, wi = generate_single_table_preview(
                     r.get("name","مطعم"), r.get("wifi_ssid","WiFi"),
-                    r.get("wifi_password",""), FRONTEND_URL,
+                    r.get("wifi_password",""), _prev_base,
                     r.get("restaurant_id","1"), pv,
                     pdf_style, r.get("primary_color","#0a0804"),
                     r.get("accent_color","#C9A84C"),
