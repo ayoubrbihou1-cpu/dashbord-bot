@@ -82,6 +82,7 @@ MASTER_HEADERS = [
     "boss_chat_id",       # chat_id مدير المطعم (للأرباح والإشعارات)
     "waiters_chat_id",    # chat_id مجموعة النوادل (dine_in جاهز)
     "delivery_chat_id",   # chat_id مجموعة التوصيل
+    "sa_json",            # Service Account JSON الخاص بهذا المطعم
 ]
 
 def _fmt_header(spread, ws, color):
@@ -437,7 +438,7 @@ def provision_restaurant(
     style="luxury", primary_color="#0a0804", accent_color="#C9A84C",
     num_tables=10, logo_url="", owner_email="", telegram_chat_id="",
     bg_type="minimal", socials=None, kitchen_password="",
-    delivery_active=False
+    delivery_active=False, sa_json=""
 ):
     res = ProvisionResult()
     steps = []
@@ -490,6 +491,7 @@ def provision_restaurant(
         "boss_chat_id":     "",
         "waiters_chat_id":  "",
         "delivery_chat_id": "",
+        "sa_json":          sa_json.strip() if sa_json else "",
     })
     if not saved:
         res.error = "فشل حفظ في Master_DB"
