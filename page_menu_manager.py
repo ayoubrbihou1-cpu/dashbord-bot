@@ -12,6 +12,7 @@ import os
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
 from gemini_helper import gemini_text, gemini_vision, gemini_available
+from groq_helper import translate_batch_groq, translate_single_groq, groq_available, groq_vision, groq_vision_available
 import requests as _requests
 
 load_dotenv()
@@ -198,7 +199,7 @@ def translate_batch(names: list) -> list:
             '[{"ar":"...","fr":"...","en":"..."}]\n\n'
             f"Dishes:\n{numbered}"
         )
-        txt = gemini_text(prompt, max_tokens=1500, temperature=0)
+        txt = gemini_text(prompt, max_tokens=4000, temperature=0)
         # تنظيف JSON
         txt = txt.strip()
         if "```json" in txt:
@@ -303,12 +304,12 @@ def load_items(sheet_id: str, tab: str, rid: str = "") -> list:
         st.error(f"❌ تحميل القائمة: {e}")
         return []
 
-def add_item(sheet_id: str, tab: str, data: dict) -> bool:
+def add_item(sheet_id: str, tab: str, data: dict, rid: str = "") -> bool:
     """إضافة أكلة واحدة"""
-    return add_items_batch(sheet_id, tab, [data]) == 1
+    return add_items_batch(sheet_id, tab, [data], rid=rid) == 1
 
 
-def add_items_batch(sheet_id: str, tab: str, items: list) -> int:
+def add_items_batch(sheet_id: str, tab: str, items: list, rid: str = "") -> int:
     """
     إضافة عدة أكلات دفعة واحدة — طلب واحد فقط لـ Google Sheets
     يرجع عدد الأكلات المضافة بنجاح
@@ -544,7 +545,9 @@ def page_menu_manager(restaurants: list):
                 st.error("❌ أدخل سعراً صحيحاً")
             else:
                 # إذا لم يدخل المستخدم الترجمة يدوياً — يترجم تلقائياً
-                _ar3, _fr3, _en3 = translate_three_languages(n_name.strip())
+                groq_ok3, _ = groq_available()
+                _ar3, _fr3, _en3 = (translate_single_groq(n_name.strip()) 
+                    if groq_ok3 else translate_three_languages(n_name.strip()))
                 final_fr = n_name_fr.strip() or _fr3
                 final_en = n_name_en.strip() or _en3
                 final_ar = _ar3 if _ar3 else n_name.strip()
@@ -671,9 +674,19 @@ Rules:
 Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
 {"items":[{"name":"dish name","price":40,"description":"","category":"الأطباق الرئيسية"}]}"""
 
-                        # ✅ Gemini Vision مباشرة (موفّر للكوتا)
-                        raw = gemini_vision(prompt, img_b64, mime, max_tokens=2000, temperature=0)
-                        st.info("🤖 تم التحليل بـ Gemini Vision")
+                        # جرب Groq Vision أولاً (6 مفاتيح مجانية)
+                        # إذا فشل → Gemini كـ fallback
+                        groq_vis_ok, _ = groq_vision_available()
+                        try:
+                            if groq_vis_ok:
+                                raw = groq_vision(prompt, img_b64, mime, max_tokens=4000)
+                                st.info("⚡ تم التحليل بـ Groq Vision")
+                            else:
+                                raise RuntimeError("Groq غير متاح")
+                        except Exception as _groq_err:
+                            log.warning(f"Groq vision failed: {_groq_err} — falling back to Gemini")
+                            raw = gemini_vision(prompt, img_b64, mime, max_tokens=4000, temperature=0)
+                            st.info("🤖 تم التحليل بـ Gemini")
 
                         # تنظيف JSON من أي نص زائد
                         raw = raw.strip()
@@ -783,9 +796,14 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
                                 if item_data.get("name","").strip()
                             ]
 
-                            # ✅ Gemini للترجمة الدفعية (استدعاء واحد فقط)
+                            # ترجمة كل الأسماء في استدعاء Gemini واحد فقط
                             names_list = [item_data["name"].strip() for _, item_data in valid_items]
-                            translations = translate_batch(names_list)
+                            # Groq للترجمة — أسرع وأوفر لـ Gemini
+                            groq_ok, _ = groq_available()
+                            if groq_ok:
+                                translations = translate_batch_groq(names_list)
+                            else:
+                                translations = translate_batch(names_list)
 
                             # تجميع حسب الصنف
                             by_tab = defaultdict(list)
@@ -809,7 +827,7 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
                             # حفظ كل صنف في طلب واحد فقط
                             added = 0
                             for tab_name, tab_items in by_tab.items():
-                                n = add_items_batch(sheet_id, tab_name, tab_items)
+                                n = add_items_batch(sheet_id, tab_name, tab_items, rid=rid)
                                 added += n
 
                         if added > 0:
@@ -848,13 +866,15 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
                 if not price_.replace(".","").isdigit():
                     errors.append(f"⚠️ سعر غير صحيح: {line[:40]}")
                     continue
-                _ar, _fr, _en = translate_three_languages(name_)
+                groq_ok_b, _ = groq_available()
+                _ar, _fr, _en = (translate_single_groq(name_) 
+                    if groq_ok_b else translate_three_languages(name_))
                 _main = _ar if _ar else name_
                 ok = add_item(sheet_id, tab_sel, {
                     "name": _main, "name_fr": _fr, "name_en": _en,
                     "price": price_, "description": desc_,
                     "available": "TRUE", "image_url": "", "image_credit": ""
-                })
+                }, rid=rid)
                 if ok: added += 1
 
             if added > 0:
