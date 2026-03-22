@@ -7,7 +7,7 @@
 ═══════════════════════════════════════════════════════════
 """
 import streamlit as st
-import os, json, requests, time
+import os, json, requests, time, io, base64
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -329,6 +329,395 @@ def pg_orders(agency: dict):
 # MAIN
 # ══════════════════════════════════════════════════════════
 
+
+
+# ══════════════════════════════════════════════════════════
+# 🖨️ PDF + QR CODE
+# ══════════════════════════════════════════════════════════
+
+def pg_pdf(agency: dict):
+    st.markdown("## 🖨️ بطاقات PDF + QR Code")
+
+    data  = api_get(f"/agency/{agency['agency_id']}/restaurants")
+    rests = data.get("restaurants",[])
+    if not rests:
+        st.info("📭 أضف مطعماً أولاً"); return
+
+    rest_names = {r["restaurant_id"]: r["name"] for r in rests}
+    sel_rid = st.selectbox("🏪 اختر المطعم", options=list(rest_names.keys()),
+                            format_func=lambda x: rest_names[x])
+    sel_rest = next((r for r in rests if r["restaurant_id"]==sel_rid), {})
+
+    c1,c2 = st.columns(2)
+    with c1:
+        num_tables = st.number_input("عدد الطاولات", 1, 200,
+                                      int(sel_rest.get("num_tables",10)))
+    with c2:
+        style = st.selectbox("الطابع", ["luxury","modern","classic"],
+                              index=["luxury","modern","classic"].index(sel_rest.get("style","luxury")))
+
+    if st.button("🖨️ توليد PDF", use_container_width=True, type="primary"):
+        with st.spinner("⏳ جاري توليد PDF..."):
+            r = requests.post(
+                f"{ROUTER_URL}/generate_pdf",
+                json={
+                    "restaurant_id": sel_rid,
+                    "num_tables":    num_tables,
+                    "style":         style,
+                    "agency_check":  agency["agency_id"],
+                },
+                headers={**api_headers(),"Content-Type":"application/json"},
+                timeout=60
+            )
+            if r.status_code == 200 and r.headers.get("content-type","").startswith("application/pdf"):
+                st.download_button(
+                    "⬇️ تحميل PDF",
+                    data     = r.content,
+                    file_name= f"qr_{sel_rest.get('name',sel_rid)}.pdf",
+                    mime     = "application/pdf",
+                    use_container_width=True
+                )
+                st.success("✅ PDF جاهز!")
+            else:
+                try:
+                    err = r.json().get("detail","خطأ في التوليد")
+                except: err = r.text[:200]
+                st.error(f"❌ {err}")
+
+    st.markdown("---")
+    st.markdown("### 📱 روابط QR مباشرة")
+    menu_url = f"{FRONTEND_URL}?rest_id={sel_rid}"
+    kitchen_url = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={sel_rid}"
+    st.markdown(f"**🍽️ رابط المينيو:**")
+    st.code(menu_url)
+    st.markdown(f"**🍳 رابط الكوزينة:**")
+    st.code(kitchen_url)
+
+
+# ══════════════════════════════════════════════════════════
+# 🖼️ صور الأكلات
+# ══════════════════════════════════════════════════════════
+
+def pg_images(agency: dict):
+    st.markdown("## 🖼️ صور الأكلات")
+
+    data  = api_get(f"/agency/{agency['agency_id']}/restaurants")
+    rests = data.get("restaurants",[])
+    if not rests:
+        st.info("📭 أضف مطعماً أولاً"); return
+
+    rest_names = {r["restaurant_id"]: r["name"] for r in rests}
+    sel_rid = st.selectbox("🏪 اختر المطعم",
+                            options=list(rest_names.keys()),
+                            format_func=lambda x: rest_names[x],
+                            key="img_rest_sel")
+    sel_rest = next((r for r in rests if r["restaurant_id"]==sel_rid), {})
+    sheet_id = sel_rest.get("sheet_id","")
+
+    if not sheet_id:
+        st.error("❌ هذا المطعم ليس لديه Sheet ID"); return
+
+    TABS = ["الأطباق الرئيسية","المقبلات","الحلويات","المشروبات"]
+    tab_sel = st.selectbox("📋 الصنف", TABS, key="img_tab_sel")
+
+    st.markdown("---")
+    tab1, tab2 = st.tabs(["🔍 Unsplash تلقائي", "📸 تحليل صورة المينيو"])
+
+    with tab1:
+        st.info("أدخل اسم الأكلة → سيبحث عن صورة مناسبة تلقائياً")
+        dish_name = st.text_input("اسم الأكلة", placeholder="طاجين دجاج")
+        if st.button("🔍 بحث عن صورة", use_container_width=True):
+            if dish_name:
+                with st.spinner("⏳ جاري البحث..."):
+                    r = requests.get(
+                        f"{ROUTER_URL}/image/search",
+                        params={"q": dish_name, "restaurant_id": sel_rid},
+                        headers=api_headers(), timeout=15
+                    )
+                    if r.status_code == 200:
+                        d = r.json()
+                        if d.get("url"):
+                            st.image(d["url"], width=200)
+                            st.code(d["url"])
+                            st.success("✅ الصورة جاهزة — انسخ الرابط وضعه في إدارة القائمة")
+                    else:
+                        st.error("❌ لم يجد صورة")
+
+    with tab2:
+        st.info("ارفع صورة المينيو → سيستخرج الأكلات والأسعار تلقائياً ويضيفها للـ Sheet")
+        uploaded = st.file_uploader("📸 صورة المينيو", type=["jpg","jpeg","png","webp"])
+        if uploaded and st.button("🤖 تحليل وإضافة للـ Sheet", use_container_width=True):
+            with st.spinner("⏳ جاري التحليل بـ Gemini Vision..."):
+                img_b64 = base64.b64encode(uploaded.read()).decode()
+                r = requests.post(
+                    f"{ROUTER_URL}/menu/scan",
+                    json={"image_b64": img_b64,
+                          "mime_type": uploaded.type,
+                          "restaurant_id": sel_rid,
+                          "sheet_id": sheet_id,
+                          "tab": tab_sel,
+                          "agency_id": agency["agency_id"]},
+                    headers={**api_headers(),"Content-Type":"application/json"},
+                    timeout=60
+                )
+                if r.status_code == 200:
+                    d = r.json()
+                    st.success(f"✅ تم إضافة {d.get('added',0)} أكلة للـ Sheet!")
+                    if d.get("items"):
+                        st.dataframe(d["items"])
+                else:
+                    try: st.error(f"❌ {r.json().get('detail','خطأ')}")
+                    except: st.error("❌ خطأ في التحليل")
+
+
+# ══════════════════════════════════════════════════════════
+# 🍽️ إدارة القائمة
+# ══════════════════════════════════════════════════════════
+
+def pg_menu(agency: dict):
+    st.markdown("## 🍽️ إدارة القائمة")
+
+    data  = api_get(f"/agency/{agency['agency_id']}/restaurants")
+    rests = data.get("restaurants",[])
+    if not rests:
+        st.info("📭 أضف مطعماً أولاً"); return
+
+    rest_names = {r["restaurant_id"]: r["name"] for r in rests}
+    sel_rid = st.selectbox("🏪 اختر المطعم",
+                            options=list(rest_names.keys()),
+                            format_func=lambda x: rest_names[x],
+                            key="menu_rest_sel")
+    sel_rest = next((r for r in rests if r["restaurant_id"]==sel_rid), {})
+    sheet_id = sel_rest.get("sheet_id","")
+
+    if not sheet_id:
+        st.error("❌ هذا المطعم ليس لديه Sheet ID"); return
+
+    TABS = ["الأطباق الرئيسية","المقبلات","الحلويات","المشروبات"]
+    tab_sel = st.selectbox("📋 الصنف", TABS, key="menu_tab_sel")
+
+    # جلب الأكلات من API
+    r = requests.get(
+        f"{ROUTER_URL}/menu_items/{sel_rid}/{tab_sel}",
+        headers=api_headers(), timeout=15
+    )
+    items = []
+    if r.status_code == 200:
+        items = r.json().get("items", [])
+
+    if items:
+        st.markdown(f"**{len(items)} أكلة في {tab_sel}:**")
+        for i, item in enumerate(items):
+            with st.expander(f"{item.get('name','')} — {item.get('price','')} درهم"):
+                c1,c2 = st.columns(2)
+                with c1:
+                    st.text(f"🇫🇷 {item.get('name_fr','')}")
+                    st.text(f"🇬🇧 {item.get('name_en','')}")
+                with c2:
+                    st.text(f"✅ متاح: {item.get('available','TRUE')}")
+                    if item.get('image_url'):
+                        st.image(item['image_url'], width=80)
+    else:
+        st.info("📭 لا توجد أكلات بعد")
+
+    st.markdown("---")
+    st.markdown("### ➕ إضافة أكلة جديدة")
+    c1,c2 = st.columns(2)
+    with c1:
+        n_name  = st.text_input("🍽️ الاسم بالعربية *", key="ag_add_name")
+        n_price = st.number_input("💰 السعر (درهم)", 0.0, 9999.0, 0.0, key="ag_add_price")
+        n_desc  = st.text_area("📝 الوصف", key="ag_add_desc", height=70)
+    with c2:
+        n_fr    = st.text_input("🇫🇷 الاسم بالفرنسية", key="ag_add_fr")
+        n_en    = st.text_input("🇬🇧 الاسم بالإنجليزية", key="ag_add_en")
+        n_img   = st.text_input("🖼️ رابط الصورة", key="ag_add_img", placeholder="https://...")
+
+    if st.button("➕ إضافة للقائمة", use_container_width=True, type="primary", key="ag_btn_add"):
+        if not n_name.strip():
+            st.error("❌ الاسم مطلوب"); return
+        if n_price <= 0:
+            st.error("❌ أدخل سعراً صحيحاً"); return
+        r = requests.post(
+            f"{ROUTER_URL}/menu_items/{sel_rid}/{tab_sel}",
+            json={"name":n_name.strip(),"name_fr":n_fr.strip(),
+                  "name_en":n_en.strip(),"price":str(n_price),
+                  "description":n_desc.strip(),"available":"TRUE",
+                  "image_url":n_img.strip()},
+            headers={**api_headers(),"Content-Type":"application/json"},
+            timeout=20
+        )
+        if r.status_code == 200:
+            st.success("✅ تمت الإضافة!")
+            st.rerun()
+        else:
+            try: st.error(f"❌ {r.json().get('detail','خطأ')}")
+            except: st.error("❌ خطأ في الإضافة")
+
+
+# ══════════════════════════════════════════════════════════
+# 📊 STATS + REPORTS
+# ══════════════════════════════════════════════════════════
+
+def pg_reports(agency: dict):
+    st.markdown("## 📊 التقارير والإحصاءات")
+
+    data  = api_get(f"/agency/{agency['agency_id']}/restaurants")
+    rests = data.get("restaurants",[])
+    if not rests:
+        st.info("📭 لا توجد مطاعم"); return
+
+    rest_names = {r["restaurant_id"]: r["name"] for r in rests}
+    sel_rid = st.selectbox("🏪 اختر المطعم",
+                            options=["الكل"] + list(rest_names.keys()),
+                            format_func=lambda x: "📊 الكل" if x=="الكل" else rest_names[x])
+
+    period = st.radio("الفترة", ["يومي","أسبوعي","شهري"], horizontal=True)
+
+    if st.button("📊 إنشاء التقرير وإرساله PDF", use_container_width=True, type="primary"):
+        if sel_rid == "الكل":
+            targets = list(rest_names.keys())
+        else:
+            targets = [sel_rid]
+
+        for rid in targets:
+            with st.spinner(f"⏳ {rest_names.get(rid,rid)}..."):
+                r = requests.post(
+                    f"{ROUTER_URL}/report/pdf/{rid}",
+                    json={"period": period},
+                    headers={**api_headers(), "Content-Type":"application/json"},
+                    timeout=30
+                )
+                if r.status_code == 200:
+                    d = r.json()
+                    st.success(f"✅ {rest_names.get(rid,rid)} — {d.get('orders',0)} طلب — {d.get('revenue',0):.0f} درهم")
+                else:
+                    st.error(f"❌ {rest_names.get(rid,rid)}")
+
+    st.markdown("---")
+
+    # Orders summary per restaurant
+    st.markdown("### 📦 ملخص الطلبات")
+    orders_data = api_get(f"/agency/{agency['agency_id']}/orders")
+    orders = orders_data.get("orders", [])
+
+    if orders:
+        from collections import Counter
+        rest_orders = Counter(o.get("restaurant_id","") for o in orders)
+        rest_revenue = {}
+        for o in orders:
+            rid = o.get("restaurant_id","")
+            if o.get("status") in ("✅ جاهز","🏁 سُلِّم"):
+                rest_revenue[rid] = rest_revenue.get(rid,0) + float(o.get("total_price",0))
+
+        for rid, name in rest_names.items():
+            c1,c2,c3 = st.columns(3)
+            with c1: st.metric(f"🏪 {name}", f"{rest_orders.get(rid,0)} طلب")
+            with c2: st.metric("💰 الإيراد", f"{rest_revenue.get(rid,0):.0f} درهم")
+            with c3: st.metric("📈 متوسط", f"{rest_revenue.get(rid,0)/max(rest_orders.get(rid,1),1):.0f} درهم")
+    else:
+        st.info("لا توجد طلبات بعد")
+
+
+# ══════════════════════════════════════════════════════════
+# ⚙️ إعدادات المطعم
+# ══════════════════════════════════════════════════════════
+
+def pg_settings(agency: dict):
+    st.markdown("## ⚙️ إعدادات المطاعم")
+
+    data  = api_get(f"/agency/{agency['agency_id']}/restaurants")
+    rests = data.get("restaurants",[])
+    if not rests:
+        st.info("📭 لا توجد مطاعم"); return
+
+    rest_names = {r["restaurant_id"]: r["name"] for r in rests}
+    sel_rid  = st.selectbox("🏪 اختر المطعم", options=list(rest_names.keys()),
+                             format_func=lambda x: rest_names[x])
+    sel_rest = next((r for r in rests if r["restaurant_id"]==sel_rid), {})
+
+    tab1, tab2, tab3 = st.tabs(["🔗 الروابط", "📱 Telegram", "🎨 الألوان"])
+
+    with tab1:
+        st.markdown("**روابط المطعم:**")
+        menu_url    = f"{FRONTEND_URL}?rest_id={sel_rid}"
+        kitchen_url = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={sel_rid}"
+        st.markdown("🍽️ رابط المينيو للزبائن:")
+        st.code(menu_url)
+        st.markdown("🍳 رابط شاشة الكوزينة:")
+        st.code(kitchen_url)
+        st.markdown(f"📶 WiFi: `{sel_rest.get('wifi_ssid','')}` | `{sel_rest.get('wifi_password','')}`")
+
+    with tab2:
+        st.markdown("**روابط ربط Telegram للمطعم:**")
+        bot = os.getenv("TELEGRAM_BOT_USERNAME","Ayoub_Resto_bot")
+        rid = sel_rid
+        links = {
+            "صاحب المطعم":  f"https://t.me/{bot}?start=reg_{rid}",
+            "مجموعة النوادل": f"https://t.me/{bot}?start=waiters_{rid}",
+            "مجموعة التوصيل": f"https://t.me/{bot}?start=delivery_{rid}",
+            "مجموعة المدير":  f"https://t.me/{bot}?start=boss_{rid}",
+        }
+        for name, link in links.items():
+            c1,c2 = st.columns([3,1])
+            with c1: st.markdown(f"**{name}:**"); st.code(link)
+            with c2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown(f"[🔗 فتح]({link})")
+
+        st.info("📌 أرسل كل رابط للشخص المناسب — يضغطه مرة واحدة فقط ويتفعل تلقائياً")
+
+    with tab3:
+        st.markdown("**ألوان المطعم:**")
+        c1,c2 = st.columns(2)
+        with c1:
+            pc = st.color_picker("لون الخلفية", sel_rest.get("primary_color","#0a0804"))
+        with c2:
+            ac = st.color_picker("لون الذهب", sel_rest.get("accent_color","#C9A84C"))
+        if st.button("💾 حفظ الألوان"):
+            st.info("⚠️ تغيير الألوان يتطلب إعادة provision — تواصل مع الدعم")
+
+
+# ══════════════════════════════════════════════════════════
+# 🆘 الدعم الفني
+# ══════════════════════════════════════════════════════════
+
+def pg_support(agency: dict):
+    st.markdown("## 🆘 الدعم الفني")
+
+    st.markdown("""
+    <div style="background:#111;border:1px solid #C9A84C33;border-radius:12px;padding:1.2rem;margin-bottom:1rem">
+      <div style="color:#C9A84C;font-weight:700;font-size:1rem;margin-bottom:.5rem">📋 دليل الاستخدام السريع</div>
+      <div style="color:#aaa;font-size:.85rem;line-height:1.8">
+        1️⃣ <b>إضافة مطعم جديد:</b> أنشئ Google Sheet → شاركه مع SA email → أضفه هنا<br>
+        2️⃣ <b>إضافة القائمة:</b> صفحة "إدارة القائمة" أو ارفع صورة المينيو<br>
+        3️⃣ <b>ربط Telegram:</b> صفحة الإعدادات → أرسل الروابط<br>
+        4️⃣ <b>طباعة QR:</b> صفحة "بطاقات PDF" → حمّل وطبع<br>
+        5️⃣ <b>الكوزينة:</b> افتح رابط الكوزينة على التابليت
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("### 📧 SA Email للمشاركة")
+    sa = "restaurant-bot@gen-lang-client-0967477901.iam.gserviceaccount.com"
+    st.code(sa)
+    st.caption("شارك كل Google Sheet مع هذا العنوان كـ Editor")
+
+    st.markdown("### ❓ أسئلة شائعة")
+    with st.expander("كيف أضيف مطعم جديد؟"):
+        st.markdown("""
+        1. اذهب sheets.google.com وأنشئ Spreadsheet
+        2. شاركه مع SA Email أعلاه كـ Editor
+        3. انسخ الـ ID من رابط الشيت
+        4. اضغط "مطعم جديد" وأدخل البيانات
+        """)
+    with st.expander("لماذا لا تظهر الطلبات في الكوزينة؟"):
+        st.markdown("تأكد من ربط Telegram للمطعم، وأن شاشة الكوزينة مفتوحة على الرابط الصحيح")
+    with st.expander("كيف أضيف صور للأكلات؟"):
+        st.markdown("صفحة **صور الأكلات** → ابحث بالاسم أو ارفع صورة المينيو")
+
+    st.markdown("---")
+    st.info("للدعم المباشر: تواصل مع مزود الخدمة")
+
 def main():
     # تهيئة session
     if "logged_in" not in st.session_state:
@@ -355,9 +744,15 @@ def main():
         st.markdown("---")
 
         nav = [
-            ("🏠 الرئيسية",     "🏠 الرئيسية"),
-            ("➕ مطعم جديد",   "➕ مطعم جديد"),
-            ("📦 الطلبات",      "📦 الطلبات"),
+            ("🏠 الرئيسية",       "🏠 الرئيسية"),
+            ("➕ مطعم جديد",     "➕ مطعم جديد"),
+            ("🍽️ إدارة القائمة", "🍽️ إدارة القائمة"),
+            ("🖼️ صور الأكلات",   "🖼️ صور الأكلات"),
+            ("🖨️ بطاقات PDF",    "🖨️ بطاقات PDF"),
+            ("📦 الطلبات",       "📦 الطلبات"),
+            ("📊 التقارير",      "📊 التقارير"),
+            ("⚙️ الإعدادات",     "⚙️ الإعدادات"),
+            ("🆘 الدعم",         "🆘 الدعم"),
         ]
         for label, key in nav:
             if st.button(label, key=f"nav_{key}", use_container_width=True):
@@ -382,9 +777,15 @@ def main():
 
     # ── صفحات ────────────────────────────────────────────
     page = st.session_state.get("page","🏠 الرئيسية")
-    if   page == "🏠 الرئيسية":   pg_home(agency)
-    elif page == "➕ مطعم جديد":  pg_add_restaurant(agency)
-    elif page == "📦 الطلبات":    pg_orders(agency)
+    if   page == "🏠 الرئيسية":        pg_home(agency)
+    elif page == "➕ مطعم جديد":       pg_add_restaurant(agency)
+    elif page == "🍽️ إدارة القائمة":   pg_menu(agency)
+    elif page == "🖼️ صور الأكلات":     pg_images(agency)
+    elif page == "🖨️ بطاقات PDF":      pg_pdf(agency)
+    elif page == "📦 الطلبات":         pg_orders(agency)
+    elif page == "📊 التقارير":        pg_reports(agency)
+    elif page == "⚙️ الإعدادات":       pg_settings(agency)
+    elif page == "🆘 الدعم":           pg_support(agency)
 
 
 if __name__ == "__main__":
