@@ -26,6 +26,7 @@ from generative_design import generate_table_card, card_to_bytes, STYLE_LABELS, 
 from pdf_generator import generate_table_tents_pdf, generate_single_table_preview
 from page_images import page_images
 from page_menu_manager import page_menu_manager
+from super_admin_agencies import page_agencies
 
 load_dotenv()
 
@@ -1358,6 +1359,7 @@ code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
             ("🖼️ صور الأكلات",   "🖼️ صور الأكلات"),
             ("🖨️ بطاقات PDF",    "🖨️ بطاقات PDF"),
             ("⚙️ إدارة",          "⚙️ إدارة"),
+            ("🏢 الوكالات",       "🏢 الوكالات"),
         ]
         if "page" not in st.session_state:
             st.session_state["page"] = "🏠 Dashboard"
@@ -1407,6 +1409,7 @@ code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
     elif page == "🖼️ صور الأكلات":   page_images(rs)
     elif page == "🖨️ بطاقات PDF":    pg_pdf(rs)
     elif page == "⚙️ إدارة":          pg_manage(rs)
+    elif page == "🏢 الوكالات":       page_agencies()
 
 if __name__ == "__main__":
     main()
