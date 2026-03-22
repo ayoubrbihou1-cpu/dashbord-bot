@@ -16,6 +16,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 
 SCOPES          = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
 MASTER_SHEET_ID = os.getenv("MASTER_SHEET_ID","")
+SUPABASE_URL    = os.getenv("SUPABASE_URL","")
+SUPABASE_KEY    = os.getenv("SUPABASE_KEY","")
 TG_TOKEN        = os.getenv("TELEGRAM_BOT_TOKEN","")
 SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
@@ -497,13 +499,13 @@ def provision_restaurant(
         return res
 
     # ✅ حفظ في Supabase أولاً — Sheets كـ fallback
-    _sb_url = os.getenv("SUPABASE_URL","")
-    _sb_key = os.getenv("SUPABASE_KEY","")
+    _sb_url = SUPABASE_URL
+    _sb_key = SUPABASE_KEY
     _saved_supabase = False
 
     if _sb_url and _sb_key:
         try:
-            import requests as _rq
+            _rq = requests  # already imported at top
             _rest_payload = {
                 "restaurant_id":   restaurant_id,
                 "name":            name,
@@ -579,9 +581,8 @@ def provision_restaurant(
     if saved:
         steps.append("✅ محفوظ في Master_DB (backup)")
     try:
-        import os, requests as _rq
-        _sb_url = os.getenv("SUPABASE_URL","")
-        _sb_key = os.getenv("SUPABASE_KEY","")
+        _sb_url_2 = os.getenv("SUPABASE_URL","")
+        _sb_key_2 = os.getenv("SUPABASE_KEY","")
         if _sb_url and _sb_key:
             _rest_data = {
                 "restaurant_id":   restaurant_id,
