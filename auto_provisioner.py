@@ -580,45 +580,6 @@ def provision_restaurant(
         return res
     if saved:
         steps.append("✅ محفوظ في Master_DB (backup)")
-    try:
-        _sb_url_2 = os.getenv("SUPABASE_URL","")
-        _sb_key_2 = os.getenv("SUPABASE_KEY","")
-        if _sb_url and _sb_key:
-            _rest_data = {
-                "restaurant_id":   restaurant_id,
-                "name":            name,
-                "agency_id":       "SUPER",
-                "sheet_id":        sid,
-                "slug":            _slug_clean,
-                "telegram_chat_id":telegram_chat_id,
-                "wifi_ssid":       wifi_ssid,
-                "wifi_password":   wifi_password,
-                "primary_color":   primary_color,
-                "accent_color":    accent_color,
-                "style":           style,
-                "bg_type":         bg_type,
-                "num_tables":      int(num_tables or 10),
-                "logo_url":        logo_url or "",
-                "owner_email":     owner_email or "",
-                "kitchen_password":kitchen_password or "",
-                "delivery_active": bool(delivery_active),
-                "socials":         json.dumps(socials or {}, ensure_ascii=False),
-                "sa_json":         sa_json.strip() if sa_json else "",
-                "status":          "active" if telegram_chat_id else "pending_telegram",
-                "plan":            "basic",
-            }
-            _h = {"apikey":_sb_key,"Authorization":f"Bearer {_sb_key}",
-                  "Content-Type":"application/json",
-                  "Prefer":"resolution=merge-duplicates,return=representation"}
-            _r = _rq.post(
-                f"{_sb_url}/rest/v1/restaurants?on_conflict=restaurant_id",
-                headers=_h, json=_rest_data, timeout=10)
-            if _r.status_code in (200, 201):
-                steps.append("✅ محفوظ في Supabase")
-            else:
-                steps.append(f"⚠️ Supabase: {_r.status_code}")
-    except Exception as _sbe:
-        steps.append(f"⚠️ Supabase error: {str(_sbe)[:50]}")
 
     # رابط Telegram
     reg = build_reg_link(restaurant_id)
