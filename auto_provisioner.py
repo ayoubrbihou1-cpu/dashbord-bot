@@ -496,7 +496,57 @@ def provision_restaurant(
         res.steps = steps
         return res
 
-    # حفظ في Master_DB tab
+    # ✅ حفظ في Supabase أولاً — Sheets كـ fallback
+    _sb_url = os.getenv("SUPABASE_URL","")
+    _sb_key = os.getenv("SUPABASE_KEY","")
+    _saved_supabase = False
+
+    if _sb_url and _sb_key:
+        try:
+            import requests as _rq
+            _rest_payload = {
+                "restaurant_id":   restaurant_id,
+                "name":            name,
+                "agency_id":       "SUPER",
+                "sheet_id":        sid,
+                "slug":            _slug_clean,
+                "telegram_chat_id":telegram_chat_id or "",
+                "wifi_ssid":       wifi_ssid or "",
+                "wifi_password":   wifi_password or "",
+                "primary_color":   primary_color or "#0a0804",
+                "accent_color":    accent_color or "#C9A84C",
+                "style":           style or "luxury",
+                "bg_type":         bg_type or "minimal",
+                "num_tables":      int(num_tables or 10),
+                "logo_url":        logo_url or "",
+                "owner_email":     owner_email or "",
+                "kitchen_password":kitchen_password or "",
+                "delivery_active": bool(delivery_active),
+                "socials":         json.dumps(socials or {}, ensure_ascii=False),
+                "sa_json":         sa_json.strip() if sa_json else "",
+                "status":          "active" if telegram_chat_id else "pending_telegram",
+                "plan":            "basic",
+            }
+            _h = {
+                "apikey": _sb_key,
+                "Authorization": f"Bearer {_sb_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates,return=representation"
+            }
+            _r = _rq.post(
+                f"{_sb_url}/rest/v1/restaurants?on_conflict=restaurant_id",
+                headers=_h, json=_rest_payload, timeout=10
+            )
+            if _r.status_code in (200, 201):
+                _saved_supabase = True
+                steps.append("✅ محفوظ في Supabase")
+                log.info(f"✅ Supabase: {restaurant_id}")
+            else:
+                steps.append(f"⚠️ Supabase {_r.status_code} — سيُحفظ في Sheets")
+        except Exception as _sbe:
+            steps.append(f"⚠️ Supabase error: {str(_sbe)[:40]} — سيُحفظ في Sheets")
+
+    # حفظ في Master_DB tab (دائماً كـ backup)
     saved = save_to_master({
         "restaurant_id":    restaurant_id,
         "name":             name,
@@ -522,11 +572,52 @@ def provision_restaurant(
         "sa_json":          sa_json.strip() if sa_json else "",
         "slug":             _slug_clean,
     })
-    if not saved:
-        res.error = "فشل حفظ في Master_DB"
+    if not saved and not _saved_supabase:
+        res.error = "فشل الحفظ في Supabase وGoogle Sheets"
         res.steps = steps
         return res
-    steps.append("✅ محفوظ في Master_DB")
+    if saved:
+        steps.append("✅ محفوظ في Master_DB (backup)")
+    try:
+        import os, requests as _rq
+        _sb_url = os.getenv("SUPABASE_URL","")
+        _sb_key = os.getenv("SUPABASE_KEY","")
+        if _sb_url and _sb_key:
+            _rest_data = {
+                "restaurant_id":   restaurant_id,
+                "name":            name,
+                "agency_id":       "SUPER",
+                "sheet_id":        sid,
+                "slug":            _slug_clean,
+                "telegram_chat_id":telegram_chat_id,
+                "wifi_ssid":       wifi_ssid,
+                "wifi_password":   wifi_password,
+                "primary_color":   primary_color,
+                "accent_color":    accent_color,
+                "style":           style,
+                "bg_type":         bg_type,
+                "num_tables":      int(num_tables or 10),
+                "logo_url":        logo_url or "",
+                "owner_email":     owner_email or "",
+                "kitchen_password":kitchen_password or "",
+                "delivery_active": bool(delivery_active),
+                "socials":         json.dumps(socials or {}, ensure_ascii=False),
+                "sa_json":         sa_json.strip() if sa_json else "",
+                "status":          "active" if telegram_chat_id else "pending_telegram",
+                "plan":            "basic",
+            }
+            _h = {"apikey":_sb_key,"Authorization":f"Bearer {_sb_key}",
+                  "Content-Type":"application/json",
+                  "Prefer":"resolution=merge-duplicates,return=representation"}
+            _r = _rq.post(
+                f"{_sb_url}/rest/v1/restaurants?on_conflict=restaurant_id",
+                headers=_h, json=_rest_data, timeout=10)
+            if _r.status_code in (200, 201):
+                steps.append("✅ محفوظ في Supabase")
+            else:
+                steps.append(f"⚠️ Supabase: {_r.status_code}")
+    except Exception as _sbe:
+        steps.append(f"⚠️ Supabase error: {str(_sbe)[:50]}")
 
     # رابط Telegram
     reg = build_reg_link(restaurant_id)
