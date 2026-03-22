@@ -1257,6 +1257,146 @@ def pg_manage(rs):
 # ══════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
+# 📦 pg_plans — إدارة الباقات
+# ══════════════════════════════════════════════════════════
+
+PLANS = {
+    "basic":   {"label":"🔵 أساسي",   "price":300,  "color":"#3498db"},
+    "pro":     {"label":"🟡 متكامل",  "price":500,  "color":"#C9A84C"},
+    "premium": {"label":"👑 متميز",   "price":800,  "color":"#9b59b6"},
+}
+
+PLAN_FEATURES_DISPLAY = {
+    "basic":   ["✅ مينيو QR","✅ كوزينة","✅ Telegram","✅ تقارير أسبوعية","✅ حتى 15 طاولة","❌ بدون توصيل","❌ بدون تقارير يومية"],
+    "pro":     ["✅ كل الأساسي","✅ تقارير يومية","✅ توصيل كامل","✅ حتى 30 طاولة","❌ بدون AI مينيو"],
+    "premium": ["✅ كل المتكامل","✅ AI مينيو","✅ طاولات لامحدود","✅ إعداد مجاني","✅ أولوية دعم"],
+}
+
+def pg_plans(rs):
+    st.markdown("## 📦 إدارة الباقات")
+
+    if not rs:
+        st.info("📭 لا توجد مطاعم بعد"); return
+
+    # ── إحصاءات سريعة ──────────────────────────────────
+    plan_counts = {"basic":0,"pro":0,"premium":0}
+    for r in rs:
+        p = r.get("plan","basic")
+        if p in plan_counts: plan_counts[p] += 1
+
+    c1,c2,c3,c4 = st.columns(4)
+    with c1: st.metric("🔵 أساسي", plan_counts["basic"], "300 د.م/مطعم")
+    with c2: st.metric("🟡 متكامل", plan_counts["pro"], "500 د.م/مطعم")
+    with c3: st.metric("👑 متميز", plan_counts["premium"], "800 د.م/مطعم")
+    total_monthly = plan_counts["basic"]*300 + plan_counts["pro"]*500 + plan_counts["premium"]*800
+    with c4: st.metric("💰 إيراد شهري متوقع", f"{total_monthly:,} د.م")
+
+    st.markdown("---")
+
+    # ── بطاقات الباقات ──────────────────────────────────
+    st.markdown("### 📋 الباقات المتاحة")
+    pc1,pc2,pc3 = st.columns(3)
+    for col, (plan_key, plan_info) in zip([pc1,pc2,pc3], PLANS.items()):
+        with col:
+            feats = PLAN_FEATURES_DISPLAY[plan_key]
+            feats_html = "".join(f"<div style='font-size:.78rem;padding:.2rem 0;color:#aaa'>{f}</div>" for f in feats)
+            st.markdown(f"""<div style="background:#111;border:1px solid {plan_info['color']}33;
+              border-radius:12px;padding:1.2rem;text-align:center;margin-bottom:.5rem">
+              <div style="font-size:1.1rem;font-weight:900;color:{plan_info['color']}">{plan_info['label']}</div>
+              <div style="font-size:2rem;font-weight:900;color:{plan_info['color']};margin:.4rem 0">{plan_info['price']}</div>
+              <div style="font-size:.72rem;color:#555;margin-bottom:.8rem">درهم/شهر</div>
+              {feats_html}
+            </div>""", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ── إدارة باقة كل مطعم ──────────────────────────────
+    st.markdown("### 🏪 إدارة باقة كل مطعم")
+
+    for r in rs:
+        rid      = r.get("restaurant_id","")
+        name     = r.get("name","—")
+        cur_plan = r.get("plan","basic")
+        delivery = str(r.get("delivery_active","false")).lower() in ("true","1")
+        plan_info = PLANS.get(cur_plan, PLANS["basic"])
+
+        with st.expander(f"{plan_info['label']} | {name} — #{rid}"):
+            col1, col2 = st.columns([2,1])
+
+            with col1:
+                new_plan = st.selectbox(
+                    "📦 الباقة",
+                    options=list(PLANS.keys()),
+                    format_func=lambda x: f"{PLANS[x]['label']} — {PLANS[x]['price']} د.م/شهر",
+                    index=list(PLANS.keys()).index(cur_plan) if cur_plan in PLANS else 0,
+                    key=f"plan_{rid}"
+                )
+
+                # التوصيل — فقط للمتكامل والمتميز
+                can_delivery = new_plan in ("pro","premium")
+                if can_delivery:
+                    new_delivery = st.checkbox(
+                        "🛵 تفعيل التوصيل",
+                        value=delivery,
+                        key=f"del_{rid}",
+                        help="يظهر خيار التوصيل لزبائن هذا المطعم"
+                    )
+                else:
+                    st.markdown("<div style='font-size:.8rem;color:#e74c3c'>🛵 التوصيل: يتطلب الباقة المتكاملة أو المتميزة</div>", unsafe_allow_html=True)
+                    new_delivery = False
+
+            with col2:
+                # ما تشمله الباقة المختارة
+                feats = PLAN_FEATURES_DISPLAY.get(new_plan,[])
+                for f in feats:
+                    color = "#2ecc71" if f.startswith("✅") else "#e74c3c"
+                    st.markdown(f"<div style='font-size:.75rem;color:{color}'>{f}</div>", unsafe_allow_html=True)
+
+            if st.button(f"💾 حفظ الباقة", key=f"save_plan_{rid}", use_container_width=True):
+                try:
+                    # تحديث في Supabase/Google Sheets
+                    _update_master_field(rid, "plan", new_plan)
+                    _update_master_field(rid, "delivery_active", "true" if new_delivery else "false")
+                    # مسح cache
+                    import requests as _rq
+                    _rq.post(f"{ROUTER_URL}/admin/cache/clear/{rid}",
+                             headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=5)
+                    st.success(f"✅ تم تحديث باقة {name} → {PLANS[new_plan]['label']}")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ {e}")
+
+            # ── إشعار Telegram للمطعم ──────────────────
+            if st.button(f"📱 أرسل إشعار تفعيل للمطعم", key=f"notif_{rid}", use_container_width=True):
+                chat_id = r.get("telegram_chat_id","")
+                if chat_id:
+                    try:
+                        plan_lbl = PLANS[new_plan]["label"]
+                        price    = PLANS[new_plan]["price"]
+                        feats_txt = "\n".join(f"  {f}" for f in PLAN_FEATURES_DISPLAY[new_plan] if f.startswith("✅"))
+                        msg = (
+                            f"🎉 *تم تفعيل باقتك!*\n"
+                            f"━━━━━━━━━━━━\n"
+                            f"📦 الباقة: *{plan_lbl}*\n"
+                            f"💰 الاشتراك: *{price} درهم/شهر*\n"
+                            f"━━━━━━━━━━━━\n"
+                            f"✅ *ما تشمله باقتك:*\n{feats_txt}\n"
+                            f"━━━━━━━━━━━━\n"
+                            f"شكراً لاشتراكك! 🙏"
+                        )
+                        import requests as _rq
+                        _rq.post(
+                            f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                            json={"chat_id":chat_id,"text":msg,"parse_mode":"Markdown"},
+                            timeout=8
+                        )
+                        st.success("✅ الإشعار أُرسل للمطعم")
+                    except Exception as e:
+                        st.error(f"❌ {e}")
+                else:
+                    st.warning("⚠️ المطعم لم يربط Telegram بعد")
+
 def main():
     if not auth(): return
     rs = fetch_all()
@@ -1360,6 +1500,7 @@ code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
             ("🖨️ بطاقات PDF",    "🖨️ بطاقات PDF"),
             ("⚙️ إدارة",          "⚙️ إدارة"),
             ("🏢 الوكالات",       "🏢 الوكالات"),
+            ("📦 الباقات",         "📦 الباقات"),
         ]
         if "page" not in st.session_state:
             st.session_state["page"] = "🏠 Dashboard"
@@ -1410,6 +1551,7 @@ code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
     elif page == "🖨️ بطاقات PDF":    pg_pdf(rs)
     elif page == "⚙️ إدارة":          pg_manage(rs)
     elif page == "🏢 الوكالات":       page_agencies()
+    elif page == "📦 الباقات":         pg_plans(rs)
 
 if __name__ == "__main__":
     main()
