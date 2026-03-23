@@ -79,9 +79,18 @@ def page_agencies():
                         st.markdown(f"**أُنشئت:** {str(ag.get('created_at',''))[:10]}")
 
                     # رابط لوحة الوكالة
-                    agency_portal_url = os.getenv("AGENCY_PORTAL_URL","")
+                    agency_portal_url = os.getenv("AGENCY_PORTAL_URL","https://agency-portal-2oz.pages.dev")
                     if agency_portal_url:
-                        st.code(f"{agency_portal_url}?agency_id={ag['agency_id']}")
+                        import urllib.parse as _up2
+                        _ag_name_enc = _up2.quote(ag.get("name",""))
+                        _ag_full_url = (
+                            f"{agency_portal_url}"
+                            f"?agency_id={ag['agency_id']}"
+                            f"&name={_ag_name_enc}"
+                        )
+                        st.markdown("**🔗 رابط البوابة:**")
+                        st.code(_ag_full_url)
+                        st.caption("📌 رابط خاص بهذه الوكالة — يظهر اسمها عند الفتح")
 
                     if ag.get("notes"):
                         st.info(f"📝 {ag['notes']}")
@@ -108,19 +117,43 @@ def page_agencies():
             max_rest    = st.number_input("🏪 الحد الأقصى للمطاعم",
                                           min_value=1, max_value=9999,
                                           value={"basic":5,"pro":20,"unlimited":999}[plan])
-            password    = st.text_input("🔒 كلمة المرور",
-                                         value=_gen_password(),
-                                         help="يمكنك تغييرها — ستُعطى للوكالة")
+            # ✅ FIX: نولّد كلمة المرور مرة واحدة فقط ونحفظها في session_state
+            # حتى لا تُعاد في كل render وتمحو ما كتبه المستخدم
+            if "agency_gen_pw" not in st.session_state:
+                st.session_state["agency_gen_pw"] = _gen_password()
+            password = st.text_input(
+                "🔒 كلمة المرور",
+                value=st.session_state["agency_gen_pw"],
+                key="agency_pw_input",
+                help="يمكنك تغييرها — ستُعطى للوكالة"
+            )
+            # حدّث session_state بما كتبه المستخدم
+            st.session_state["agency_gen_pw"] = password
             notes       = st.text_area("📝 ملاحظات", placeholder="معلومات إضافية...", height=80)
 
         if "agency_create_msg" in st.session_state:
             msg = st.session_state.pop("agency_create_msg")
             if msg.get("ok"):
                 st.success(f"✅ تم إنشاء الوكالة **{agency_name}** بنجاح!")
+                agency_portal_url = os.getenv("AGENCY_PORTAL_URL","https://agency-portal-2oz.pages.dev")
+                # ✅ FIX 2: رابط خاص بكل وكالة يحتوي على agency_id
+                _agency_link = f"{agency_portal_url}?agency_id={agency_id}" if agency_portal_url else ""
                 st.markdown("**بيانات الدخول لإعطائها للوكالة:**")
-                st.code(f"Agency ID: {agency_id}\nPassword: {password}", language=None)
-                agency_portal_url = os.getenv("AGENCY_PORTAL_URL","https://agency-portal.netlify.app")
-                st.code(f"رابط البوابة: {agency_portal_url}", language=None)
+                st.code(
+                    f"Agency ID: {agency_id}\n"
+                    f"Password:  {password}\n"
+                    f"الرابط:    {_agency_link}",
+                    language=None
+                )
+                if _agency_link:
+                    import urllib.parse as _up
+                    _name_enc = _up.quote(agency_name)
+                    _full_link = f"{agency_portal_url}?agency_id={agency_id}&name={_name_enc}"
+                    st.markdown(f"**🔗 رابط البوابة الخاص بالوكالة:**")
+                    st.code(_full_link, language=None)
+                    st.caption("📌 هذا الرابط خاص بهذه الوكالة — سيظهر اسمها عند فتحه")
+                # امسح كلمة المرور المولّدة حتى تتجهز للوكالة التالية
+                st.session_state.pop("agency_gen_pw", None)
             else:
                 st.error(f"❌ {msg.get('detail',msg.get('error','خطأ'))}")
 
