@@ -135,13 +135,13 @@ body.day-theme{
   --sidebar:#ede8df;
   --text:#1a150a; --text2:#5a4820; --text3:#9a8a60;
   --border:#ccc4a8; --border2:#ddd5bc;
-  --gold:#8a6010; --gold2:#b08030; --gold-dim:#f0e8c8;
+  --gold:#7a5008; --gold2:#a07030; --gold-dim:#e8d8a0;
   --card:#ffffff; --card-border:#ccc4a8;
-  --input-bg:#ffffff; --input-text:#1a150a; --input-border:#ccc4a8;
-  --btn-sidebar:linear-gradient(135deg,#8a6010,#6a4800);
+  --input-bg:#ffffff; --input-text:#1a150a; --input-border:#c8b890;
+  --btn-sidebar:linear-gradient(135deg,#7a5008,#5a3800);
   --btn-sidebar-txt:#fff;
-  --success:#1a7030; --danger:#901818; --info:#1a4a8a;
-  --tab-active:#8a6010; --tab-active-txt:#fff;
+  --success:#1a6028; --danger:#881515; --info:#1a4a88;
+  --tab-active:#7a5008; --tab-active-txt:#fff;
   --shadow:0 2px 8px rgba(0,0,0,.12);
 }
 
@@ -314,19 +314,40 @@ hr,.gdiv{border-color:var(--border)!important}
   border-radius:var(--radius);padding:.6rem .8rem;text-align:center;
   margin:.5rem 0;font-weight:700;color:var(--gold);font-size:.9rem;
 }
-/* ══ ضمان وضوح النصوص في النهار ══ */
+/* ══ ضمان وضوح كل شيء في وضع النهار ══ */
 body.day-theme p, body.day-theme li, body.day-theme span,
 body.day-theme label, body.day-theme h1, body.day-theme h2,
-body.day-theme h3, body.day-theme h4
+body.day-theme h3, body.day-theme h4, body.day-theme div
 {color:var(--text)!important}
-body.day-theme [data-testid="stMarkdown"] *
+body.day-theme [data-testid="stMarkdown"] *,
+body.day-theme [data-testid="stMarkdownContainer"] *
 {color:var(--text)!important}
-body.day-theme [data-testid="stExpander"] *
-{color:var(--text)!important}
-/* أيقونات sidebar في النهار — واضحة */
-body.day-theme section[data-testid="stSidebar"] .stButton>button img,
-body.day-theme section[data-testid="stSidebar"] .stButton>button span
-{filter:brightness(0) invert(1)!important}
+body.day-theme [data-testid="stExpander"] *,
+body.day-theme [data-testid="stExpanderDetails"] *
+{color:var(--text)!important;background:var(--card)!important}
+body.day-theme [data-testid="stMetricValue"]
+{color:var(--gold)!important}
+body.day-theme [data-testid="stMetricLabel"]
+{color:var(--text2)!important}
+/* ضمان وضوح النص في حقول الإدخال بالنهار */
+body.day-theme input, body.day-theme textarea, body.day-theme select
+{color:var(--input-text)!important;background:var(--input-bg)!important}
+/* ضمان وضوح الأزرار في النهار */
+body.day-theme .stButton>button
+{color:var(--gold)!important}
+body.day-theme section[data-testid="stSidebar"] .stButton>button
+{color:var(--gold)!important;background:var(--gold-dim)!important;
+ border-color:var(--border)!important}
+/* تابات واضحة في النهار */
+body.day-theme [data-baseweb="tab"]
+{color:var(--text2)!important}
+body.day-theme [aria-selected="true"][data-baseweb="tab"]
+{color:var(--tab-active)!important}
+/* code واضح في النهار */
+body.day-theme code, body.day-theme pre
+{background:var(--bg3)!important;color:var(--gold)!important;
+ border:1px solid var(--border)!important}
+/* أيقونات sidebar في النهار */
 </style>
 """, unsafe_allow_html=True)
 
@@ -1718,19 +1739,22 @@ def main():
             if key == active:
                 css_btns += f"""
         div[data-testid="stSidebar"] .stButton:nth-of-type({i+1})>button {{
-            background:linear-gradient(135deg,#C9A84C,#e8c96a)!important;
-            color:#000!important; font-weight:800!important;
-            border:none!important;
+            background:var(--btn-sidebar)!important;
+            color:var(--btn-sidebar-txt)!important;
+            font-weight:800!important;
+            border:2px solid var(--gold)!important;
         }}"""
         st.markdown(f"""<style>
         div[data-testid="stSidebar"] .stButton>button {{
             width:100%; border-radius:10px; padding:.5rem .8rem;
-            background:rgba(201,168,76,.1); color:#C9A84C;
-            border:1px solid rgba(201,168,76,.25); font-size:.88rem;
-            margin:.1rem 0; transition:all .2s;
+            background:var(--gold-dim); color:var(--gold);
+            border:1px solid var(--border); font-size:.88rem;
+            margin:.1rem 0; transition:all .2s; font-weight:600;
         }}
         div[data-testid="stSidebar"] .stButton>button:hover {{
-            background:rgba(201,168,76,.2)!important; color:#e8c96a!important;
+            background:var(--btn-sidebar)!important;
+            color:var(--btn-sidebar-txt)!important;
+            border-color:var(--gold)!important;
         }}
         {css_btns}
         </style>""", unsafe_allow_html=True)
