@@ -826,7 +826,9 @@ def pg_add(rs):
                 _queries = VENUE_QUERIES.get(rvenue_type, [rname])
                 _photo_query = random.choice(_queries)
                 menu_img, wifi_img = generate_table_card(
-                    rname, rssid, rwpass, 1, f"{mu}&table=1",
+                    rname, rssid, rwpass, 1,
+                    # ✅ FIX: بناء URL صحيح مع table param
+                    (f"{mu}?table=1" if "?" not in mu else f"{mu}&table=1"),
                     rstyle, rprimary, raccent, rbg_type, rsocials,
                     pexels_key=PEXELS_KEY,
                     unsplash_key=UNSPLASH_KEY,
@@ -845,7 +847,10 @@ def pg_add(rs):
                     "last_rid": rid,
                     "last_rbg_type": rbg_type,
                     "last_rsocials": rsocials,
-                    "last_photo_query": _photo_query,  # ✅ نحفظ الـ query المستخدم
+                    "last_photo_query": _photo_query,
+                    # ✅ FIX: احفظ slug و base_url للـ PDF
+                    "last_slug": _clean_slug,
+                    "last_base_url": mu.split("&table=")[0] if "&table=" in mu else mu,
                 })
                 st.session_state.pop("last_pdf_bytes", None)
 
@@ -932,10 +937,20 @@ def _show_cards_and_pdf():
                 from pdf_generator import generate_table_tents_pdf
                 # ✅ استخدام نفس الـ photo_query المحفوظ من عند توليد البطاقة
                 saved_query = st.session_state.get("last_photo_query", rname)
-                # ✅ استخدم الرابط النظيف إذا وُجد slug
-                _pdf_base_url = f"{FRONTEND_URL}/{_clean_slug}" if _clean_slug else FRONTEND_URL
+                # ✅ FIX: استخدم last_base_url المحفوظة مباشرة — لا تحتاج _clean_slug
+                _last_mu = st.session_state.get("last_mu", "")
+                _last_base = st.session_state.get("last_base_url", "")
+                if _last_base:
+                    _pdf_base_url = _last_base
+                elif _last_mu:
+                    _pdf_base_url = _last_mu.split("&table=")[0] if "&table=" in _last_mu else _last_mu
+                else:
+                    _last_slug_ss = st.session_state.get("last_slug", "")
+                    _pdf_base_url = f"{FRONTEND_URL}/{_last_slug_ss}" if _last_slug_ss else f"{FRONTEND_URL}?rest_id={rid}"
+                # ✅ FIX: تأكد أن الـ URL يحتوي rest_id أو slug بشكل صحيح
+                _pdf_url_clean = _pdf_base_url.rstrip("/")
                 pdf = generate_table_tents_pdf(
-                    rname, rssid, rwpass, _pdf_base_url,
+                    rname, rssid, rwpass, _pdf_url_clean,
                     rid, rtables, rstyle, rp, ra,
                     bg_type=rbg, socials=rsoc,
                     pexels_key=PEXELS_KEY,
