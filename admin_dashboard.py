@@ -1169,13 +1169,27 @@ def pg_manage(rs):
                     st.cache_data.clear()
                     st.rerun()
 
-                # ✅ زر تفعيل/إلغاء التوصيل
-                delivery_on = str(r.get("delivery_active","")).lower() == "true"
+                # ✅ زر تفعيل/إلغاء التوصيل — يكتب في Supabase مباشرة
+                delivery_on = (
+                    r.get("delivery_active") is True or
+                    str(r.get("delivery_active","")).lower() == "true"
+                )
                 delivery_label = "🛵 إلغاء التوصيل" if delivery_on else "🛵 تفعيل التوصيل"
-                col1d, col2d = st.columns([2,1])
-                with col1d:
-                    if st.button(delivery_label, key=f"del_tog_{uid}", use_container_width=True):
-                        new_val = "false" if delivery_on else "true"
+                delivery_color = "🟢 مفعّل" if delivery_on else "🔴 غير مفعّل"
+                st.markdown(f"<div style='font-size:.8rem;color:#888;margin-bottom:.3rem'>التوصيل: {delivery_color}</div>", unsafe_allow_html=True)
+
+                if st.button(delivery_label, key=f"del_tog_{uid}", use_container_width=True,
+                             type="primary" if not delivery_on else "secondary"):
+                    new_bool = not delivery_on
+                    new_val  = "true" if new_bool else "false"
+                    try:
+                        # ✅ 1) كتابة في Supabase أولاً (boolean صحيح)
+                        _ok_sb = _sb_patch(
+                            "restaurants",
+                            f"restaurant_id=eq.{rid}",
+                            {"delivery_active": new_bool}
+                        )
+                        # ✅ 2) كتابة في Google Sheets كـ backup
                         try:
                             import gspread as _gs_mod
                             from google.oauth2.service_account import Credentials as _Creds
@@ -1188,41 +1202,33 @@ def pg_manage(rs):
                                 _client = _gs_mod.authorize(_creds)
                                 _ws     = _client.open_by_key(_MASTER).worksheet("Master_DB")
                                 _headers = _ws.row_values(1)
-                                # أضف العمود إذا ناقص
                                 if "delivery_active" not in _headers:
                                     _ws.update_cell(1, len(_headers)+1, "delivery_active")
                                     _headers.append("delivery_active")
                                 _col = _headers.index("delivery_active") + 1
-                                # ✅ نستخدم get_all_values بدل get_all_records
-                                _all = _ws.get_all_values()
                                 _rid_col = _headers.index("restaurant_id") if "restaurant_id" in _headers else 0
-                                for _i, _row in enumerate(_all[1:], start=2):
+                                for _i, _row in enumerate(_ws.get_all_values()[1:], start=2):
                                     if len(_row) > _rid_col and str(_row[_rid_col]).strip() == rid:
                                         _ws.update_cell(_i, _col, new_val)
                                         break
-                                # ✅ مسح cache الـ API فوراً + مسح cache الداشبورد
-                                try:
-                                    requests.post(f"{ROUTER_URL}/cache/refresh/{rid}", timeout=8)
-                                    requests.post(f"{ROUTER_URL}/cache/refresh", timeout=8)
-                                except: pass
-                                st.cache_data.clear()
-                                lbl = 'مفعّل 🛵' if new_val=='true' else 'ملغى ✅'
-                                st.success(f"التوصيل {lbl} — تطبّق فوراً على المينيو")
-                                st.rerun()
-                        except Exception as _e:
-                            st.error(f"❌ {_e}")
-                with col2d:
-                    # ✅ زر Refresh فوري منفصل
-                    if st.button("🔄 تطبيق فوري", key=f"ref_del_{uid}",
-                                 help="اضغط بعد أي تعديل لتطبيق التغييرات فوراً على المينيو",
-                                 use_container_width=True):
-                        try:
-                            requests.post(f"{ROUTER_URL}/cache/refresh/{rid}", timeout=8)
-                            requests.post(f"{ROUTER_URL}/cache/refresh", timeout=8)
                         except: pass
+                        # ✅ 3) مسح cache الـ Router فوراً
+                        try:
+                            requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
+                                          headers={"X-Admin-Key": SPASSWORD}, timeout=8)
+                            requests.post(f"{ROUTER_URL}/cache/refresh",
+                                          headers={"X-Admin-Key": SPASSWORD}, timeout=8)
+                        except: pass
+                        # ✅ 4) مسح cache الداشبورد وإعادة التحميل
                         st.cache_data.clear()
-                        st.success("✅ تم تطبيق التغييرات فوراً!")
+                        lbl = "مفعّل 🛵" if new_bool else "ملغى ❌"
+                        if _ok_sb:
+                            st.success(f"✅ التوصيل {lbl} — تم الحفظ في Supabase فوراً")
+                        else:
+                            st.warning(f"⚠️ التوصيل {lbl} — تحقق من الاتصال بـ Supabase")
                         st.rerun()
+                    except Exception as _e:
+                        st.error(f"❌ خطأ: {_e}")
 
             # ══ خانة الـ Slug (رابط نظيف) ══
             st.markdown("---")
