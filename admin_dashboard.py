@@ -95,6 +95,7 @@ SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
 TG_TOKEN        = os.getenv("TELEGRAM_BOT_TOKEN","")
 KITCHEN_URL     = os.getenv("KITCHEN_URL","https://kitchen-qr.netlify.app")
+CAISSE_URL      = os.getenv("CAISSE_URL","https://caisse-restcaf.pages.dev")
 
 # مفاتيح الصور للخلفية food_photo
 PEXELS_KEY    = os.getenv("PEXELS_API_KEY","")
@@ -645,6 +646,9 @@ def pg_add(rs):
             rkitchen_pass = st.text_input("🔑 كلمة مرور الكوزينة *",
                 type="password", placeholder="كلمة مرور يعرفها الطاهي فقط",
                 help="يحتاجها الطاهي لفتح شاشة الكوزينة — لا يعرفها الزباءن")
+            rcashier_pass = st.text_input("💰 كلمة مرور الكاسيير",
+                placeholder="اتركه فارغاً إذا لم تريد كلمة مرور",
+                key="new_cashier_pass")
 
         # ✅ خيار التوصيل
         st.markdown("---")
@@ -766,6 +770,23 @@ def pg_add(rs):
               <small style="color:#555">📌 Bookmark على التابليت في الكوزينة</small>
             </div>""", unsafe_allow_html=True)
             st.code(kitchen_link, language=None)
+
+            # ✅ رابط الكاشير (الدفع)
+            if CAISSE_URL:
+                _caisse_rid_new = _clean_slug if _clean_slug else rid.strip()
+                _caisse_link_new = f"{CAISSE_URL}?rid={_caisse_rid_new}&api={ROUTER_URL}"
+                _cashier_pw_new = rcashier_pass.strip() if rcashier_pass.strip() else "بدون كلمة مرور"
+                st.markdown(f"""<div style="background:rgba(0,200,83,.07);border:1px solid rgba(0,200,83,.2);
+                  border-radius:12px;padding:1rem 1.2rem;margin:.5rem 0">
+                  <b style="color:#00c853">💰 رابط شاشة الكاشير (الدفع):</b><br>
+                  <div style="background:#001a08;border:1px solid rgba(0,200,83,.2);border-radius:8px;
+                       padding:.6rem 1rem;font-family:monospace;font-size:.78rem;color:#00c853;
+                       word-break:break-all;margin:.5rem 0">{_caisse_link_new}</div>
+                  <b style="color:#69f0ae">🔑 كلمة مرور الكاشير:</b>
+                  <code style="background:#002210;color:#69f0ae;padding:2px 8px;border-radius:4px">{_cashier_pw_new}</code><br>
+                  <small style="color:#555">📌 ضعه على كمبيوتر الكاشير — تصله الطلبات فور تقديمها من النادل</small>
+                </div>""", unsafe_allow_html=True)
+                st.code(_caisse_link_new, language=None)
 
             # توليد البطاقات
             st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
@@ -1109,6 +1130,7 @@ def pg_manage(rs):
                 **🎨 طابع:** {r.get('style','')} | 🪑 {r.get('num_tables','')} طاولة
 
                 **🔑 كلمة سر الكوزينة:** `{r.get('kitchen_password','⚠️ غير محددة')}`
+                **💰 كلمة سر الكاسيير:** `{r.get('cashier_password','') or '⚠️ غير محددة'}`
 
                 **🛵 التوصيل:** {'✅ مفعّل' if str(r.get('delivery_active','')).lower()=='true' else '❌ غير مفعّل'}
                 """)
@@ -1125,6 +1147,14 @@ def pg_manage(rs):
                 kitchen_link = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={rid}&name={requests.utils.quote(r.get('name',''))}"
                 st.markdown("**🍳 شاشة الكوزينة:**")
                 st.code(kitchen_link)
+                if CAISSE_URL:
+                    _slug_m = r.get("slug","").strip() or rid
+                    _caisse_m = f"{CAISSE_URL}?rid={_slug_m}&api={ROUTER_URL}"
+                    st.markdown("**💰 رابط الكاشير:**")
+                    st.code(_caisse_m)
+                    _cpw = r.get("cashier_password","")
+                    if _cpw:
+                        st.markdown(f"**🔑 كلمة مرور الكاشير:** `{_cpw}`")
 
                 # ✅ إصلاح: جلب اسم البوت ديناميكياً من API Telegram
                 try:
@@ -1452,11 +1482,28 @@ def pg_plans(rs):
                     color = "#2ecc71" if f.startswith("✅") else "#e74c3c"
                     st.markdown(f"<div style='font-size:.75rem;color:{color}'>{f}</div>", unsafe_allow_html=True)
 
-            if st.button(f"💾 حفظ الباقة", key=f"save_plan_{rid}", use_container_width=True):
+            if st.button(f"💾 حفظ الباقة", key=f"save_plan_{rid}", use_container_width=True,
+                         type="primary"):
                 try:
+                    import requests as _rqp
+                    # ✅ 1) حفظ في Supabase مباشرة (boolean صحيح)
+                    _ok1 = _sb_patch("restaurants", f"restaurant_id=eq.{rid}",
+                                     {"plan": new_plan,
+                                      "delivery_active": bool(new_del)})
+                    # ✅ 2) حفظ عبر _update_master_field (Sheets backup)
                     _update_master_field(rid, "plan", new_plan)
                     _update_master_field(rid, "delivery_active", "true" if new_del else "false")
-                    st.success(f"✅ تم تحديث {name} → {PLANS[new_plan]['label']}")
+                    # ✅ 3) مسح cache الـ Router فوراً — يُطبَّق على المينيو لحظياً
+                    try:
+                        _rqp.post(f"{ROUTER_URL}/cache/refresh/{rid}",
+                                  headers={"X-Admin-Key": SPASSWORD}, timeout=5)
+                        _rqp.post(f"{ROUTER_URL}/cache/refresh",
+                                  headers={"X-Admin-Key": SPASSWORD}, timeout=5)
+                    except: pass
+                    # ✅ 4) مسح cache الداشبورد
+                    st.cache_data.clear()
+                    del_status = "🛵 مع توصيل" if new_del else "بدون توصيل"
+                    st.success(f"✅ {name} → {PLANS[new_plan]['label']} {del_status} — طُبِّق فوراً!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ {e}")
