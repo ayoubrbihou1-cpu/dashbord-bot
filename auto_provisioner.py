@@ -29,6 +29,7 @@ SA_EMAIL        = "restaurant-bot@gen-lang-client-0967477901.iam.gserviceaccount
 # Gmail للإرسال (اختياري)
 GMAIL_USER      = os.getenv("GMAIL_USER","")
 GMAIL_PASSWORD  = os.getenv("GMAIL_APP_PASSWORD","")
+CAISSE_URL      = os.getenv("CAISSE_URL","https://caisse-restcaf.pages.dev")
 
 @dataclass
 class ProvisionResult:
@@ -267,6 +268,7 @@ def send_welcome_email(to_email: str, restaurant_name: str,
                        sheet_url: str, menu_url: str,
                        wifi_ssid: str, reg_link: str = "",
                        kitchen_url: str = "", kitchen_password: str = "",
+                       caisse_url: str = "", cashier_password: str = "",
                        group_links: dict = None) -> bool:
     if not GMAIL_USER or not GMAIL_PASSWORD:
         log.warning("⚠️ GMAIL_USER أو GMAIL_APP_PASSWORD غير محدد — تخطي الإيميل")
@@ -327,6 +329,19 @@ def send_welcome_email(to_email: str, restaurant_name: str,
           </td>
         </tr>""" if kitchen_url else ""
 
+        caisse_section = f"""
+        <tr>
+          <td colspan="2" style="padding:12px;background:#001a0d;border-radius:8px;margin-top:8px">
+            <b style="color:#00c853">💰 شاشة الكاشير (الدفع):</b><br>
+            <a href="{caisse_url}" style="color:#00c853;font-size:.85rem">{caisse_url}</a><br>
+            <b style="color:#00c853">🔑 كلمة مرور الكاشير:</b>
+            <code style="background:#001a08;color:#69f0ae;padding:2px 8px;border-radius:4px;font-size:1rem">
+              {cashier_password if cashier_password else "بدون كلمة مرور"}
+            </code><br>
+            <small style="color:#888">📌 تصلها الطلبات فور تقديمها من النادل</small>
+          </td>
+        </tr>""" if caisse_url else ""
+
         html = f"""
         <html><body style="font-family:Arial,sans-serif;background:#0a0a0a;color:#eee;padding:20px">
           <div style="max-width:600px;margin:0 auto;background:#111;border-radius:16px;
@@ -355,6 +370,7 @@ def send_welcome_email(to_email: str, restaurant_name: str,
                   <td>{wifi_ssid}</td>
                 </tr>
                 {kitchen_section}
+                {caisse_section}
                 {groups_section}
               </table>
               <hr style="border-color:#222;margin:16px 0">
@@ -608,9 +624,13 @@ def provision_restaurant(
 
     # ✅ إرسال إيميل Gmail
     if owner_email:
+        _caisse_rid = slug or str(restaurant_id)
+        _caisse_link = f"{CAISSE_URL}?rid={_caisse_rid}&api={ROUTER_BASE_URL}" if CAISSE_URL else ""
         email_ok = send_welcome_email(
             owner_email, name, url, menu_url, wifi_ssid, reg,
             kitchen_url=kitchen_url, kitchen_password=kitchen_password,
+            caisse_url=_caisse_link,
+            cashier_password=data.get("cashier_password","") if hasattr(data,"get") else "",
             group_links=gl
         )
         steps.append("✅ إيميل أُرسل" if email_ok else "⚠️ إيميل فشل (تحقق من GMAIL_USER/GMAIL_APP_PASSWORD)")
