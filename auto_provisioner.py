@@ -475,7 +475,8 @@ def provision_restaurant(
     style="luxury", primary_color="#0a0804", accent_color="#C9A84C",
     num_tables=10, logo_url="", owner_email="", telegram_chat_id="",
     bg_type="minimal", socials=None, kitchen_password="",
-    delivery_active=False, sa_json="", slug=""
+    delivery_active=False, sa_json="", slug="",
+    cashier_password=""
 ):
     res = ProvisionResult()
     steps = []
@@ -539,6 +540,7 @@ def provision_restaurant(
                 "logo_url":        logo_url or "",
                 "owner_email":     owner_email or "",
                 "kitchen_password":kitchen_password or "",
+                "cashier_password":cashier_password or "",
                 "delivery_active": bool(delivery_active),
                 "socials":         json.dumps(socials or {}, ensure_ascii=False),
                 "sa_json":         sa_json.strip() if sa_json else "",
@@ -580,6 +582,7 @@ def provision_restaurant(
         "num_tables":       num_tables,
         "logo_url":         logo_url,
         "kitchen_password": kitchen_password,
+        "cashier_password": cashier_password,
         "owner_email":      owner_email,
         "status":           "active" if telegram_chat_id else "pending_telegram",
         "created_at":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
