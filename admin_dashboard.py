@@ -504,6 +504,34 @@ def pg_dashboard(rs):
             st.markdown('<div class="res err">🔴 API غير متاح (Render نائم؟)</div>', unsafe_allow_html=True)
 
         st.code(f"API:      {ROUTER_URL}\nFrontend: {FRONTEND_URL}")
+        # ✅ زر اختبار الإيميل
+        st.markdown("---")
+        st.markdown("**📧 اختبار إرسال الإيميل:**")
+        _test_email = st.text_input("📮 أدخل إيميل للاختبار", placeholder="test@gmail.com", key="test_email_inp")
+        if st.button("📤 إرسال إيميل اختبار", key="btn_test_email"):
+            if _test_email.strip():
+                try:
+                    import smtplib, os as _ose
+                    from email.mime.text import MIMEText
+                    _gu = _ose.getenv("GMAIL_USER","")
+                    _gp = _ose.getenv("GMAIL_APP_PASSWORD","")
+                    if not _gu or not _gp:
+                        st.error("❌ GMAIL_USER أو GMAIL_APP_PASSWORD غير موجودَين في Secrets")
+                    else:
+                        _msg = MIMEText(f"<h2>✅ اختبار ناجح!</h2><p>الإيميل يعمل من {_gu}</p>", "html", "utf-8")
+                        _msg["Subject"] = "✅ اختبار إيميل النظام"
+                        _msg["From"] = _gu
+                        _msg["To"] = _test_email.strip()
+                        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as _srv:
+                            _srv.login(_gu, _gp)
+                            _srv.sendmail(_gu, _test_email.strip(), _msg.as_string())
+                        st.success(f"✅ تم الإرسال بنجاح إلى {_test_email.strip()} — تحقق من البريد الوارد وSpam")
+                except smtplib.SMTPAuthenticationError:
+                    st.error("❌ GMAIL_APP_PASSWORD خاطئة — أنشئ App Password جديدة من Google Account")
+                except Exception as _te:
+                    st.error(f"❌ خطأ: {type(_te).__name__}: {_te}")
+            else:
+                st.warning("⚠️ أدخل إيميل أولاً")
 
         if st.button("🔄 تحديث Cache", key="dash_refresh"):
             try:
