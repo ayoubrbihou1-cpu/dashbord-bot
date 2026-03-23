@@ -1,19 +1,16 @@
 """
-👑 admin_dashboard.py — النسخة النهائية الكاملة v5.0
-═══════════════════════════════════════════════════
-✅ كيف يعمل التعدد:
-   - كل مطعم له Sheet ID خاص = قاعدة بياناته المستقلة
-   - Master_DB tab = جدول الفهرس (restaurant_id → sheet_id)
-   - عندما يفتح الزبون ?rest_id=2 → API يبحث في Master_DB
-     عن restaurant_id=2 → يجلب sheet_id → يقرأ منه فقط
-   - لا يختلط مطعم بآخر أبداً
+👑 admin_dashboard.py — لوحة التحكم الرئيسية
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 Supabase ← مصدر البيانات الرئيسي
+   fetch_all()        → يقرأ المطاعم من Supabase
+   _update_master_field() → يكتب في Supabase
+   pg_plans()         → يحفظ الباقات في Supabase
+   page_agencies()    → يدير الوكالات عبر API→Supabase
 
-✅ إصلاحات:
-   - KeyError في صور الأكلات
-   - DuplicateElementKey في الإدارة
-   - PDF يعمل (ImageReader)
-   - Telegram Webhook صحيح
-   - صور الأكلات تُحفظ في Sheet كل مطعم
+📋 Google Sheets ← قراءة المنيو فقط
+   page_menu_manager() → يعدّل الأكلات والأسعار
+   page_images()       → يعدّل صور الأكلات
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 import streamlit as st
 import gspread, io, os, json, time, requests
@@ -36,6 +33,63 @@ ADMIN_PASSWORD  = os.getenv("ADMIN_PASSWORD","admin2024")
 ROUTER_URL      = os.getenv("ROUTER_BASE_URL","https://your-api.onrender.com")
 SUPABASE_URL    = os.getenv("SUPABASE_URL","")
 SUPABASE_KEY    = os.getenv("SUPABASE_KEY","")
+
+# ══════════════════════════════════════════════════════════
+# 🗄️ Supabase Direct Helpers — للداشبورد
+# ══════════════════════════════════════════════════════════
+def _sb_get(table, filters="", limit=500):
+    """جلب مباشر من Supabase REST API"""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return []
+    try:
+        import requests as _rq
+        h = {"apikey": SUPABASE_KEY,
+             "Authorization": f"Bearer {SUPABASE_KEY}",
+             "Content-Type": "application/json"}
+        url = f"{SUPABASE_URL}/rest/v1/{table}?limit={limit}"
+        if filters:
+            url += f"&{filters}"
+        r = _rq.get(url, headers=h, timeout=10)
+        return r.json() if r.status_code == 200 else []
+    except:
+        return []
+
+def _sb_patch(table, filters, data):
+    """تحديث مباشر في Supabase"""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return False
+    try:
+        import requests as _rq
+        h = {"apikey": SUPABASE_KEY,
+             "Authorization": f"Bearer {SUPABASE_KEY}",
+             "Content-Type": "application/json",
+             "Prefer": "return=minimal"}
+        r = _rq.patch(f"{SUPABASE_URL}/rest/v1/{table}?{filters}",
+                      headers=h, json=data, timeout=8)
+        return r.status_code in (200, 204)
+    except:
+        return False
+
+def fetch_orders_supabase(restaurant_id, limit=100):
+    """جلب طلبات مطعم من Supabase"""
+    rows = _sb_get("orders",
+                   f"restaurant_id=eq.{restaurant_id}&order=created_at.desc",
+                   limit)
+    import json as _j
+    for r in rows:
+        if isinstance(r.get("items"), str):
+            try: r["items"] = _j.loads(r["items"])
+            except: r["items"] = []
+        if isinstance(r.get("delivery_active"), bool):
+            r["delivery_active"] = "true" if r["delivery_active"] else "false"
+    return rows
+
+def fetch_staff_supabase(restaurant_id):
+    """جلب موظفي مطعم من Supabase"""
+    return _sb_get("staff",
+                   f"restaurant_id=eq.{restaurant_id}&status=eq.active")
+
+
 FRONTEND_URL    = os.getenv("FRONTEND_URL","https://your-menu.netlify.app")
 SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
