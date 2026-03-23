@@ -1696,19 +1696,150 @@ def pg_plans(rs):
 def main():
     if not auth(): return
     rs = fetch_all()
-
-    # ══ تطبيق الثيم على body ══
+    # ══ تطبيق الثيم — CSS مباشر بدون JavaScript ══
     if "dark_mode" not in st.session_state:
         st.session_state.dark_mode = True
 
-    theme_class = "" if st.session_state.dark_mode else "day-theme"
-    st.markdown(f"""
-<script>
-(function(){{
-  document.body.className = "{theme_class}";
-  document.documentElement.className = "{theme_class}";
-}})();
-</script>""", unsafe_allow_html=True)
+    if not st.session_state.dark_mode:
+        st.markdown("""<style>
+/* ══ وضع النهار — يُحقن مباشرة بـ Python كل render ══ */
+:root, .stApp, [data-testid="stAppViewContainer"],
+[data-testid="stAppViewBlockContainer"], .main, .block-container {
+  --bg:#f7f3ec !important; --bg2:#ede8df !important; --bg3:#e4ddd2 !important;
+  --sidebar:#ede8df !important;
+  --text:#1a150a !important; --text2:#5a4820 !important; --text3:#9a8a60 !important;
+  --border:#ccc4a8 !important; --border2:#ddd5bc !important;
+  --gold:#7a5008 !important; --gold2:#a07030 !important; --gold-dim:#e8d8a0 !important;
+  --card:#ffffff !important; --card-border:#ccc4a8 !important;
+  --input-bg:#ffffff !important; --input-text:#1a150a !important;
+  --input-border:#c8b890 !important;
+  --btn-sidebar:linear-gradient(135deg,#7a5008,#5a3800) !important;
+  --btn-sidebar-txt:#ffffff !important;
+  --tab-active:#7a5008 !important;
+  --shadow:0 2px 8px rgba(0,0,0,.12) !important;
+}
+/* الخلفيات */
+.stApp, [data-testid="stAppViewContainer"],
+[data-testid="stAppViewBlockContainer"], [data-testid="stHeader"],
+.main, .block-container, [data-testid="stDecoration"]
+{ background:#f7f3ec !important; color:#1a150a !important; }
+
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"]>div
+{ background:#ede8df !important; }
+
+/* كل النصوص */
+section[data-testid="stSidebar"] *,
+p, span, div, label, li, td, th, h1, h2, h3, h4, h5,
+[data-testid="stMarkdown"] *, [data-testid="stMarkdownContainer"] *,
+[data-testid="stText"] *, [data-testid="stCaption"] *,
+.stMarkdown *, .element-container *
+{ color:#1a150a !important; }
+
+/* الحقول */
+input, textarea, select,
+.stTextInput input, .stTextArea textarea, .stNumberInput input,
+[data-baseweb="input"] input, [data-baseweb="textarea"]
+{ background:#ffffff !important; color:#1a150a !important;
+  border-color:#c8b890 !important; }
+::placeholder { color:#9a8a60 !important; opacity:1 !important; }
+
+/* الأزرار */
+.stButton>button
+{ background:#e8d8a0 !important; color:#7a5008 !important;
+  border:1px solid #c8b890 !important; }
+.stButton>button:hover
+{ background:linear-gradient(135deg,#7a5008,#5a3800) !important;
+  color:#ffffff !important; border-color:#7a5008 !important; }
+
+/* أزرار السيدبار */
+section[data-testid="stSidebar"] .stButton>button
+{ background:#e8d8a0 !important; color:#7a5008 !important;
+  border:1px solid #ccc4a8 !important; font-weight:600 !important; }
+section[data-testid="stSidebar"] .stButton>button:hover
+{ background:linear-gradient(135deg,#7a5008,#5a3800) !important;
+  color:#ffffff !important; }
+
+/* selectbox */
+[data-baseweb="select"]>div,
+[data-baseweb="select"] [class*="control"],
+[data-baseweb="select"] [class*="singleValue"],
+[data-baseweb="select"] [class*="placeholder"]
+{ background:#ffffff !important; color:#1a150a !important;
+  border-color:#c8b890 !important; }
+[data-baseweb="select"] [class*="menu"],
+[data-baseweb="popover"]>div
+{ background:#f7f3ec !important; border-color:#ccc4a8 !important; }
+[data-baseweb="select"] [class*="option"]
+{ background:#f7f3ec !important; color:#1a150a !important; }
+[data-baseweb="select"] [class*="option"]:hover
+{ background:#e8d8a0 !important; }
+
+/* تابات */
+[data-baseweb="tab-list"], [role="tablist"]
+{ background:#ede8df !important; border-color:#ccc4a8 !important; }
+[data-baseweb="tab"], [role="tab"]
+{ color:#5a4820 !important; }
+[aria-selected="true"][data-baseweb="tab"],
+[aria-selected="true"][role="tab"]
+{ color:#7a5008 !important; border-bottom-color:#7a5008 !important;
+  background:transparent !important; }
+
+/* expanders */
+[data-testid="stExpander"]>details,
+[data-testid="stExpander"]
+{ background:#ffffff !important; border-color:#ccc4a8 !important; }
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary *
+{ color:#1a150a !important; }
+[data-testid="stExpander"] [data-testid="stExpanderDetails"],
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] *
+{ background:#ffffff !important; color:#1a150a !important; }
+
+/* metrics */
+[data-testid="stMetricValue"] { color:#7a5008 !important; }
+[data-testid="stMetricLabel"] { color:#5a4820 !important; }
+[data-testid="stMetric"], [data-testid="metric-container"]
+{ background:#ffffff !important; border-color:#ccc4a8 !important; }
+
+/* code */
+code, pre, [data-testid="stCode"]>div
+{ background:#e4ddd2 !important; color:#7a5008 !important;
+  border-color:#ccc4a8 !important; }
+
+/* alerts */
+[data-testid="stAlert"] { border-radius:10px !important; }
+
+/* radio / checkbox */
+[data-testid="stRadio"] label, [data-testid="stCheckbox"] label,
+[data-testid="stRadio"] p, [data-testid="stCheckbox"] p,
+[data-testid="stRadio"] span, [data-testid="stCheckbox"] span
+{ color:#1a150a !important; }
+
+/* file uploader */
+[data-testid="stFileUploader"]>div
+{ background:#e4ddd2 !important; border-color:#ccc4a8 !important; }
+[data-testid="stFileUploader"] *
+{ color:#1a150a !important; }
+
+/* slider */
+[data-testid="stSlider"] *
+{ color:#1a150a !important; }
+
+/* tabs panel */
+[data-baseweb="tab-panel"] *
+{ color:#1a150a !important; }
+
+/* custom cards in page */
+.s-card,.r-card,.iblk,.tgbox,.info-box
+{ background:#ffffff !important; border-color:#ccc4a8 !important; }
+.s-num,.r-name,.iv { color:#7a5008 !important; }
+.s-lbl,.r-meta,.il { color:#5a4820 !important; }
+
+/* table */
+table, th, td { color:#1a150a !important; }
+th { background:#e4ddd2 !important; color:#7a5008 !important; }
+</style>""", unsafe_allow_html=True)
 
     with st.sidebar:
         st.markdown('<div style="color:#C9A84C;font-size:1.1rem;font-weight:900;'
