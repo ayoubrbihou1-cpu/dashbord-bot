@@ -22,6 +22,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from auto_provisioner import provision_restaurant, ProvisionResult, build_reg_link
+from super_admin_agencies import page_agencies
 from generative_design import generate_table_card, card_to_bytes, STYLE_LABELS, BG_LABELS, SOCIAL_CONFIG
 from pdf_generator import generate_table_tents_pdf, generate_single_table_preview
 from page_images import page_images
@@ -33,6 +34,8 @@ SCOPES          = ["https://www.googleapis.com/auth/spreadsheets","https://www.g
 MASTER_SHEET_ID = os.getenv("MASTER_SHEET_ID","")
 ADMIN_PASSWORD  = os.getenv("ADMIN_PASSWORD","admin2024")
 ROUTER_URL      = os.getenv("ROUTER_BASE_URL","https://your-api.onrender.com")
+SUPABASE_URL    = os.getenv("SUPABASE_URL","")
+SUPABASE_KEY    = os.getenv("SUPABASE_KEY","")
 FRONTEND_URL    = os.getenv("FRONTEND_URL","https://your-menu.netlify.app")
 SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
 SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
@@ -237,15 +240,16 @@ def _safe_str(val, default=""):
 
 def _sanitize_record(rec: dict) -> dict:
     """
-    يُنظّف كل حقل في سجل المطعم بعد قراءته من الشيت.
-    يتعامل مع: أعمدة مختلطة، قيم فارغة، نصوص بدل أرقام...
+    ✅ يُنظّف كل حقل في سجل المطعم (Supabase أو Sheets)
     """
     import json as _json
 
-    # حقول نصية عادية
+    # ✅ حقول نصية كاملة بما فيها Supabase-only fields
     for f in ["restaurant_id","name","sheet_id","telegram_chat_id",
               "wifi_ssid","wifi_password","primary_color","accent_color",
-              "style","logo_url","owner_email","status","created_at"]:
+              "style","logo_url","owner_email","status","created_at",
+              "kitchen_password","slug","plan","agency_id",
+              "boss_chat_id","waiters_chat_id","delivery_chat_id","sa_json"]:
         rec[f] = _safe_str(rec.get(f,""))
 
     # ألوان — قيمة افتراضية إذا غير صالحة
@@ -281,11 +285,39 @@ def _sanitize_record(rec: dict) -> dict:
 
     return rec
 
-@st.cache_data(ttl=30)   # ✅ إصلاح: 30 ثانية بدل 120 — تحديث أسرع بعد أي تغيير
+@st.cache_data(ttl=30)   # ✅ إصلاح: 30 ثانية — تحديث أسرع بعد أي تغيير
 def fetch_all():
     """
-    ✅ يقرأ من tab 'Master_DB' حصراً
+    ✅ FIX 8: يقرأ من Supabase أولاً (delivery_active صحيح) ثم من Google Sheets كـ fallback
     """
+    import requests as _rq8
+    sb_url = SUPABASE_URL
+    sb_key = SUPABASE_KEY
+    if sb_url and sb_key:
+        try:
+            h8 = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                  "Content-Type": "application/json"}
+            resp8 = _rq8.get(
+                f"{sb_url}/rest/v1/restaurants?order=created_at.desc&limit=1000",
+                headers=h8, timeout=10
+            )
+            if resp8.status_code == 200:
+                rows8 = resp8.json() or []
+                if rows8:
+                    records8 = []
+                    for r8 in rows8:
+                        # تحويل delivery_active للنص لأن الداشبورد يقرأه بـ str().lower()
+                        if isinstance(r8.get("delivery_active"), bool):
+                            r8["delivery_active"] = "true" if r8["delivery_active"] else "false"
+                        # تحويل الـ nulls لـ strings فارغة
+                        for k8, v8 in r8.items():
+                            if v8 is None:
+                                r8[k8] = ""
+                        records8.append(_sanitize_record(r8))
+                    return records8
+        except Exception as _e8:
+            pass  # fallback للـ Sheets أدناه
+    # ── Fallback: Google Sheets ──────────────────────────
     c = gs()
     if not c or not MASTER_SHEET_ID: return []
     try:
@@ -310,7 +342,6 @@ def fetch_all():
                 records.append(_sanitize_record(rec))
         return records
     except Exception as e:
-        # عند خطأ 429 — لا نُظهر خطأ ونرجع قائمة فارغة بصمت
         if "429" in str(e) or "Quota" in str(e):
             st.warning("⚠️ Google Sheets: حد الطلبات مؤقتاً — انتظر دقيقة", icon="⏳")
         else:
@@ -1272,16 +1303,36 @@ PLAN_FEATURES_DISPLAY = {
 }
 
 def _update_master_field(rid, field, value):
-    """تحديث حقل في Master_DB"""
+    """✅ تحديث حقل في Supabase — مع تحويل النوع الصحيح لكل حقل"""
     try:
-        import os, requests as _rq
-        sb_url = os.getenv("SUPABASE_URL","")
-        sb_key = os.getenv("SUPABASE_KEY","")
+        import requests as _rq
+        sb_url = SUPABASE_URL
+        sb_key = SUPABASE_KEY
         if sb_url and sb_key:
             h = {"apikey":sb_key,"Authorization":f"Bearer {sb_key}",
                  "Content-Type":"application/json","Prefer":"return=minimal"}
-            _rq.patch(f"{sb_url}/rest/v1/restaurants?restaurant_id=eq.{rid}",
-                      headers=h, json={field:value}, timeout=8)
+            # ✅ FIX 7: تحويل القيمة للنوع الصحيح حسب الحقل
+            BOOLEAN_FIELDS = {"delivery_active"}
+            INT_FIELDS = {"num_tables", "max_restaurants"}
+            if field in BOOLEAN_FIELDS:
+                typed_val = value in (True, "true", "1", 1)
+            elif field in INT_FIELDS:
+                try: typed_val = int(value)
+                except: typed_val = value
+            else:
+                typed_val = value
+            resp = _rq.patch(
+                f"{sb_url}/rest/v1/restaurants?restaurant_id=eq.{rid}",
+                headers=h, json={field: typed_val}, timeout=8
+            )
+            # أيضاً حدّث Google Sheets عبر Router cache refresh
+            try:
+                router_url = os.getenv("ROUTER_BASE_URL","")
+                admin_pass = os.getenv("ADMIN_PASSWORD","")
+                if router_url and admin_pass:
+                    _rq.post(f"{router_url}/cache/refresh/{rid}",
+                             headers={"X-Admin-Key": admin_pass}, timeout=5)
+            except: pass
     except: pass
 
 def pg_plans(rs):
@@ -1469,6 +1520,8 @@ code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
             ("🖼️ صور الأكلات",   "🖼️ صور الأكلات"),
             ("🖨️ بطاقات PDF",    "🖨️ بطاقات PDF"),
             ("⚙️ إدارة",          "⚙️ إدارة"),
+            ("📦 الباقات",        "📦 الباقات"),
+            ("🏢 الوكالات",       "🏢 الوكالات"),
         ]
         if "page" not in st.session_state:
             st.session_state["page"] = "🏠 Dashboard"
@@ -1518,6 +1571,8 @@ code,pre{background:var(--bg3)!important;color:var(--gold2)!important}
     elif page == "🖼️ صور الأكلات":   page_images(rs)
     elif page == "🖨️ بطاقات PDF":    pg_pdf(rs)
     elif page == "⚙️ إدارة":          pg_manage(rs)
+    elif page == "📦 الباقات":        pg_plans(rs)
+    elif page == "🏢 الوكالات":       page_agencies()
 
 if __name__ == "__main__":
     main()
