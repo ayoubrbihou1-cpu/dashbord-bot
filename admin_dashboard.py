@@ -719,7 +719,8 @@ def pg_add(rs):
             kitchen_password=rkitchen_pass.strip(),
             delivery_active=rdelivery,
             sa_json=rsa_json.strip() if rsa_json.strip() else "",
-            slug=_clean_slug)
+            slug=_clean_slug,
+            cashier_password=rcashier_pass.strip() if rcashier_pass.strip() else "")
 
         done = len([s for s in result.steps if "✅" in s])
         show(min(done, len(steps_lbl)-1), result.steps)
