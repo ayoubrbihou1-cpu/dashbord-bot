@@ -383,13 +383,21 @@ def send_welcome_email(to_email: str, restaurant_name: str,
         """
 
         msg.attach(MIMEText(html, "html", "utf-8"))
+        log.info(f"📧 محاولة إرسال إيميل → {to_email} via {GMAIL_USER}")
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.set_debuglevel(0)
             server.login(GMAIL_USER, GMAIL_PASSWORD)
             server.sendmail(GMAIL_USER, to_email, msg.as_string())
-        log.info(f"✅ إيميل أُرسل إلى: {to_email}")
+        log.info(f"✅ إيميل أُرسل بنجاح إلى: {to_email}")
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        log.error(f"Gmail AUTH: {e} — تحقق من GMAIL_USER وGMAIL_APP_PASSWORD")
+        return False
+    except smtplib.SMTPException as e:
+        log.error(f"Gmail SMTP: {e}")
+        return False
     except Exception as e:
-        log.error(f"Gmail: {e}")
+        log.error(f"Gmail خطأ عام: {type(e).__name__}: {e}")
         return False
 
 
@@ -633,10 +641,18 @@ def provision_restaurant(
             owner_email, name, url, menu_url, wifi_ssid, reg,
             kitchen_url=kitchen_url, kitchen_password=kitchen_password,
             caisse_url=_caisse_link,
-            cashier_password=data.get("cashier_password","") if hasattr(data,"get") else "",
+            cashier_password=cashier_password or "",
             group_links=gl
         )
-        steps.append("✅ إيميل أُرسل" if email_ok else "⚠️ إيميل فشل (تحقق من GMAIL_USER/GMAIL_APP_PASSWORD)")
+        if email_ok:
+            steps.append(f"✅ إيميل أُرسل إلى {owner_email}")
+        else:
+            import os as _os_email
+            _gmail_ok = bool(_os_email.getenv("GMAIL_USER","") and _os_email.getenv("GMAIL_APP_PASSWORD",""))
+            if not _gmail_ok:
+                steps.append("⚠️ إيميل: GMAIL_USER أو GMAIL_APP_PASSWORD غير محدد في المتغيرات")
+            else:
+                steps.append(f"⚠️ إيميل فشل إلى {owner_email} — تحقق من logs")
 
     res.success = True
     res.menu_url = menu_url
