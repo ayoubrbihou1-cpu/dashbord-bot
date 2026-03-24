@@ -1702,202 +1702,276 @@ def main():
 
     if not st.session_state.dark_mode:
         st.markdown("""<style>
-/* ══ وضع النهار — يُحقن مباشرة بـ Python كل render ══ */
-:root, .stApp, [data-testid="stAppViewContainer"],
-[data-testid="stAppViewBlockContainer"], .main, .block-container {
-  --bg:#f7f3ec !important; --bg2:#ede8df !important; --bg3:#e4ddd2 !important;
-  --sidebar:#ede8df !important;
-  --text:#1a150a !important; --text2:#5a4820 !important; --text3:#9a8a60 !important;
-  --border:#ccc4a8 !important; --border2:#ddd5bc !important;
-  --gold:#7a5008 !important; --gold2:#a07030 !important; --gold-dim:#e8d8a0 !important;
-  --card:#ffffff !important; --card-border:#ccc4a8 !important;
-  --input-bg:#ffffff !important; --input-text:#1a150a !important;
-  --input-border:#c8b890 !important;
-  --btn-sidebar:linear-gradient(135deg,#7a5008,#5a3800) !important;
-  --btn-sidebar-txt:#ffffff !important;
-  --tab-active:#7a5008 !important;
-  --shadow:0 2px 8px rgba(0,0,0,.12) !important;
-}
-/* الخلفيات */
-.stApp, [data-testid="stAppViewContainer"],
-[data-testid="stAppViewBlockContainer"], [data-testid="stHeader"],
-.main, .block-container, [data-testid="stDecoration"]
-{ background:#f7f3ec !important; color:#1a150a !important; }
+/* ══════════════════════════════════════════════════════
+   وضع النهار — CSS محقون مباشرة كل render
+   القاعدة: لا نستخدم * selector — نستهدف كل عنصر بدقة
+══════════════════════════════════════════════════════ */
 
+/* 1. الخلفيات الرئيسية */
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewBlockContainer"],
+[data-testid="stHeader"],
+.main, .block-container,
+[data-testid="stDecoration"]
+{ background:#f7f3ec !important; }
+
+/* 2. السيدبار */
 section[data-testid="stSidebar"],
 section[data-testid="stSidebar"]>div
 { background:#ede8df !important; }
 
-/* كل النصوص */
-section[data-testid="stSidebar"] *,
-p, span, div, label, li, td, th, h1, h2, h3, h4, h5,
-[data-testid="stMarkdown"] *, [data-testid="stMarkdownContainer"] *,
-[data-testid="stText"] *, [data-testid="stCaption"] *,
-.stMarkdown *, .element-container *
+/* 3. النصوص الأساسية */
+.stApp, .main, .block-container,
+p, h1, h2, h3, h4, h5, h6,
+span:not([class*="highlight"]),
+label, li, td, th, caption,
+[data-testid="stMarkdown"],
+[data-testid="stMarkdown"] *,
+[data-testid="stText"],
+[data-testid="stCaption"],
+[data-testid="stHeading"],
+.stMarkdown, .stMarkdown *,
+.element-container
 { color:#1a150a !important; }
 
-/* الحقول */
-input, textarea, select,
-.stTextInput input, .stTextArea textarea, .stNumberInput input,
-[data-baseweb="input"] input, [data-baseweb="textarea"]
-{ background:#ffffff !important; color:#1a150a !important;
-  border-color:#c8b890 !important; }
+/* 4. الحقول — نص داخلها واضح */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="url"],
+input[type="tel"],
+textarea
+{ background:#ffffff !important;
+  color:#1a150a !important;
+  border:1.5px solid #c8b890 !important;
+  border-radius:8px !important; }
+
+input:focus, textarea:focus
+{ border-color:#7a5008 !important;
+  box-shadow:0 0 0 2px #e8d8a040 !important; }
+
 ::placeholder { color:#9a8a60 !important; opacity:1 !important; }
 
-/* الأزرار */
-.stButton>button
-{ background:#e8d8a0 !important; color:#7a5008 !important;
-  border:1px solid #c8b890 !important; }
-.stButton>button:hover
-{ background:linear-gradient(135deg,#7a5008,#5a3800) !important;
-  color:#ffffff !important; border-color:#7a5008 !important; }
+/* 5. File uploader — الأهم */
+[data-testid="stFileUploader"],
+[data-testid="stFileUploader"] > div,
+[data-testid="stFileUploader"] > div > div,
+[data-testid="stFileUploaderDropzone"],
+[data-testid="stFileUploaderDropzone"] > div
+{ background:#f0ebe0 !important;
+  border:2px dashed #c8b890 !important;
+  border-radius:10px !important;
+  color:#1a150a !important; }
 
-/* أزرار السيدبار */
-section[data-testid="stSidebar"] .stButton>button
-{ background:#e8d8a0 !important; color:#7a5008 !important;
-  border:1px solid #ccc4a8 !important; font-weight:600 !important; }
-section[data-testid="stSidebar"] .stButton>button:hover
+[data-testid="stFileUploader"] *,
+[data-testid="stFileUploaderDropzone"] *
+{ color:#1a150a !important;
+  background:transparent !important; }
+
+[data-testid="stFileUploaderDropzone"] button,
+[data-testid="stFileUploader"] button
+{ background:#e8d8a0 !important;
+  color:#7a5008 !important;
+  border:1px solid #c8b890 !important; }
+
+/* 6. أزرار عامة */
+.stButton > button
+{ background:#e8d8a0 !important;
+  color:#7a5008 !important;
+  border:1px solid #c8b890 !important;
+  border-radius:10px !important;
+  font-weight:600 !important; }
+
+.stButton > button:hover
+{ background:linear-gradient(135deg,#7a5008,#5a3800) !important;
+  color:#ffffff !important;
+  border-color:#7a5008 !important; }
+
+.stButton > button[kind="primary"]
+{ background:linear-gradient(135deg,#7a5008,#5a3800) !important;
+  color:#ffffff !important;
+  border:none !important; }
+
+/* 7. أزرار السيدبار */
+section[data-testid="stSidebar"] .stButton > button
+{ background:#e8d8a0 !important;
+  color:#7a5008 !important;
+  border:1px solid #ccc4a8 !important;
+  font-weight:700 !important; }
+
+section[data-testid="stSidebar"] .stButton > button:hover
 { background:linear-gradient(135deg,#7a5008,#5a3800) !important;
   color:#ffffff !important; }
 
-/* selectbox */
-[data-baseweb="select"]>div,
+/* 8. selectbox */
+[data-baseweb="select"] > div,
 [data-baseweb="select"] [class*="control"],
+[data-baseweb="select"] [class*="ValueContainer"],
 [data-baseweb="select"] [class*="singleValue"],
-[data-baseweb="select"] [class*="placeholder"]
-{ background:#ffffff !important; color:#1a150a !important;
+[data-baseweb="select"] [class*="placeholder"],
+[data-baseweb="select"] [class*="indicatorContainer"]
+{ background:#ffffff !important;
+  color:#1a150a !important;
   border-color:#c8b890 !important; }
+
 [data-baseweb="select"] [class*="menu"],
-[data-baseweb="popover"]>div
-{ background:#f7f3ec !important; border-color:#ccc4a8 !important; }
-[data-baseweb="select"] [class*="option"]
-{ background:#f7f3ec !important; color:#1a150a !important; }
-[data-baseweb="select"] [class*="option"]:hover
+[data-baseweb="select"] [class*="MenuList"],
+[data-baseweb="popover"] > div,
+[data-baseweb="popover"] ul,
+[role="listbox"]
+{ background:#f7f3ec !important;
+  border:1px solid #ccc4a8 !important;
+  border-radius:8px !important; }
+
+[data-baseweb="select"] [class*="option"],
+[role="option"]
+{ background:#f7f3ec !important;
+  color:#1a150a !important; }
+
+[data-baseweb="select"] [class*="option"]:hover,
+[role="option"]:hover
 { background:#e8d8a0 !important; }
 
-/* تابات */
-[data-baseweb="tab-list"], [role="tablist"]
-{ background:#ede8df !important; border-color:#ccc4a8 !important; }
-[data-baseweb="tab"], [role="tab"]
-{ color:#5a4820 !important; }
-[aria-selected="true"][data-baseweb="tab"],
-[aria-selected="true"][role="tab"]
-{ color:#7a5008 !important; border-bottom-color:#7a5008 !important;
+/* 9. Tabs */
+[data-baseweb="tab-list"],
+[role="tablist"]
+{ background:#ede8df !important;
+  border-bottom:1px solid #ccc4a8 !important; }
+
+[data-baseweb="tab"]
+{ color:#5a4820 !important;
   background:transparent !important; }
 
-/* expanders */
-[data-testid="stExpander"]>details,
-[data-testid="stExpander"]
-{ background:#ffffff !important; border-color:#ccc4a8 !important; }
-[data-testid="stExpander"] summary,
-[data-testid="stExpander"] summary *
-{ color:#1a150a !important; }
-[data-testid="stExpander"] [data-testid="stExpanderDetails"],
-[data-testid="stExpander"] [data-testid="stExpanderDetails"] *
-{ background:#ffffff !important; color:#1a150a !important; }
+[aria-selected="true"][data-baseweb="tab"]
+{ color:#7a5008 !important;
+  border-bottom:2px solid #7a5008 !important; }
 
-/* metrics */
-[data-testid="stMetricValue"] { color:#7a5008 !important; }
-[data-testid="stMetricLabel"] { color:#5a4820 !important; }
-[data-testid="stMetric"], [data-testid="metric-container"]
-{ background:#ffffff !important; border-color:#ccc4a8 !important; }
+[data-baseweb="tab-panel"]
+{ background:#f7f3ec !important; }
 
-/* code */
-code, pre, [data-testid="stCode"]>div
-{ background:#e4ddd2 !important; color:#7a5008 !important;
-  border-color:#ccc4a8 !important; }
-
-/* alerts */
-[data-testid="stAlert"] { border-radius:10px !important; }
-
-/* radio / checkbox */
-[data-testid="stRadio"] label, [data-testid="stCheckbox"] label,
-[data-testid="stRadio"] p, [data-testid="stCheckbox"] p,
-[data-testid="stRadio"] span, [data-testid="stCheckbox"] span
-{ color:#1a150a !important; }
-
-/* file uploader */
-[data-testid="stFileUploader"]>div
-{ background:#e4ddd2 !important; border-color:#ccc4a8 !important; }
-[data-testid="stFileUploader"] *
-{ color:#1a150a !important; }
-
-/* slider */
-[data-testid="stSlider"] *
-{ color:#1a150a !important; }
-
-/* tabs panel */
 [data-baseweb="tab-panel"] *
 { color:#1a150a !important; }
 
-/* custom cards in page */
-.s-card,.r-card,.iblk,.tgbox,.info-box
-{ background:#ffffff !important; border-color:#ccc4a8 !important; }
-.s-num,.r-name,.iv { color:#7a5008 !important; }
-.s-lbl,.r-meta,.il { color:#5a4820 !important; }
+/* 10. Expanders */
+[data-testid="stExpander"] > details
+{ background:#ffffff !important;
+  border:1px solid #ccc4a8 !important;
+  border-radius:10px !important; }
 
-/* table */
-table, th, td { color:#1a150a !important; }
-th { background:#e4ddd2 !important; color:#7a5008 !important; }
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary *,
+[data-testid="stExpander"] summary p
+{ color:#1a150a !important; }
 
-/* ══ iframe / stIFrame — preview cards ══ */
-[data-testid="stIFrame"] { background:#ffffff !important; }
+[data-testid="stExpanderDetails"],
+[data-testid="stExpanderDetails"] *
+{ background:#ffffff !important;
+  color:#1a150a !important; }
 
-/* ══ كل الصناديق السوداء المتبقية ══ */
-[data-testid="stImage"] > div,
-[data-testid="stVerticalBlock"] > div,
-[class*="stBlock"] { background:transparent !important; }
+/* 11. Metrics */
+[data-testid="stMetric"],
+[data-testid="metric-container"]
+{ background:#ffffff !important;
+  border:1px solid #ccc4a8 !important;
+  border-radius:10px !important; }
 
-/* ══ info/warning/error boxes ══ */
+[data-testid="stMetricValue"]
+{ color:#7a5008 !important; }
+
+[data-testid="stMetricLabel"]
+{ color:#5a4820 !important; }
+
+/* 12. Radio + Checkbox */
+[data-testid="stRadio"] label,
+[data-testid="stRadio"] p,
+[data-testid="stRadio"] span,
+[data-testid="stCheckbox"] label,
+[data-testid="stCheckbox"] p,
+[data-testid="stCheckbox"] span
+{ color:#1a150a !important; }
+
+[data-baseweb="radio"] [role="radio"][aria-checked="true"],
+[data-baseweb="radio"] [role="radio"][aria-checked="true"] > div
+{ background:#7a5008 !important;
+  border-color:#7a5008 !important; }
+
+[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"],
+[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] > div
+{ background:#7a5008 !important;
+  border-color:#7a5008 !important; }
+
+/* 13. Alerts */
 [data-testid="stAlert"] > div
-{ background:#f0f0f0 !important; color:#1a150a !important; }
-[data-baseweb="notification"]
-{ background:#f0f0f0 !important; }
+{ border-radius:10px !important; }
+[data-testid="stAlert"][data-type="info"] > div
+{ background:#e8f0f8 !important;
+  border:1px solid #1a4a8a !important;
+  color:#1a4a8a !important; }
+[data-testid="stAlert"][data-type="success"] > div
+{ background:#e8f5ec !important;
+  border:1px solid #1a6028 !important;
+  color:#1a6028 !important; }
+[data-testid="stAlert"][data-type="error"] > div,
+[data-testid="stAlert"][data-type="warning"] > div
+{ background:#fdf0ee !important;
+  border:1px solid #881515 !important;
+  color:#881515 !important; }
 
-/* ══ المحاور (axes) في صفحة صور الأكلات ══ */
-[data-testid="stHorizontalBlock"] > div,
-[data-testid="stColumn"] > div
-{ background:transparent !important; }
-
-/* ══ color picker ══ */
-[data-baseweb="popover"] *
-{ background:#f7f3ec !important; color:#1a150a !important; }
-
-/* ══ markdown html blocks ══ */
-.stMarkdown div, .element-container div
-{ background:transparent !important; }
-
-/* ══ progress/spinner ══ */
-[data-testid="stSpinner"] { color:#7a5008 !important; }
-
-/* ══ checkbox ══ */
-[data-baseweb="checkbox"] div
-{ background:transparent !important; }
-[data-baseweb="checkbox"] [aria-checked="true"] div
-{ background:#7a5008 !important; }
-
-/* ══ number input buttons ══ */
-.stNumberInput button
-{ background:#e8d8a0 !important; color:#7a5008 !important;
+/* 14. Number input buttons */
+.stNumberInput button,
+[data-baseweb="input"] button
+{ background:#e8d8a0 !important;
+  color:#7a5008 !important;
   border-color:#c8b890 !important; }
 
-/* ══ radio buttons ══ */
-[data-baseweb="radio"] [role="radio"]
-{ border-color:#7a5008 !important; }
-[data-baseweb="radio"] [role="radio"][aria-checked="true"]
-{ background:#7a5008 !important; }
+/* 15. Code blocks */
+code, pre,
+[data-testid="stCode"] > div
+{ background:#e4ddd2 !important;
+  color:#7a5008 !important;
+  border:1px solid #ccc4a8 !important;
+  border-radius:8px !important; }
 
-/* ══ الحاوية الرئيسية لكل element ══ */
-.element-container { background:transparent !important; }
+/* 16. Dividers */
+hr { border-color:#ccc4a8 !important; }
 
-/* ══ stForm ══ */
+/* 17. Tables */
+table { border-color:#ccc4a8 !important; }
+th { background:#e4ddd2 !important; color:#7a5008 !important; }
+td { color:#1a150a !important; border-color:#ccc4a8 !important; }
+
+/* 18. Custom classes in pages */
+.s-card, .r-card, .iblk, .tgbox, .info-box, .res
+{ background:#ffffff !important;
+  border-color:#ccc4a8 !important; }
+.s-num, .r-name, .iv, .s-lbl-val
+{ color:#7a5008 !important; }
+.s-lbl, .r-meta, .il
+{ color:#5a4820 !important; }
+.res.ok
+{ background:#e8f5ec !important;
+  border-color:#1a6028 !important;
+  color:#1a6028 !important; }
+.res.warn
+{ background:#fef9e7 !important;
+  border-color:#d4800a !important;
+  color:#d4800a !important; }
+
+/* 19. Form container */
 [data-testid="stForm"]
-{ background:#ffffff !important; border:1px solid #ccc4a8 !important;
-  border-radius:10px !important; padding:1rem !important; }
+{ background:#ffffff !important;
+  border:1px solid #ccc4a8 !important;
+  border-radius:10px !important; }
 
-/* ══ تأكيد: كل * في الـ app ══ */
-.stApp * { color:inherit !important; }
-.stApp { color:#1a150a !important; }
+/* 20. Sidebar sub-text */
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] span,
+section[data-testid="stSidebar"] div,
+section[data-testid="stSidebar"] label
+{ color:#1a150a !important; }
+
 </style>""", unsafe_allow_html=True)
 
     with st.sidebar:
