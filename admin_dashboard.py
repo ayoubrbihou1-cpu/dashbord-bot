@@ -1839,6 +1839,65 @@ code, pre, [data-testid="stCode"]>div
 /* table */
 table, th, td { color:#1a150a !important; }
 th { background:#e4ddd2 !important; color:#7a5008 !important; }
+
+/* ══ iframe / stIFrame — preview cards ══ */
+[data-testid="stIFrame"] { background:#ffffff !important; }
+
+/* ══ كل الصناديق السوداء المتبقية ══ */
+[data-testid="stImage"] > div,
+[data-testid="stVerticalBlock"] > div,
+[class*="stBlock"] { background:transparent !important; }
+
+/* ══ info/warning/error boxes ══ */
+[data-testid="stAlert"] > div
+{ background:#f0f0f0 !important; color:#1a150a !important; }
+[data-baseweb="notification"]
+{ background:#f0f0f0 !important; }
+
+/* ══ المحاور (axes) في صفحة صور الأكلات ══ */
+[data-testid="stHorizontalBlock"] > div,
+[data-testid="stColumn"] > div
+{ background:transparent !important; }
+
+/* ══ color picker ══ */
+[data-baseweb="popover"] *
+{ background:#f7f3ec !important; color:#1a150a !important; }
+
+/* ══ markdown html blocks ══ */
+.stMarkdown div, .element-container div
+{ background:transparent !important; }
+
+/* ══ progress/spinner ══ */
+[data-testid="stSpinner"] { color:#7a5008 !important; }
+
+/* ══ checkbox ══ */
+[data-baseweb="checkbox"] div
+{ background:transparent !important; }
+[data-baseweb="checkbox"] [aria-checked="true"] div
+{ background:#7a5008 !important; }
+
+/* ══ number input buttons ══ */
+.stNumberInput button
+{ background:#e8d8a0 !important; color:#7a5008 !important;
+  border-color:#c8b890 !important; }
+
+/* ══ radio buttons ══ */
+[data-baseweb="radio"] [role="radio"]
+{ border-color:#7a5008 !important; }
+[data-baseweb="radio"] [role="radio"][aria-checked="true"]
+{ background:#7a5008 !important; }
+
+/* ══ الحاوية الرئيسية لكل element ══ */
+.element-container { background:transparent !important; }
+
+/* ══ stForm ══ */
+[data-testid="stForm"]
+{ background:#ffffff !important; border:1px solid #ccc4a8 !important;
+  border-radius:10px !important; padding:1rem !important; }
+
+/* ══ تأكيد: كل * في الـ app ══ */
+.stApp * { color:inherit !important; }
+.stApp { color:#1a150a !important; }
 </style>""", unsafe_allow_html=True)
 
     with st.sidebar:
