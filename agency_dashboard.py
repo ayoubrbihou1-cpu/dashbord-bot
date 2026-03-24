@@ -127,7 +127,10 @@ def pg_login():
                     )
                     d = r.json()
                     if d.get("ok"):
-                        st.session_state["agency"] = d["agency"]
+                        # ✅ نحفظ password في session للاستخدام في provision
+                        agency_data = d["agency"]
+                        agency_data["password"] = password  # للـ API calls
+                        st.session_state["agency"] = agency_data
                         st.session_state["logged_in"] = True
                         st.rerun()
                     else:
@@ -248,41 +251,64 @@ def pg_add_restaurant(agency: dict):
         if res.get("ok"):
             st.success("✅ تم إنشاء المطعم بنجاح!")
             rid = res.get("restaurant_id","")
-            st.markdown(f"""
-            **🔢 رقم المطعم:** `{rid}`
-
-            **🍽️ رابط المينيو:**
-            """)
-            st.code(res.get("menu_url",""), language=None)
-            if res.get("kitchen_url"):
-                st.markdown("**🍳 شاشة الكوزينة:**")
-                st.code(res["kitchen_url"], language=None)
-            if res.get("reg_link"):
-                st.markdown("**📱 رابط Telegram:**")
-                st.code(res["reg_link"], language=None)
+            c_a, c_b = st.columns(2)
+            with c_a:
+                st.markdown(f"**🔢 رقم المطعم:** `{rid}`")
+                if res.get("menu_url"):
+                    st.markdown("**📱 رابط المينيو:**")
+                    st.code(res["menu_url"], language=None)
+                if res.get("reg_link"):
+                    st.markdown("**📲 رابط Telegram:**")
+                    st.code(res["reg_link"], language=None)
+            with c_b:
+                if res.get("kitchen_url"):
+                    st.markdown("**🍳 شاشة الكوزينة:**")
+                    st.code(res["kitchen_url"], language=None)
+                _caisse_url = os.getenv("CAISSE_URL","https://caisse-restcaf.pages.dev")
+                if _caisse_url:
+                    _slug_r = res.get("slug","") or rid
+                    _caisse_link = f"{_caisse_url}?rid={_slug_r}&api={ROUTER_URL}"
+                    st.markdown("**💰 صفحة الكاشير:**")
+                    st.code(_caisse_link, language=None)
         else:
-            st.error(f"❌ {res.get('detail','خطأ في الإنشاء')}")
+            err_msg = res.get("detail") or res.get("error") or str(res)
+            st.error(f"❌ {err_msg}")
+
+    # رقم المطعم وslug
+    c3, c4 = st.columns(2)
+    with c3:
+        rid_input = st.text_input("🔢 رقم المطعم (ID)", placeholder="مثال: 10 أو أي رقم فريد")
+    with c4:
+        slug_input = st.text_input("🔗 Slug (رابط نظيف)", placeholder="مثال: nakhil (بالإنجليزية)")
 
     if st.button("🚀 إنشاء المطعم", use_container_width=True, type="primary"):
         if not name.strip():
-            st.error("❌ أدخل اسم المطعم")
-            return
+            st.error("❌ أدخل اسم المطعم"); return
         if not sheet_id.strip():
-            st.error("❌ أدخل Sheet ID")
-            return
+            st.error("❌ أدخل Sheet ID"); return
+        if not rid_input.strip():
+            st.error("❌ أدخل رقم المطعم"); return
+        
+        # slug آمن
+        import re
+        _slug = slug_input.strip().lower().replace(" ","-") if slug_input.strip() else re.sub(r"[^a-z0-9-]","",name.strip().lower().replace(" ","-"))[:25]
+        
         with st.spinner("⏳ جاري الإنشاء... (قد يستغرق 30 ثانية)"):
             result = api_post("/agency/provision", {
-                "agency_id":       agency["agency_id"],
-                "name":            name.strip(),
-                "sheet_id":        sheet_id.strip(),
-                "wifi_ssid":       wifi.strip(),
-                "wifi_password":   wifi_p.strip(),
-                "style":           style,
-                "num_tables":      tables,
-                "owner_email":     email.strip(),
-                "kitchen_password":kpass.strip(),
-                "primary_color":   color1,
-                "accent_color":    color2,
+                "agency_id":        agency["agency_id"],
+                "password":         agency.get("password",""),
+                "restaurant_id":    rid_input.strip(),
+                "name":             name.strip(),
+                "sheet_id":         sheet_id.strip(),
+                "slug":             _slug,
+                "wifi_ssid":        wifi.strip(),
+                "wifi_password":    wifi_p.strip(),
+                "style":            style,
+                "num_tables":       tables,
+                "owner_email":      email.strip(),
+                "kitchen_password": kpass.strip(),
+                "primary_color":    color1,
+                "accent_color":     color2,
             })
             st.session_state["agency_add_result"] = result
             st.rerun()
@@ -386,8 +412,10 @@ def pg_pdf(agency: dict):
 
     st.markdown("---")
     st.markdown("### 📱 روابط QR مباشرة")
-    menu_url = f"{FRONTEND_URL}?rest_id={sel_rid}"
+    # menu_url already set above
     kitchen_url = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={sel_rid}"
+    slug_k = sel_rest.get("slug","").strip()
+    menu_url = f"{FRONTEND_URL}/{slug_k}" if slug_k else f"{FRONTEND_URL}?rest_id={sel_rid}"
     st.markdown(f"**🍽️ رابط المينيو:**")
     st.code(menu_url)
     st.markdown(f"**🍳 رابط الكوزينة:**")
@@ -639,8 +667,10 @@ def pg_settings(agency: dict):
 
     with tab1:
         st.markdown("**روابط المطعم:**")
-        menu_url    = f"{FRONTEND_URL}?rest_id={sel_rid}"
+        # menu_url set below with slug
         kitchen_url = f"{KITCHEN_URL}?api={ROUTER_URL}&rid={sel_rid}"
+        slug_k = sel_rest.get("slug","").strip()
+        menu_url = f"{FRONTEND_URL}/{slug_k}" if slug_k else f"{FRONTEND_URL}?rest_id={sel_rid}"
         st.markdown("🍽️ رابط المينيو للزبائن:")
         st.code(menu_url)
         st.markdown("🍳 رابط شاشة الكوزينة:")
