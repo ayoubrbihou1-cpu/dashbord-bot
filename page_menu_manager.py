@@ -1,3 +1,432 @@
+"""
+🍽️ page_menu_manager.py — إدارة قائمة الطعام لكل مطعم
+✅ عرض + إضافة + تعديل + حذف الأكلات
+✅ كل مطعم له شيت خاص به — النظام يميز تلقائياً
+"""
+import streamlit as st
+import logging
+log = logging.getLogger(__name__)
+import gspread
+import json
+import os
+from google.oauth2.service_account import Credentials
+from dotenv import load_dotenv
+from gemini_helper import gemini_text, gemini_vision, gemini_available
+from groq_helper import translate_batch_groq, translate_single_groq, groq_available, groq_vision, groq_vision_available
+import requests as _requests
+
+load_dotenv()
+
+SCOPES          = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
+SA_JSON_PATH    = os.getenv("GOOGLE_SA_JSON","./service_account.json")
+SA_JSON_CONTENT = os.getenv("GOOGLE_SA_JSON_CONTENT","")
+MASTER_SHEET_ID = os.getenv("MASTER_SHEET_ID","")
+ROUTER_BASE_URL = os.getenv("ROUTER_BASE_URL","https://restaurant-qr-saas.onrender.com")
+ADMIN_PASSWORD  = os.getenv("ADMIN_PASSWORD","admin_fes_2026")
+
+def _refresh_api_cache(restaurant_id: str):
+    """✅ يمسح cache المنيو في الـ API — الصور تظهر فوراً بعد الحفظ"""
+    try:
+        url = f"{ROUTER_BASE_URL}/cache/refresh/{restaurant_id}"
+        _requests.post(url, timeout=8,
+                       headers={"X-Admin-Key": ADMIN_PASSWORD})
+    except Exception:
+        pass  # لا نوقف العملية إذا فشل الـ cache refresh
+
+TABS = ["الأطباق الرئيسية","المقبلات","الحلويات","المشروبات"]
+
+# ══════════════════════════════════════════════════════════
+# 🌍 ترجمة تلقائية للأسماء
+# ══════════════════════════════════════════════════════════
+# Gemini key is read inside auto_translate()
+FOOD_DICT = {
+    # أكلات مغربية شائعة
+    "طاجين دجاج":  ("Tajine Poulet",       "Chicken Tagine"),
+    "طاجين لحم":   ("Tajine Viande",        "Beef Tagine"),
+    "طاجين":       ("Tajine",               "Tagine"),
+    "كسكس مغربي":  ("Couscous Marocain",    "Moroccan Couscous"),
+    "كسكس":        ("Couscous",             "Couscous"),
+    "حريرة":       ("Harira",               "Harira Soup"),
+    "بسطيلة":      ("Pastilla",             "Pastilla"),
+    "بريوات":      ("Briouats",             "Briouats"),
+    "مشوي مختلط":  ("Grillade Mixte",       "Mixed Grill"),
+    "دجاج مشوي":   ("Poulet Grillé",        "Grilled Chicken"),
+    "سمك مشوي":    ("Poisson Grillé",       "Grilled Fish"),
+    "سمك":         ("Poisson",              "Fish"),
+    "سلطة مغربية": ("Salade Marocaine",     "Moroccan Salad"),
+    "سلطة":        ("Salade",               "Salad"),
+    "شوربة":       ("Soupe",                "Soup"),
+    "مرق":         ("Bouillon",             "Broth"),
+    "أرز":         ("Riz",                  "Rice"),
+    "بيتزا":       ("Pizza",                "Pizza"),
+    "برغر":        ("Burger",               "Burger"),
+    "ساندويش":     ("Sandwich",             "Sandwich"),
+    "باستا":       ("Pâtes",               "Pasta"),
+    "بسطيلة حلوة": ("Pastilla Sucrée",      "Sweet Pastilla"),
+    "شباكية":      ("Chebakia",             "Chebakia"),
+    "حلوى مغربية": ("Pâtisserie Marocaine", "Moroccan Pastry"),
+    "كعب الغزال":  ("Cornes de Gazelle",    "Gazelle Horns"),
+    "آيس كريم":    ("Glace",               "Ice Cream"),
+    "تارت":        ("Tarte",                "Tart"),
+    "كيك":         ("Gâteau",              "Cake"),
+    "أتاي بالنعناع":("Thé à la Menthe",    "Mint Tea"),
+    "أتاي":        ("Thé Marocain",         "Moroccan Tea"),
+    "شاي":         ("Thé",                 "Tea"),
+    "قهوة":        ("Café",                "Coffee"),
+    "عصير برتقال": ("Jus d'Orange",        "Orange Juice"),
+    "عصير":        ("Jus",                 "Juice"),
+    "ماء":         ("Eau",                 "Water"),
+    "كوكا":        ("Coca-Cola",           "Coca-Cola"),
+    "سودا":        ("Soda",                "Soda"),
+    "لبن":         ("Lait",                "Milk"),
+    "لبن رائب":    ("Lben",                "Buttermilk"),
+    "دجاج":        ("Poulet",              "Chicken"),
+    "لحم":         ("Viande",              "Meat"),
+    "لحم مفروم":   ("Viande Hachée",       "Minced Meat"),
+    "كفتة":        ("Kefta",               "Kefta"),
+    "مقبلات":      ("Entrées",             "Starters"),
+    "فطائر":       ("Feuilletés",          "Pastries"),
+}
+
+def _detect_language(name: str) -> str:
+    """يكتشف لغة الاسم: arabic / french / english"""
+    arabic_chars = sum(1 for c in name if '؀' <= c <= 'ۿ')
+    if arabic_chars > 1:
+        return "arabic"
+    # كلمات فرنسية شائعة في المينيو
+    fr_words = ["tajine","couscous","poulet","viande","salade","soupe","tarte","mousse",
+                "sorbet","creme","gateau","briouats","pastilla","sardine","filet","plat",
+                "omelette","aubergine","courgette","brochette","merguez","harira","seffa",
+                "tanjia","rafissa","bastilla","de","du","au","aux","les","avec","sans"]
+    name_l = name.lower()
+    if any(w in name_l for w in fr_words):
+        return "french"
+    return "english"
+
+
+def auto_translate(arabic_name: str) -> tuple:
+    """
+    يترجم اسم الأكلة للفرنسية والإنجليزية
+    يدعم العربية والفرنسية والإنجليزية
+    """
+    name = arabic_name.strip()
+    # قاموس محلي للعربية
+    for ar, (fr, en) in FOOD_DICT.items():
+        if ar in name or name == ar:
+            return fr, en
+    # Gemini للترجمة مع دوران تلقائي
+    try:
+        lang = _detect_language(name)
+        if lang == "arabic":
+            prompt = f"Translate this Moroccan Arabic food name to French and English.\nReply ONLY: French | English\nFood: {name}"
+        elif lang == "french":
+            prompt = f"Translate this French food name to English. Also give the original French back.\nReply ONLY: French | English\nFood: {name}"
+        else:
+            prompt = f"This is an English food name. Translate it to French.\nReply ONLY: French | English\nFood: {name}"
+        txt = gemini_text(prompt, max_tokens=60, temperature=0)
+        parts = [p.strip() for p in txt.split("|")]
+        if len(parts) == 2:
+            return parts[0], parts[1]
+    except Exception:
+        pass
+    return "", ""
+
+
+def translate_three_languages(name: str) -> tuple:
+    """
+    يترجم اسم الأكلة للغات الثلاث: عربي | فرنسي | إنجليزي
+    يكتشف لغة الاسم تلقائياً ويترجم للباقيتين
+    يرجع: (name_ar, name_fr, name_en)
+    """
+    name = name.strip()
+    if not name:
+        return "", "", ""
+    try:
+        lang = _detect_language(name)
+        prompt = (
+            f'This is a Moroccan restaurant dish name: "{name}"\n'
+            f'Detected language: {lang}\n\n'
+            "Translate it to all 3 languages. Reply ONLY in this exact format:\n"
+            "Arabic | French | English\n\n"
+            "Rules:\n"
+            "- Arabic: use Modern Standard Arabic or Moroccan Arabic\n"
+            "- French: standard French used in Moroccan restaurants\n"
+            "- English: clear English description\n"
+            "- No extra text, just: Arabic | French | English"
+        )
+
+        txt = gemini_text(prompt, max_tokens=80, temperature=0)
+        parts = [p.strip() for p in txt.split("|")]
+        if len(parts) == 3:
+            ar, fr, en = parts[0], parts[1], parts[2]
+            # إذا كان الاسم الأصلي عربي — استخدمه مباشرة
+            if lang == "arabic":
+                ar = name
+            elif lang == "french":
+                fr = name
+            elif lang == "english":
+                en = name
+            return ar, fr, en
+    except Exception:
+        pass
+    # fallback — إذا فشل Gemini
+    fr, en = auto_translate(name)
+    lang = _detect_language(name)
+    if lang == "arabic":
+        return name, fr, en
+    elif lang == "french":
+        return "", name, en
+    else:
+        return "", fr, name
+
+HEADERS = ["name","name_fr","name_en","price","description","available","image_url","image_credit"]
+
+
+def translate_batch(names: list) -> list:
+    """
+    يترجم قائمة أسماء دفعة واحدة في استدعاء Gemini واحد فقط
+    يرجع قائمة من (name_ar, name_fr, name_en) لكل اسم
+    """
+    if not names:
+        return []
+    try:
+        # بناء قائمة الأسماء مرقمة
+        numbered = "\n".join(f"{i+1}. {n}" for i, n in enumerate(names))
+        prompt = (
+            "You are a Moroccan restaurant menu translator.\n"
+            "Translate each dish name below to Arabic, French, and English.\n"
+            "Reply ONLY with a JSON array, no extra text:\n"
+            '[{"ar":"...","fr":"...","en":"..."}]\n\n'
+            f"Dishes:\n{numbered}"
+        )
+        txt = gemini_text(prompt, max_tokens=4000, temperature=0)
+        # تنظيف JSON
+        txt = txt.strip()
+        if "```json" in txt:
+            txt = txt.split("```json")[1].split("```")[0].strip()
+        elif "```" in txt:
+            txt = txt.split("```")[1].split("```")[0].strip()
+        import json as _json
+        txt = txt.strip()
+        if "```json" in txt:
+            txt = txt.split("```json")[1].split("```")[0].strip()
+        elif "```" in txt:
+            txt = txt.split("```")[1].split("```")[0].strip()
+        start = txt.find("[")
+        if start != -1:
+            txt = txt[start:]
+        # raw_decode لتجاهل أي نص بعد الـ JSON
+        try:
+            parsed, _ = _json.JSONDecoder().raw_decode(txt)
+        except _json.JSONDecodeError:
+            end = txt.rfind("]")
+            if end != -1:
+                txt = txt[:end+1]
+            parsed = _json.loads(txt)
+        result = []
+        for i, item in enumerate(parsed):
+            orig = names[i] if i < len(names) else ""
+            lang = _detect_language(orig)
+            ar = item.get("ar", "") or (orig if lang == "arabic" else "")
+            fr = item.get("fr", "") or (orig if lang == "french" else "")
+            en = item.get("en", "") or (orig if lang == "english" else "")
+            result.append((ar, fr, en))
+        return result
+    except Exception as e:
+        # fallback — إرجاع الاسم الأصلي بدون ترجمة
+        result = []
+        for name in names:
+            lang = _detect_language(name)
+            if lang == "arabic":
+                result.append((name, "", ""))
+            elif lang == "french":
+                result.append(("", name, ""))
+            else:
+                result.append(("", "", name))
+        return result
+
+def _gs():
+    if SA_JSON_CONTENT:
+        c = Credentials.from_service_account_info(json.loads(SA_JSON_CONTENT), scopes=SCOPES)
+    else:
+        c = Credentials.from_service_account_file(SA_JSON_PATH, scopes=SCOPES)
+    return gspread.authorize(c)
+
+def _gs_for_restaurant(rid: str = ""):
+    """يستخدم SA الخاص بالمطعم من Master_DB — Fallback للـ SA الرئيسي"""
+    if not rid:
+        return _gs()
+    try:
+        sa_cache_key = f"_sa_mm_{rid}"
+        if sa_cache_key in st.session_state:
+            return st.session_state[sa_cache_key]
+        master_client = _gs()
+        ws = master_client.open_by_key(MASTER_SHEET_ID).worksheet("Master_DB")
+        headers = ws.row_values(1)
+        if "sa_json" not in headers or "restaurant_id" not in headers:
+            return _gs()
+        rid_col = headers.index("restaurant_id") + 1
+        sa_col  = headers.index("sa_json") + 1
+        for row in ws.get_all_values()[1:]:
+            if len(row) >= rid_col and str(row[rid_col-1]).strip() == str(rid).strip():
+                sa_str = row[sa_col-1].strip() if len(row) >= sa_col else ""
+                if sa_str and sa_str.startswith("{"):
+                    c = Credentials.from_service_account_info(json.loads(sa_str), scopes=SCOPES)
+                    client = gspread.authorize(c)
+                    st.session_state[sa_cache_key] = client
+                    return client
+    except Exception as e:
+        pass
+    return _gs()
+
+def _get_ws(sheet_id: str, tab: str, rid: str = ""):
+    return _gs_for_restaurant(rid).open_by_key(sheet_id).worksheet(tab)
+
+@st.cache_data(ttl=120)  # cache القائمة 2 دقيقة — يقلل طلبات Sheets API بـ 90%
+def load_items(sheet_id: str, tab: str, rid: str = "") -> list:
+    """تحميل أكلات tab معين"""
+    try:
+        ws = _get_ws(sheet_id, tab, rid)
+        all_vals = ws.get_all_values()
+        if len(all_vals) < 2:
+            return []
+        headers = all_vals[0]
+        items = []
+        for i, row in enumerate(all_vals[1:], start=2):
+            if not any(cell.strip() for cell in row):
+                continue
+            padded = row + [''] * (len(headers) - len(row))
+            item = dict(zip(headers, padded))
+            item["_row"] = i
+            items.append(item)
+        return items
+    except Exception as e:
+        st.error(f"❌ تحميل القائمة: {e}")
+        return []
+
+def add_item(sheet_id: str, tab: str, data: dict, rid: str = "") -> bool:
+    """إضافة أكلة واحدة"""
+    return add_items_batch(sheet_id, tab, [data], rid=rid) == 1
+
+
+def add_items_batch(sheet_id: str, tab: str, items: list, rid: str = "") -> int:
+    """
+    إضافة عدة أكلات دفعة واحدة — طلب واحد فقط لـ Google Sheets
+    يرجع عدد الأكلات المضافة بنجاح
+    """
+    if not items:
+        return 0
+    try:
+        ws = _get_ws(sheet_id, tab, rid)
+        headers = ws.row_values(1)
+        if not headers:
+            ws.append_row(HEADERS)
+            headers = HEADERS
+
+        rows = []
+        for data in items:
+            row = [data.get(h, "") for h in headers]
+            rows.append(row)
+
+        # كتابة كل الصفوف في طلب واحد بدل طلب لكل أكلة
+        ws.append_rows(rows, value_input_option="USER_ENTERED")
+        return len(rows)
+    except Exception as e:
+        st.error(f"❌ إضافة الأكلات: {e}")
+        return 0
+
+def update_item(sheet_id: str, tab: str, row_num: int, data: dict, rid: str = "") -> bool:
+    try:
+        ws = _get_ws(sheet_id, tab, rid)
+        headers = ws.row_values(1)
+        for col_idx, h in enumerate(headers, start=1):
+            if h in data:
+                ws.update_cell(row_num, col_idx, data[h])
+        return True
+    except Exception as e:
+        st.error(f"❌ تحديث الأكلة: {e}")
+        return False
+
+def delete_item(sheet_id: str, tab: str, row_num: int, rid: str = "") -> bool:
+    try:
+        ws = _get_ws(sheet_id, tab, rid)
+        ws.delete_rows(row_num)
+        return True
+    except Exception as e:
+        st.error(f"❌ حذف الأكلة: {e}")
+        return False
+
+def toggle_available(sheet_id: str, tab: str, row_num: int, current: str, rid: str = "") -> bool:
+    new_val = "FALSE" if current.upper() == "TRUE" else "TRUE"
+    return update_item(sheet_id, tab, row_num, {"available": new_val}, rid=rid)
+
+
+# ══════════════════════════════════════════════════════════
+# 🔍 دوال مساعدة للبحث عن الأكلات بالاسم (لـ API)
+# ══════════════════════════════════════════════════════════
+
+def find_item_by_name(sheet_id: str, tab: str, item_name: str, rid: str = "") -> tuple[int, dict]:
+    """
+    يبحث عن أكلة باسمها في tab معين.
+    يرجع (row_num, item_dict) أو (None, None) إذا لم يوجد.
+    """
+    items = load_items(sheet_id, tab, rid)
+    for item in items:
+        if item.get("name", "").strip() == item_name.strip():
+            return item.get("_row"), item
+    return None, None
+
+
+def update_item_by_name(sheet_id: str, tab: str, item_name: str, data: dict, rid: str = "") -> bool:
+    """
+    يحدّث أكلة باستخدام اسمها بدلاً من رقم الصف.
+    data: قاموس يحتوي الحقول المراد تحديثها (مثل name, price, image_url, ...)
+    """
+    row_num, _ = find_item_by_name(sheet_id, tab, item_name, rid)
+    if not row_num:
+        return False
+    return update_item(sheet_id, tab, row_num, data, rid=rid)
+
+
+def delete_item_by_name(sheet_id: str, tab: str, item_name: str, rid: str = "") -> bool:
+    """
+    يحذف أكلة باستخدام اسمها.
+    """
+    row_num, _ = find_item_by_name(sheet_id, tab, item_name, rid)
+    if not row_num:
+        return False
+    return delete_item(sheet_id, tab, row_num, rid=rid)
+
+
+def update_item_image(sheet_id: str, tab: str, item_name: str, image_url: str, image_credit: str = "", rid: str = "") -> bool:
+    """
+    يحدّث صورة الأكلة فقط.
+    """
+    return update_item_by_name(sheet_id, tab, item_name, {
+        "image_url": image_url,
+        "image_credit": image_credit
+    }, rid=rid)
+
+
+# ══════════════════════════════════════════════════════════
+# الصفحة الرئيسية
+# ══════════════════════════════════════════════════════════
+def page_menu_manager(restaurants: list):
+    st.markdown("## 🍽️ إدارة قائمة الطعام")
+
+    if not restaurants:
+        st.info("📭 أضف مطعماً أولاً من صفحة 🚀 إضافة مطعم")
+        return
+
+    # ── شرح كيف يعمل النظام ─────────────────────────────
+    with st.expander("ℹ️ كيف يعمل النظام؟"):
+        st.markdown("""
+        **كل مطعم له Google Sheet خاص به:**
+مطعم 1 (محمد) → Sheet_ID_1 → قائمته الخاصة
+مطعم 2 (علي) → Sheet_ID_2 → قائمته الخاصة
+مطعم 3 (سارة) → Sheet_ID_3 → قائمته الخاصة
+
+text
 - عندما يفتح الزبون `?rest_id=1` → يقرأ من Sheet مطعم محمد فقط
 - عندما يفتح `?rest_id=2` → يقرأ من Sheet مطعم علي فقط
 - **لا يختلطان أبداً ✅**
