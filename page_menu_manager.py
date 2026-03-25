@@ -429,24 +429,24 @@ def page_menu_manager(restaurants: list):
 **الصور:** أضف رابط الصورة في عمود `image_url` أو استخدم صفحة **🖼️ صور الأكلات**
 """)
 
-# ── اختيار المطعم ───────────────────────────────────
-c1, c2 = st.columns([2, 1])
-with c1:
-opts = {f"#{r.get('restaurant_id','?')} — {r.get('name','مطعم')}": r for r in restaurants}
-sel  = st.selectbox("🏪 اختر المطعم", list(opts.keys()), key="mm_rest_sel")
-rest = opts[sel]
-sheet_id = rest.get("sheet_id","")
-rid      = rest.get("restaurant_id","")
+    # ── اختيار المطعم ───────────────────────────────────
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        opts = {f"#{r.get('restaurant_id','?')} — {r.get('name','مطعم')}": r for r in restaurants}
+        sel  = st.selectbox("🏪 اختر المطعم", list(opts.keys()), key="mm_rest_sel")
+        rest = opts[sel]
+        sheet_id = rest.get("sheet_id","")
+        rid      = rest.get("restaurant_id","")
 
-with c2:
-# معلومات المطعم
-st.markdown(f"""
-<div style="background:#111;border:1px solid #C9A84C33;border-radius:10px;padding:.8rem;margin-top:1.6rem">
-  <div style="color:#C9A84C;font-size:.8rem;font-weight:700">#{rid} — {rest.get('name','')}</div>
-  <div style="color:#555;font-size:.7rem;margin-top:.3rem">📶 {rest.get('wifi_ssid','')}</div>
-  <div style="color:#333;font-size:.65rem;margin-top:.2rem">Sheet: {sheet_id[:20]}...</div>
-</div>
-""", unsafe_allow_html=True)
+    with c2:
+        # معلومات المطعم
+        st.markdown(f"""
+        <div style="background:#111;border:1px solid #C9A84C33;border-radius:10px;padding:.8rem;margin-top:1.6rem">
+          <div style="color:#C9A84C;font-size:.8rem;font-weight:700">#{rid} — {rest.get('name','')}</div>
+          <div style="color:#555;font-size:.7rem;margin-top:.3rem">📶 {rest.get('wifi_ssid','')}</div>
+          <div style="color:#333;font-size:.65rem;margin-top:.2rem">Sheet: {sheet_id[:20]}...</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 if not sheet_id:
 st.error("❌ هذا المطعم ليس له Sheet ID")
