@@ -418,215 +418,241 @@ def page_menu_manager(restaurants: list):
         st.info("📭 أضف مطعماً أولاً من صفحة 🚀 إضافة مطعم")
         return
 
-    # ── شرح كيف يعمل النظام ─────────────────────────────
     with st.expander("ℹ️ كيف يعمل النظام؟"):
-        st.markdown("""
+        st.markdown(
+            """
         **كل مطعم له Google Sheet خاص به:**
 مطعم 1 (محمد) → Sheet_ID_1 → قائمته الخاصة
 مطعم 2 (علي) → Sheet_ID_2 → قائمته الخاصة
 مطعم 3 (سارة) → Sheet_ID_3 → قائمته الخاصة
 
-text
 - عندما يفتح الزبون `?rest_id=1` → يقرأ من Sheet مطعم محمد فقط
 - عندما يفتح `?rest_id=2` → يقرأ من Sheet مطعم علي فقط
 - **لا يختلطان أبداً ✅**
 
 **الصور:** أضف رابط الصورة في عمود `image_url` أو استخدم صفحة **🖼️ صور الأكلات**
-""")
+"""
+        )
 
-# ── اختيار المطعم ───────────────────────────────────
-c1, c2 = st.columns([2, 1])
-with c1:
-opts = {f"#{r.get('restaurant_id','?')} — {r.get('name','مطعم')}": r for r in restaurants}
-sel  = st.selectbox("🏪 اختر المطعم", list(opts.keys()), key="mm_rest_sel")
-rest = opts[sel]
-sheet_id = rest.get("sheet_id","")
-rid      = rest.get("restaurant_id","")
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        opts = {
+            f"#{r.get('restaurant_id', '?')} — {r.get('name', 'مطعم')}": r
+            for r in restaurants
+        }
+        sel = st.selectbox("🏪 اختر المطعم", list(opts.keys()), key="mm_rest_sel")
+        rest = opts[sel]
+        sheet_id = rest.get("sheet_id", "")
+        rid = rest.get("restaurant_id", "")
 
-with c2:
-# معلومات المطعم
-st.markdown(f"""
+    with c2:
+        st.markdown(
+            f"""
 <div style="background:#111;border:1px solid #C9A84C33;border-radius:10px;padding:.8rem;margin-top:1.6rem">
-  <div style="color:#C9A84C;font-size:.8rem;font-weight:700">#{rid} — {rest.get('name','')}</div>
-  <div style="color:#555;font-size:.7rem;margin-top:.3rem">📶 {rest.get('wifi_ssid','')}</div>
+  <div style="color:#C9A84C;font-size:.8rem;font-weight:700">#{rid} — {rest.get('name', '')}</div>
+  <div style="color:#555;font-size:.7rem;margin-top:.3rem">📶 {rest.get('wifi_ssid', '')}</div>
   <div style="color:#333;font-size:.65rem;margin-top:.2rem">Sheet: {sheet_id[:20]}...</div>
 </div>
-""", unsafe_allow_html=True)
+""",
+            unsafe_allow_html=True,
+        )
 
-if not sheet_id:
-st.error("❌ هذا المطعم ليس له Sheet ID")
-return
+    if not sheet_id:
+        st.error("❌ هذا المطعم ليس له Sheet ID")
+        return
 
-# ── اختيار الصنف ────────────────────────────────────
-tab_sel = st.radio("📂 الصنف", TABS, horizontal=True, key="mm_tab_sel")
+    tab_sel = st.radio("📂 الصنف", TABS, horizontal=True, key="mm_tab_sel")
+    st.markdown("---")
 
-st.markdown("---")
+    view_tab, add_tab, import_tab = st.tabs(
+        ["📋 عرض وتعديل", "➕ إضافة أكلة جديدة", "📸 استيراد من صورة"]
+    )
 
-# ── تبويبان: عرض + إضافة ────────────────────────────
-view_tab, add_tab, import_tab = st.tabs(["📋 عرض وتعديل", "➕ إضافة أكلة جديدة", "📸 استيراد من صورة"])
+    with view_tab:
+        if st.button("🔄 تحديث القائمة", key="mm_refresh"):
+            st.cache_data.clear()
+            _refresh_api_cache(rid)
+            st.toast("✅ تم تحديث القائمة — الصور ستظهر فوراً في المينيو", icon="🔄")
 
-# ══ عرض وتعديل ════════════════════════════════════════
-with view_tab:
-if st.button("🔄 تحديث القائمة", key="mm_refresh"):
-    st.cache_data.clear()
-    # ✅ مسح cache الـ API أيضاً حتى تظهر آخر التغييرات في المينيو
-    _refresh_api_cache(rid)
-    st.toast("✅ تم تحديث القائمة — الصور ستظهر فوراً في المينيو", icon="🔄")
+        items = load_items(sheet_id, tab_sel, rid)
+        if not items:
+            st.info(f"📭 لا توجد أكلات في '{tab_sel}' بعد — أضف من التبويب التالي")
+        else:
+            st.markdown(f"**{len(items)} أكلة في {tab_sel}**")
+            for item in items:
+                row_num = item.get("_row", 0)
+                name = item.get("name", "")
+                price = item.get("price", "0")
+                avail = item.get("available", "TRUE")
+                img_url = item.get("image_url", "")
+                desc = item.get("description", "")
+                is_avail = avail.upper() == "TRUE"
 
-items = load_items(sheet_id, tab_sel, rid)
+                avail_color = "#69f0ae" if is_avail else "#ef9a9a"
+                avail_label = "✅ متوفر" if is_avail else "❌ غير متوفر"
 
-if not items:
-    st.info(f"📭 لا توجد أكلات في '{tab_sel}' بعد — أضف من التبويب التالي")
-else:
-    st.markdown(f"**{len(items)} أكلة في {tab_sel}**")
+                with st.expander(f"{'✅' if is_avail else '❌'} {name} — {price} درهم"):
+                    col1, col2, col3 = st.columns([2, 2, 1])
 
-    for item in items:
-        row_num = item.get("_row", 0)
-        name    = item.get("name","")
-        price   = item.get("price","0")
-        avail   = item.get("available","TRUE")
-        img_url = item.get("image_url","")
-        desc    = item.get("description","")
-        is_avail = avail.upper() == "TRUE"
+                    with col1:
+                        new_name = st.text_input("🍽️ الاسم بالعربية", name, key=f"name_{row_num}")
+                        new_name_fr = st.text_input(
+                            "🇫🇷 بالفرنسية", item.get("name_fr", ""), key=f"fr_{row_num}"
+                        )
+                        new_desc = st.text_input("📝 الوصف", desc, key=f"desc_{row_num}")
 
-        avail_color = "#69f0ae" if is_avail else "#ef9a9a"
-        avail_label = "✅ متوفر" if is_avail else "❌ غير متوفر"
+                    with col2:
+                        price_str = str(price)
+                        price_val = (
+                            float(price_str)
+                            if price_str.replace(".", "").isdigit()
+                            else 0.0
+                        )
+                        new_price = st.number_input(
+                            "💰 السعر (درهم)",
+                            value=price_val,
+                            min_value=0.0,
+                            step=5.0,
+                            key=f"price_{row_num}",
+                        )
+                        new_img = st.text_input("🖼️ رابط الصورة", img_url, key=f"img_{row_num}")
+                        if new_img:
+                            st.image(new_img, width=120)
 
-        with st.expander(f"{'✅' if is_avail else '❌'} {name} — {price} درهم"):
-            col1, col2, col3 = st.columns([2, 2, 1])
+                    with col3:
+                        st.markdown(
+                            f'<div style="margin-top:1.5rem;color:{avail_color};font-weight:700">{avail_label}</div>',
+                            unsafe_allow_html=True,
+                        )
 
-            with col1:
-                new_name  = st.text_input("🍽️ الاسم بالعربية", name,
-                                           key=f"name_{row_num}")
-                new_name_fr = st.text_input("🇫🇷 بالفرنسية",
-                                             item.get("name_fr",""),
-                                             key=f"fr_{row_num}")
-                new_desc  = st.text_input("📝 الوصف", desc,
-                                           key=f"desc_{row_num}")
-            with col2:
-                new_price = st.number_input("💰 السعر (درهم)",
-                                             value=float(price) if str(price).replace('.','').isdigit() else 0.0,
-                                             min_value=0.0, step=5.0,
-                                             key=f"price_{row_num}")
-                new_img   = st.text_input("🖼️ رابط الصورة",
-                                           img_url,
-                                           key=f"img_{row_num}")
-                if new_img:
-                    st.image(new_img, width=120)
+                        if st.button("🔄 تبديل", key=f"tog_{row_num}"):
+                            if toggle_available(sheet_id, tab_sel, row_num, avail):
+                                st.success("✅ تم")
+                                st.rerun()
 
-            with col3:
-                st.markdown(f'<div style="margin-top:1.5rem;color:{avail_color};font-weight:700">{avail_label}</div>',
-                            unsafe_allow_html=True)
+                        if st.button("💾 حفظ", key=f"save_{row_num}"):
+                            ok = update_item(
+                                sheet_id,
+                                tab_sel,
+                                row_num,
+                                {
+                                    "name": new_name,
+                                    "name_fr": new_name_fr,
+                                    "price": str(new_price),
+                                    "description": new_desc,
+                                    "image_url": new_img,
+                                },
+                                rid=rid,
+                            )
+                            if ok:
+                                if new_img.strip():
+                                    _refresh_api_cache(rid)
+                                st.success("✅ تم الحفظ")
+                                st.rerun()
 
-                # تبديل التوفر
-                if st.button("🔄 تبديل", key=f"tog_{row_num}"):
-                    if toggle_available(sheet_id, tab_sel, row_num, avail):
-                        st.success("✅ تم"); st.rerun()
+                        if st.button("🗑️ حذف", key=f"del_{row_num}"):
+                            if delete_item(sheet_id, tab_sel, row_num, rid=rid):
+                                st.success("🗑️ تم الحذف")
+                                st.rerun()
 
-                # حفظ التعديلات
-                if st.button("💾 حفظ", key=f"save_{row_num}"):
-                    ok = update_item(sheet_id, tab_sel, row_num, {
-                        "name":        new_name,
-                        "name_fr":     new_name_fr,
-                        "price":       str(new_price),
-                        "description": new_desc,
-                        "image_url":   new_img,
-                    }, rid=rid)
-                    if ok:
-                        # ✅ مسح cache الـ API حتى تظهر الصورة فوراً في المينيو
-                        if new_img.strip():
-                            _refresh_api_cache(rid)
-                        st.success("✅ تم الحفظ"); st.rerun()
+    with add_tab:
+        st.markdown(f"### ➕ إضافة أكلة جديدة في **{tab_sel}**")
+        st.markdown(
+            f'<div style="background:#0a0a0a;border:1px solid #C9A84C33;border-radius:10px;padding:1rem;margin-bottom:1rem"><b style="color:#C9A84C">المطعم:</b> {rest.get("name", "")} &nbsp;|&nbsp; <b style="color:#C9A84C">الصنف:</b> {tab_sel}</div>',
+            unsafe_allow_html=True,
+        )
 
-                # حذف
-                if st.button("🗑️ حذف", key=f"del_{row_num}"):
-                    if delete_item(sheet_id, tab_sel, row_num, rid=rid):
-                        st.success("🗑️ تم الحذف"); st.rerun()
+        c0 = st.columns([3, 1])
+        with c0[0]:
+            n_name = st.text_input("🍽️ الاسم بالعربية *", key="add_name", placeholder="طاجين دجاج")
+        with c0[1]:
+            st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
+            if st.button("🌍 ترجم تلقائياً", key="btn_translate", use_container_width=True):
+                if n_name.strip():
+                    fr, en = auto_translate(n_name.strip())
+                    st.session_state["_auto_fr"] = fr
+                    st.session_state["_auto_en"] = en
+                    if fr or en:
+                        st.success(f"🇫🇷 {fr or '?'} | 🇬🇧 {en or '?'}")
+                else:
+                    st.warning("⚠️ أضف اسم الأكلة أولاً أو أدخل الترجمة يدوياً")
 
-# ══ إضافة أكلة ════════════════════════════════════════
-with add_tab:
-st.markdown(f"### ➕ إضافة أكلة جديدة في **{tab_sel}**")
-st.markdown(f'<div style="background:#0a0a0a;border:1px solid #C9A84C33;border-radius:10px;padding:1rem;margin-bottom:1rem"><b style="color:#C9A84C">المطعم:</b> {rest.get("name","")} &nbsp;|&nbsp; <b style="color:#C9A84C">الصنف:</b> {tab_sel}</div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            n_name_fr = st.text_input(
+                "🇫🇷 بالفرنسية",
+                key="add_fr",
+                value=st.session_state.get("_auto_fr", ""),
+                placeholder="Tajine Poulet",
+            )
+            n_name_en = st.text_input(
+                "🇬🇧 بالإنجليزية",
+                key="add_en",
+                value=st.session_state.get("_auto_en", ""),
+                placeholder="Chicken Tagine",
+            )
+            n_desc = st.text_area(
+                "📝 الوصف", key="add_desc", placeholder="وصف مختصر للأكلة", height=80
+            )
+        with c2:
+            n_price = st.number_input("💰 السعر (درهم) *", min_value=0.0, step=5.0, key="add_price")
+            n_avail = st.selectbox("📦 التوفر", ["TRUE", "FALSE"], key="add_avail")
+            n_img = st.text_input(
+                "🖼️ رابط الصورة (اختياري)", key="add_img", placeholder="https://..."
+            )
+            if n_img:
+                st.image(n_img, width=150, caption="معاينة الصورة")
 
-# ── إدخال الاسم + ترجمة تلقائية ──────────────────
-c0 = st.columns([3, 1])
-with c0[0]:
-    n_name = st.text_input("🍽️ الاسم بالعربية *", key="add_name",
-                            placeholder="طاجين دجاج")
-with c0[1]:
-    st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
-    if st.button("🌍 ترجم تلقائياً", key="btn_translate", use_container_width=True):
-        if n_name.strip():
-            fr, en = auto_translate(n_name.strip())
-            st.session_state["_auto_fr"] = fr
-            st.session_state["_auto_en"] = en
-            if fr or en:
-                st.success(f"🇫🇷 {fr or '?'} | 🇬🇧 {en or '?'}")
+        if st.button("➕ إضافة للقائمة", use_container_width=True, key="btn_add_item"):
+            if not n_name.strip():
+                st.error("❌ الاسم مطلوب")
+            elif n_price <= 0:
+                st.error("❌ أدخل سعراً صحيحاً")
             else:
-                st.warning("⚠️ أضف اسم الأكلة أولاً أو أدخل الترجمة يدوياً")
+                groq_ok3, _ = groq_available()
+                _ar3, _fr3, _en3 = (
+                    translate_single_groq(n_name.strip())
+                    if groq_ok3
+                    else translate_three_languages(n_name.strip())
+                )
+                final_fr = n_name_fr.strip() or _fr3
+                final_en = n_name_en.strip() or _en3
+                final_ar = _ar3 if _ar3 else n_name.strip()
+                ok = add_item(
+                    sheet_id,
+                    tab_sel,
+                    {
+                        "name": final_ar,
+                        "name_fr": final_fr,
+                        "name_en": final_en,
+                        "price": str(n_price),
+                        "description": n_desc.strip(),
+                        "available": n_avail,
+                        "image_url": n_img.strip(),
+                        "image_credit": "",
+                    },
+                    rid=rid,
+                )
+                if ok:
+                    if n_img.strip():
+                        _refresh_api_cache(rid)
+                    st.success(f"✅ تمت إضافة '{n_name}' بسعر {n_price} درهم")
+                    st.rerun()
 
-c1, c2 = st.columns(2)
-with c1:
-    n_name_fr = st.text_input("🇫🇷 بالفرنسية", key="add_fr",
-                               value=st.session_state.get("_auto_fr",""),
-                               placeholder="Tajine Poulet")
-    n_name_en = st.text_input("🇬🇧 بالإنجليزية", key="add_en",
-                               value=st.session_state.get("_auto_en",""),
-                               placeholder="Chicken Tagine")
-    n_desc    = st.text_area("📝 الوصف", key="add_desc",
-                              placeholder="وصف مختصر للأكلة", height=80)
-with c2:
-    n_price = st.number_input("💰 السعر (درهم) *", min_value=0.0,
-                               step=5.0, key="add_price")
-    n_avail = st.selectbox("📦 التوفر", ["TRUE","FALSE"],
-                            key="add_avail")
-    n_img   = st.text_input("🖼️ رابط الصورة (اختياري)", key="add_img",
-                             placeholder="https://...")
-    if n_img:
-        st.image(n_img, width=150, caption="معاينة الصورة")
+    with import_tab:
+        _render_image_import_tab(sheet_id, tab_sel, rest, rid)
 
-if st.button("➕ إضافة للقائمة", use_container_width=True, key="btn_add_item"):
-    if not n_name.strip():
-        st.error("❌ الاسم مطلوب")
-    elif n_price <= 0:
-        st.error("❌ أدخل سعراً صحيحاً")
-    else:
-        # إذا لم يدخل المستخدم الترجمة يدوياً — يترجم تلقائياً
-        groq_ok3, _ = groq_available()
-        _ar3, _fr3, _en3 = (translate_single_groq(n_name.strip()) 
-            if groq_ok3 else translate_three_languages(n_name.strip()))
-        final_fr = n_name_fr.strip() or _fr3
-        final_en = n_name_en.strip() or _en3
-        final_ar = _ar3 if _ar3 else n_name.strip()
-        ok = add_item(sheet_id, tab_sel, {
-            "name":        final_ar,
-            "name_fr":     final_fr,
-            "name_en":     final_en,
-            "price":       str(n_price),
-            "description": n_desc.strip(),
-            "available":   n_avail,
-            "image_url":   n_img.strip(),
-            "image_credit": ""
-        })
-        if ok:
-            # ✅ مسح cache الـ API حتى تظهر الصورة فوراً في المينيو
-            if n_img.strip():
-                _refresh_api_cache(rid)
-            st.success(f"✅ تمت إضافة '{n_name}' بسعر {n_price} درهم")
-            st.rerun()
-
-# ══ استيراد من صورة ══════════════════════════════════
-with import_tab:
-_render_image_import_tab(sheet_id, tab_sel, rest, rid)
 
 def _render_image_import_tab(sheet_id, tab_sel, rest, rid=""):
-"""تبويب استيراد المينيو من صورة باستخدام Gemini"""
-import base64
+    """تبويب استيراد المينيو من صورة باستخدام Gemini"""
+    import base64
 
-ok, msg = gemini_available()
+    _ = (tab_sel, rest)
+    ok, msg = gemini_available()
 
-st.markdown("### 📸 استيراد المينيو من صورة")
-st.markdown("""
+    st.markdown("### 📸 استيراد المينيو من صورة")
+    st.markdown(
+        """
 <div style="background:#0a1a0a;border:1px solid #C9A84C33;border-radius:10px;padding:1rem;margin-bottom:1rem;font-size:.85rem;color:#888;line-height:1.8">
 📌 <b style="color:#C9A84C">كيف يعمل؟</b><br>
 1. ارفع صورة المينيو (ورقي أو صورة هاتف)<br>
@@ -634,79 +660,91 @@ st.markdown("""
 3. راجع النتائج وعدّل إذا لزم<br>
 4. اضغط <b style="color:#69f0ae">حفظ في Google Sheet</b> ← تظهر فوراً في المينيو
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
-if not ok:
-st.error(f"❌ {msg} — أضف GEMINI_API_KEY في Secrets")
-return
-st.markdown(f'<div style="color:#69f0ae;font-size:.8rem">🤖 Gemini: {msg} — دوران تلقائي عند نفاذ الحصة</div>', unsafe_allow_html=True)
+    if not ok:
+        st.error(f"❌ {msg} — أضف GEMINI_API_KEY في Secrets")
+        return
 
-uploaded = st.file_uploader(
-"📷 ارفع ملف المينيو",
-type=["jpg", "jpeg", "png", "webp", "pdf"],
-key="menu_img_upload",
-help="صورة JPG/PNG أو ملف PDF للمينيو"
-)
+    st.markdown(
+        f'<div style="color:#69f0ae;font-size:.8rem">🤖 Gemini: {msg} — دوران تلقائي عند نفاذ الحصة</div>',
+        unsafe_allow_html=True,
+    )
 
-target_tab = st.selectbox(
-"📂 أضف الأكلات إلى صنف:",
-["كل الأصناف تلقائياً", "الأطباق الرئيسية", "المقبلات", "الحلويات", "المشروبات"],
-key="img_target_tab"
-)
+    uploaded = st.file_uploader(
+        "📷 ارفع ملف المينيو",
+        type=["jpg", "jpeg", "png", "webp", "pdf"],
+        key="menu_img_upload",
+        help="صورة JPG/PNG أو ملف PDF للمينيو",
+    )
 
-if uploaded:
-col_img, col_btn = st.columns([2, 1])
-with col_img:
-    # عرض معاينة حسب نوع الملف
-    if uploaded.type == "application/pdf":
-        st.markdown(f"""
+    target_tab = st.selectbox(
+        "📂 أضف الأكلات إلى صنف:",
+        ["كل الأصناف تلقائياً", "الأطباق الرئيسية", "المقبلات", "الحلويات", "المشروبات"],
+        key="img_target_tab",
+    )
+
+    analyze_btn = False
+    if uploaded:
+        col_img, col_btn = st.columns([2, 1])
+        with col_img:
+            if uploaded.type == "application/pdf":
+                st.markdown(
+                    f"""
         <div style="background:#0a1a0a;border:1px solid #C9A84C33;border-radius:10px;
              padding:1.5rem;text-align:center">
           <div style="font-size:3rem">📄</div>
           <div style="color:#C9A84C;font-weight:700;margin-top:.5rem">{uploaded.name}</div>
           <div style="color:#555;font-size:.8rem;margin-top:.3rem">PDF — سيتم تحليل الصفحة الأولى</div>
         </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.image(uploaded, caption="الصورة المرفوعة", use_container_width=True)
-with col_btn:
-    st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
-    analyze_btn = st.button("🤖 تحليل بالذكاء الاصطناعي",
-                             use_container_width=True,
-                             key="btn_analyze_menu")
+        """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.image(uploaded, caption="الصورة المرفوعة", use_container_width=True)
+        with col_btn:
+            st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
+            analyze_btn = st.button(
+                "🤖 تحليل بالذكاء الاصطناعي",
+                use_container_width=True,
+                key="btn_analyze_menu",
+            )
 
-if analyze_btn or st.session_state.get("_analyzed_items"):
-    if analyze_btn:
-        with st.spinner("🤖 جاري تحليل الملف... قد يستغرق 10-30 ثانية"):
-            try:
-                file_bytes = uploaded.read()
-                mime = uploaded.type or "image/jpeg"
+    if analyze_btn or st.session_state.get("_analyzed_items"):
+        if analyze_btn:
+            with st.spinner("🤖 جاري تحليل الملف... قد يستغرق 10-30 ثانية"):
+                try:
+                    file_bytes = uploaded.read()
+                    mime = uploaded.type or "image/jpeg"
 
-                # تحويل PDF لصورة إذا لزم
-                if uploaded.type == "application/pdf" or uploaded.name.lower().endswith(".pdf"):
-                    try:
-                        import fitz  # PyMuPDF
-                        pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
-                        # تحليل كل الصفحات ودمجها في صورة واحدة طويلة
-                        images_b64 = []
-                        for page_num in range(min(pdf_doc.page_count, 4)):  # max 4 صفحات
-                            page = pdf_doc[page_num]
-                            mat = fitz.Matrix(2, 2)  # دقة عالية x2
-                            pix = page.get_pixmap(matrix=mat)
-                            images_b64.append(base64.b64encode(pix.tobytes("jpeg")).decode())
-                        img_b64 = images_b64[0]  # الصفحة الأولى للتحليل الأساسي
-                        mime = "image/jpeg"
-                        st.info(f"📄 تم تحويل PDF ({pdf_doc.page_count} صفحة) — يتم تحليل الصفحة الأولى")
-                    except ImportError:
-                        st.error("❌ مكتبة PyMuPDF غير مثبتة — أضف 'pymupdf' في requirements.txt")
-                        return
-                    except Exception as e:
-                        st.error(f"❌ خطأ في تحويل PDF: {e}")
-                        return
-                else:
-                    img_b64 = base64.b64encode(file_bytes).decode()
+                    if uploaded.type == "application/pdf" or uploaded.name.lower().endswith(".pdf"):
+                        try:
+                            import fitz
 
-                prompt = """You are an expert at reading restaurant menus. This menu may be in Arabic, French, or both.
+                            pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                            images_b64 = []
+                            for page_num in range(min(pdf_doc.page_count, 4)):
+                                page = pdf_doc[page_num]
+                                mat = fitz.Matrix(2, 2)
+                                pix = page.get_pixmap(matrix=mat)
+                                images_b64.append(base64.b64encode(pix.tobytes("jpeg")).decode())
+                            img_b64 = images_b64[0]
+                            mime = "image/jpeg"
+                            st.info(
+                                f"📄 تم تحويل PDF ({pdf_doc.page_count} صفحة) — يتم تحليل الصفحة الأولى"
+                            )
+                        except ImportError:
+                            st.error("❌ مكتبة PyMuPDF غير مثبتة — أضف 'pymupdf' في requirements.txt")
+                            return
+                        except Exception as e:
+                            st.error(f"❌ خطأ في تحويل PDF: {e}")
+                            return
+                    else:
+                        img_b64 = base64.b64encode(file_bytes).decode()
+
+                    prompt = """You are an expert at reading restaurant menus. This menu may be in Arabic, French, or both.
 
 Extract ALL dishes and their prices from this image.
 
@@ -721,212 +759,248 @@ Rules:
 Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
 {"items":[{"name":"dish name","price":40,"description":"","category":"الأطباق الرئيسية"}]}"""
 
-                # جرب Groq Vision أولاً (6 مفاتيح مجانية)
-                # إذا فشل → Gemini كـ fallback
-                groq_vis_ok, _ = groq_vision_available()
-                try:
-                    if groq_vis_ok:
-                        raw = groq_vision(prompt, img_b64, mime, max_tokens=4000)
-                        st.info("⚡ تم التحليل بـ Groq Vision")
-                    else:
-                        raise RuntimeError("Groq غير متاح")
-                except Exception as _groq_err:
-                    log.warning(f"Groq vision failed: {_groq_err} — falling back to Gemini")
-                    raw = gemini_vision(prompt, img_b64, mime, max_tokens=4000, temperature=0)
-                    st.info("🤖 تم التحليل بـ Gemini")
-
-                # تنظيف JSON من أي نص زائد
-                raw = raw.strip()
-                if "```json" in raw:
-                    raw = raw.split("```json")[1].split("```")[0].strip()
-                elif "```" in raw:
-                    raw = raw.split("```")[1].split("```")[0].strip()
-
-                # نحدد نوع الـ JSON: object أو array
-                first_char = ""
-                for ch in raw:
-                    if ch in "{[":
-                        first_char = ch
-                        break
-
-                if first_char == "[":
-                    # رجع array مباشرة — ابحث عنه
-                    start = raw.find("[")
-                    raw = raw[start:]
+                    groq_vis_ok, _ = groq_vision_available()
                     try:
-                        items_found, _ = json.JSONDecoder().raw_decode(raw)
-                    except json.JSONDecodeError:
-                        end = raw.rfind("]")
-                        items_found = json.loads(raw[:end+1] if end != -1 else raw)
-                else:
-                    # رجع object — ابحث عنه
-                    start = raw.find("{")
-                    if start != -1:
+                        if groq_vis_ok:
+                            raw = groq_vision(prompt, img_b64, mime, max_tokens=4000)
+                            st.info("⚡ تم التحليل بـ Groq Vision")
+                        else:
+                            raise RuntimeError("Groq غير متاح")
+                    except Exception as _groq_err:
+                        log.warning(f"Groq vision failed: {_groq_err} — falling back to Gemini")
+                        raw = gemini_vision(prompt, img_b64, mime, max_tokens=4000, temperature=0)
+                        st.info("🤖 تم التحليل بـ Gemini")
+
+                    raw = raw.strip()
+                    if "```json" in raw:
+                        raw = raw.split("```json")[1].split("```")[0].strip()
+                    elif "```" in raw:
+                        raw = raw.split("```")[1].split("```")[0].strip()
+
+                    first_char = ""
+                    for ch in raw:
+                        if ch in "{[":
+                            first_char = ch
+                            break
+
+                    if first_char == "[":
+                        start = raw.find("[")
                         raw = raw[start:]
-                    try:
-                        parsed, _ = json.JSONDecoder().raw_decode(raw)
-                    except json.JSONDecodeError:
-                        end = raw.rfind("}")
-                        if end != -1:
-                            raw = raw[:end+1]
-                        parsed = json.loads(raw)
-                    # جرب كل المفاتيح الممكنة
-                    items_found = (
-                        parsed.get("items") or
-                        parsed.get("dishes") or
-                        parsed.get("menu") or
-                        parsed.get("data") or
-                        (list(parsed.values())[0] if parsed and isinstance(list(parsed.values())[0], list) else [])
-                    )
-
-                # تأكد أن النتيجة list of dicts
-                if not isinstance(items_found, list):
-                    items_found = []
-                items_found = [i for i in items_found if isinstance(i, dict) and i.get("name","").strip()]
-                st.session_state["_analyzed_items"] = items_found
-                st.session_state["_analyzed_edits"] = {i: dict(item) for i, item in enumerate(items_found)}
-                if items_found:
-                    st.success(f"✅ تم استخراج {len(items_found)} أكلة!")
-                else:
-                    st.warning("⚠️ لم يتم استخراج أي أكلة — رد الذكاء الاصطناعي:")
-                    st.code(raw[:800])
-            except json.JSONDecodeError as e:
-                st.error(f"❌ خطأ في قراءة JSON: {e}")
-                st.code(raw[:500] if 'raw' in dir() else "لا يوجد رد")
-                return
-            except RuntimeError as e:
-                st.error(f"❌ {e}")
-                return
-            except Exception as e:
-                st.error(f"❌ خطأ غير متوقع: {type(e).__name__}: {e}")
-                return
-
-    items_found = st.session_state.get("_analyzed_items", [])
-    edits = st.session_state.get("_analyzed_edits", {})
-
-    if items_found:
-        st.markdown(f"### ✏️ راجع وعدّل ({len(items_found)} أكلة مستخرجة)")
-
-        for i, item in enumerate(items_found):
-            with st.expander(f"🍽️ {item.get('name','؟')} — {item.get('price',0)} درهم", expanded=False):
-                c1, c2, c3 = st.columns([2, 1, 1])
-                with c1:
-                    new_name = st.text_input("الاسم", value=edits[i].get("name",""), key=f"ai_name_{i}")
-                    edits[i]["name"] = new_name
-                    new_desc = st.text_input("الوصف", value=edits[i].get("description",""), key=f"ai_desc_{i}")
-                    edits[i]["description"] = new_desc
-                with c2:
-                    new_price = st.number_input("السعر", value=float(edits[i].get("price",0) or 0),
-                                                 min_value=0.0, step=5.0, key=f"ai_price_{i}")
-                    edits[i]["price"] = new_price
-                with c3:
-                    cats = ["الأطباق الرئيسية","المقبلات","الحلويات","المشروبات"]
-                    cur_cat = edits[i].get("category","الأطباق الرئيسية")
-                    if cur_cat not in cats: cur_cat = "الأطباق الرئيسية"
-                    new_cat = st.selectbox("الصنف", cats, index=cats.index(cur_cat), key=f"ai_cat_{i}")
-                    edits[i]["category"] = new_cat
-
-        st.session_state["_analyzed_edits"] = edits
-        st.markdown("---")
-
-        col_save, col_clear = st.columns([3, 1])
-        with col_save:
-            if st.button("💾 حفظ كل الأكلات في Google Sheet ✅",
-                          use_container_width=True, key="btn_save_ai_items"):
-                with st.spinner("⏳ جاري الترجمة والحفظ..."):
-                    from collections import defaultdict
-
-                    # جمع كل الأسماء الصالحة
-                    valid_items = [
-                        (i, item_data)
-                        for i, item_data in edits.items()
-                        if item_data.get("name","").strip()
-                    ]
-
-                    # ترجمة كل الأسماء في استدعاء Gemini واحد فقط
-                    names_list = [item_data["name"].strip() for _, item_data in valid_items]
-                    # Groq للترجمة — أسرع وأوفر لـ Gemini
-                    groq_ok, _ = groq_available()
-                    if groq_ok:
-                        translations = translate_batch_groq(names_list)
+                        try:
+                            items_found, _ = json.JSONDecoder().raw_decode(raw)
+                        except json.JSONDecodeError:
+                            end = raw.rfind("]")
+                            items_found = json.loads(raw[: end + 1] if end != -1 else raw)
                     else:
-                        translations = translate_batch(names_list)
+                        start = raw.find("{")
+                        if start != -1:
+                            raw = raw[start:]
+                        try:
+                            parsed, _ = json.JSONDecoder().raw_decode(raw)
+                        except json.JSONDecodeError:
+                            end = raw.rfind("}")
+                            if end != -1:
+                                raw = raw[: end + 1]
+                            parsed = json.loads(raw)
+                        items_found = (
+                            parsed.get("items")
+                            or parsed.get("dishes")
+                            or parsed.get("menu")
+                            or parsed.get("data")
+                            or (
+                                list(parsed.values())[0]
+                                if parsed and isinstance(list(parsed.values())[0], list)
+                                else []
+                            )
+                        )
 
-                    # تجميع حسب الصنف
-                    by_tab = defaultdict(list)
-                    for idx2, (i, item_data) in enumerate(valid_items):
-                        ar, fr, en = translations[idx2] if idx2 < len(translations) else ("","","")
-                        main_name = ar if ar else item_data["name"].strip()
-                        save_tab = item_data.get("category","الأطباق الرئيسية")
-                        if target_tab != "كل الأصناف تلقائياً":
-                            save_tab = target_tab
-                        by_tab[save_tab].append({
-                            "name":         main_name,
-                            "name_fr":      fr,
-                            "name_en":      en,
-                            "price":        str(int(item_data.get("price",0) or 0)),
-                            "description":  item_data.get("description","").strip(),
-                            "available":    "TRUE",
-                            "image_url":    "",
-                            "image_credit": ""
-                        })
+                    if not isinstance(items_found, list):
+                        items_found = []
+                    items_found = [
+                        i for i in items_found if isinstance(i, dict) and i.get("name", "").strip()
+                    ]
+                    st.session_state["_analyzed_items"] = items_found
+                    st.session_state["_analyzed_edits"] = {
+                        i: dict(item) for i, item in enumerate(items_found)
+                    }
+                    if items_found:
+                        st.success(f"✅ تم استخراج {len(items_found)} أكلة!")
+                    else:
+                        st.warning("⚠️ لم يتم استخراج أي أكلة — رد الذكاء الاصطناعي:")
+                        st.code(raw[:800])
+                except json.JSONDecodeError as e:
+                    st.error(f"❌ خطأ في قراءة JSON: {e}")
+                    st.code(raw[:500] if "raw" in dir() else "لا يوجد رد")
+                    return
+                except RuntimeError as e:
+                    st.error(f"❌ {e}")
+                    return
+                except Exception as e:
+                    st.error(f"❌ خطأ غير متوقع: {type(e).__name__}: {e}")
+                    return
 
-                    # حفظ كل صنف في طلب واحد فقط
-                    added = 0
-                    for tab_name, tab_items in by_tab.items():
-                        n = add_items_batch(sheet_id, tab_name, tab_items, rid=rid)
-                        added += n
+        items_found = st.session_state.get("_analyzed_items", [])
+        edits = st.session_state.get("_analyzed_edits", {})
 
-                if added > 0:
-                    # ✅ مسح cache الـ API — الأكلات تظهر فوراً في المينيو
-                    _refresh_api_cache(rid)
-                    st.success(f"✅ تم حفظ {added} أكلة في Google Sheet! تظهر في المينيو فوراً 🎉")
+        if items_found:
+            st.markdown(f"### ✏️ راجع وعدّل ({len(items_found)} أكلة مستخرجة)")
+
+            for i, item in enumerate(items_found):
+                with st.expander(
+                    f"🍽️ {item.get('name', '؟')} — {item.get('price', 0)} درهم", expanded=False
+                ):
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    with c1:
+                        new_name = st.text_input(
+                            "الاسم", value=edits[i].get("name", ""), key=f"ai_name_{i}"
+                        )
+                        edits[i]["name"] = new_name
+                        new_desc = st.text_input(
+                            "الوصف", value=edits[i].get("description", ""), key=f"ai_desc_{i}"
+                        )
+                        edits[i]["description"] = new_desc
+                    with c2:
+                        new_price = st.number_input(
+                            "السعر",
+                            value=float(edits[i].get("price", 0) or 0),
+                            min_value=0.0,
+                            step=5.0,
+                            key=f"ai_price_{i}",
+                        )
+                        edits[i]["price"] = new_price
+                    with c3:
+                        cats = ["الأطباق الرئيسية", "المقبلات", "الحلويات", "المشروبات"]
+                        cur_cat = edits[i].get("category", "الأطباق الرئيسية")
+                        if cur_cat not in cats:
+                            cur_cat = "الأطباق الرئيسية"
+                        new_cat = st.selectbox(
+                            "الصنف", cats, index=cats.index(cur_cat), key=f"ai_cat_{i}"
+                        )
+                        edits[i]["category"] = new_cat
+
+            st.session_state["_analyzed_edits"] = edits
+            st.markdown("---")
+
+            col_save, col_clear = st.columns([3, 1])
+            with col_save:
+                if st.button(
+                    "💾 حفظ كل الأكلات في Google Sheet ✅",
+                    use_container_width=True,
+                    key="btn_save_ai_items",
+                ):
+                    with st.spinner("⏳ جاري الترجمة والحفظ..."):
+                        from collections import defaultdict
+
+                        valid_items = [
+                            (i, item_data)
+                            for i, item_data in edits.items()
+                            if item_data.get("name", "").strip()
+                        ]
+
+                        names_list = [item_data["name"].strip() for _, item_data in valid_items]
+                        groq_ok, _ = groq_available()
+                        if groq_ok:
+                            translations = translate_batch_groq(names_list)
+                        else:
+                            translations = translate_batch(names_list)
+
+                        by_tab = defaultdict(list)
+                        for idx2, (i, item_data) in enumerate(valid_items):
+                            ar, fr, en = (
+                                translations[idx2]
+                                if idx2 < len(translations)
+                                else ("", "", "")
+                            )
+                            main_name = ar if ar else item_data["name"].strip()
+                            save_tab = item_data.get("category", "الأطباق الرئيسية")
+                            if target_tab != "كل الأصناف تلقائياً":
+                                save_tab = target_tab
+                            by_tab[save_tab].append(
+                                {
+                                    "name": main_name,
+                                    "name_fr": fr,
+                                    "name_en": en,
+                                    "price": str(int(item_data.get("price", 0) or 0)),
+                                    "description": item_data.get("description", "").strip(),
+                                    "available": "TRUE",
+                                    "image_url": "",
+                                    "image_credit": "",
+                                }
+                            )
+
+                        added = 0
+                        for tab_name, tab_items in by_tab.items():
+                            n = add_items_batch(sheet_id, tab_name, tab_items, rid=rid)
+                            added += n
+
+                    if added > 0:
+                        _refresh_api_cache(rid)
+                        st.success(f"✅ تم حفظ {added} أكلة في Google Sheet! تظهر في المينيو فوراً 🎉")
+                        st.session_state.pop("_analyzed_items", None)
+                        st.session_state.pop("_analyzed_edits", None)
+                        st.rerun()
+            with col_clear:
+                if st.button("🗑️ مسح", key="btn_clear_ai"):
                     st.session_state.pop("_analyzed_items", None)
                     st.session_state.pop("_analyzed_edits", None)
                     st.rerun()
-        with col_clear:
-            if st.button("🗑️ مسح", key="btn_clear_ai"):
-                st.session_state.pop("_analyzed_items", None)
-                st.session_state.pop("_analyzed_edits", None)
+
+    st.markdown("---")
+    st.markdown("### 📤 أو استيراد نصي سريع — الصق قائمتك")
+
+    bulk_text = st.text_area(
+        "📝 الصق هنا",
+        height=200,
+        key="bulk_import",
+        placeholder="طاجين دجاج | 85 | بالزيتون\nكسكس مغربي | 70\n...",
+    )
+
+    if st.button("📤 استيراد", use_container_width=True, key="btn_bulk"):
+        if not bulk_text.strip():
+            st.warning("الحقل فارغ")
+        else:
+            lines = [l.strip() for l in bulk_text.split("\n") if l.strip()]
+            added = 0
+            errors = []
+            for line in lines:
+                parts = [p.strip() for p in line.split("|")]
+                if len(parts) < 2:
+                    errors.append(f"⚠️ تجاهلت: {line[:40]}")
+                    continue
+                name_ = parts[0]
+                price_ = parts[1].replace("درهم", "").replace("دراهم", "").strip()
+                desc_ = parts[2] if len(parts) > 2 else ""
+                if not price_.replace(".", "").isdigit():
+                    errors.append(f"⚠️ سعر غير صحيح: {line[:40]}")
+                    continue
+                groq_ok_b, _ = groq_available()
+                _ar, _fr, _en = (
+                    translate_single_groq(name_)
+                    if groq_ok_b
+                    else translate_three_languages(name_)
+                )
+                _main = _ar if _ar else name_
+                ok = add_item(
+                    sheet_id,
+                    tab_sel,
+                    {
+                        "name": _main,
+                        "name_fr": _fr,
+                        "name_en": _en,
+                        "price": price_,
+                        "description": desc_,
+                        "available": "TRUE",
+                        "image_url": "",
+                        "image_credit": "",
+                    },
+                    rid=rid,
+                )
+                if ok:
+                    added += 1
+
+            if added > 0:
+                st.success(f"✅ تمت إضافة {added} أكلة إلى '{tab_sel}'")
+            for err in errors:
+                st.warning(err)
+            if added > 0:
                 st.rerun()
-
-st.markdown("---")
-st.markdown("### 📤 أو استيراد نصي سريع — الصق قائمتك")
-
-bulk_text = st.text_area("📝 الصق هنا", height=200, key="bulk_import",
-                      placeholder="طاجين دجاج | 85 | بالزيتون\nكسكس مغربي | 70\n...")
-
-if st.button("📤 استيراد", use_container_width=True, key="btn_bulk"):
-if not bulk_text.strip():
-    st.warning("الحقل فارغ")
-else:
-    lines = [l.strip() for l in bulk_text.split("\n") if l.strip()]
-    added = 0; errors = []
-    for line in lines:
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) < 2:
-            errors.append(f"⚠️ تجاهلت: {line[:40]}")
-            continue
-        name_  = parts[0]
-        price_ = parts[1].replace("درهم","").replace("دراهم","").strip()
-        desc_  = parts[2] if len(parts) > 2 else ""
-        if not price_.replace(".","").isdigit():
-            errors.append(f"⚠️ سعر غير صحيح: {line[:40]}")
-            continue
-        groq_ok_b, _ = groq_available()
-        _ar, _fr, _en = (translate_single_groq(name_) 
-            if groq_ok_b else translate_three_languages(name_))
-        _main = _ar if _ar else name_
-        ok = add_item(sheet_id, tab_sel, {
-            "name": _main, "name_fr": _fr, "name_en": _en,
-            "price": price_, "description": desc_,
-            "available": "TRUE", "image_url": "", "image_credit": ""
-        }, rid=rid)
-        if ok: added += 1
-
-    if added > 0:
-        st.success(f"✅ تمت إضافة {added} أكلة إلى '{tab_sel}'")
-    for e in errors:
-        st.warning(e)
-    if added > 0:
-        st.rerun()
