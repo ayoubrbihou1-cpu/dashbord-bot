@@ -567,7 +567,7 @@ def page_menu_manager(restaurants: list):
             n_name = st.text_input("🍽️ الاسم بالعربية *", key="add_name", placeholder="طاجين دجاج")
         with c0[1]:
             st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
-            if st.button("🌍 ترجم تلقائياً", key="btn_translate", use_container_width=True):
+            if st.button("🌍 ترجم تلقائياً", key="btn_translate", width="stretch"):
                 if n_name.strip():
                     fr, en = auto_translate(n_name.strip())
                     st.session_state["_auto_fr"] = fr
@@ -603,7 +603,7 @@ def page_menu_manager(restaurants: list):
             if n_img:
                 st.image(n_img, width=150, caption="معاينة الصورة")
 
-        if st.button("➕ إضافة للقائمة", use_container_width=True, key="btn_add_item"):
+        if st.button("➕ إضافة للقائمة", width="stretch", key="btn_add_item"):
             if not n_name.strip():
                 st.error("❌ الاسم مطلوب")
             elif n_price <= 0:
@@ -703,12 +703,12 @@ def _render_image_import_tab(sheet_id, tab_sel, rest, rid=""):
                     unsafe_allow_html=True,
                 )
             else:
-                st.image(uploaded, caption="الصورة المرفوعة", use_container_width=True)
+                st.image(uploaded, caption="الصورة المرفوعة", width="stretch")
         with col_btn:
             st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
             analyze_btn = st.button(
                 "🤖 تحليل بالذكاء الاصطناعي",
-                use_container_width=True,
+                width="stretch",
                 key="btn_analyze_menu",
             )
 
@@ -885,7 +885,7 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
             with col_save:
                 if st.button(
                     "💾 حفظ كل الأكلات في Google Sheet ✅",
-                    use_container_width=True,
+                    width="stretch",
                     key="btn_save_ai_items",
                 ):
                     with st.spinner("⏳ جاري الترجمة والحفظ..."):
@@ -955,7 +955,7 @@ Reply ONLY with valid JSON, no extra text, no markdown, no code blocks:
         placeholder="طاجين دجاج | 85 | بالزيتون\nكسكس مغربي | 70\n...",
     )
 
-    if st.button("📤 استيراد", use_container_width=True, key="btn_bulk"):
+    if st.button("📤 استيراد", width="stretch", key="btn_bulk"):
         if not bulk_text.strip():
             st.warning("الحقل فارغ")
         else:

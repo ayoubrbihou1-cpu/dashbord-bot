@@ -110,45 +110,60 @@ def fetch_pollinations(name: str, count: int = 1) -> list:
     if POLLINATIONS_KEY:
         headers["Authorization"] = f"Bearer {POLLINATIONS_KEY}"
 
+    def _try_pollinations(url: str) -> Optional[requests.Response]:
+        """
+        يحاول الطلب مع الـ Authorization (إن وجد).
+        إذا رجع 401 يتم إعادة المحاولة بدون Authorization لأن بعض endpoints
+        تعمل كضيوف ولا تقبل الهيدر مع مفاتيح غير متوافقة.
+        """
+        try:
+            resp = requests.get(url, headers=headers, timeout=90)
+            if resp.status_code == 401 and headers:
+                log.warning("Pollinations returned 401 with auth header, retrying without auth...")
+                resp = requests.get(url, timeout=90)
+            return resp
+        except Exception:
+            return None
+
     for i in range(count):
         try:
             seed = 42 + (i * 13)
             nologo = "true" if POLLINATIONS_KEY else "false"
 
-            # جرب الـ endpoint الجديد أولاً
-            url_new = f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}"
-            url_old = f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}"
+            # جرب عدة صيغ لأن Pollinations يتغير كثيراً بين الإصدارات
+            url_candidates = [
+                f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}",
+                f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}&nologo={nologo}",
+                f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}",
+                f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}",
+                f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}&nologo={nologo}",
+                f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}",
+            ]
 
             if i > 0:
                 time.sleep(3)
 
             img_url = None
-            # جرب الجديد
-            try:
-                resp = requests.get(url_new, headers=headers, timeout=90)
-                if resp.status_code == 200 and resp.headers.get("content-type","").startswith("image"):
-                    img_url = url_new
-                else:
-                    log.warning(f"New endpoint failed {resp.status_code}, trying old...")
-            except Exception:
-                pass
-
-            # إذا فشل الجديد → جرب القديم
-            if not img_url:
+            for idx, candidate in enumerate(url_candidates):
                 try:
-                    resp2 = requests.get(url_old, headers=headers, timeout=90)
-                    if resp2.status_code == 200 and resp2.headers.get("content-type","").startswith("image"):
-                        img_url = url_old
-                    else:
-                        log.warning(f"Pollinations both endpoints failed for {name}")
-                except Exception as e2:
-                    log.warning(f"Pollinations old endpoint error for {name}: {e2}")
+                    resp = _try_pollinations(candidate)
+                    if resp and resp.status_code == 200 and resp.headers.get("content-type","").startswith("image"):
+                        img_url = candidate
+                        break
+                    status = getattr(resp, "status_code", "no-response")
+                    if idx == 0:
+                        log.warning(f"New endpoint failed {status}, trying fallbacks...")
+                except Exception as e_try:
+                    log.warning(f"Pollinations candidate error for {name}: {e_try}")
+
+            if not img_url:
+                log.warning(f"Pollinations all endpoint variants failed for {name}")
 
             if img_url:
                 # نحمّل الصورة كـ base64 لضمان العرض الصحيح في Streamlit
                 try:
-                    img_resp = requests.get(img_url, headers=headers, timeout=60)
-                    if img_resp.status_code == 200:
+                    img_resp = _try_pollinations(img_url)
+                    if img_resp and img_resp.status_code == 200:
                         import base64 as _b64
                         img_data = _b64.b64encode(img_resp.content).decode()
                         results.append({

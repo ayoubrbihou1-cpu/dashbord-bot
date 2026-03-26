@@ -33,17 +33,32 @@ ROUTER_BASE_URL = os.getenv("ROUTER_BASE_URL","https://restaurant-qr-saas.onrend
 # ══════════════════════════════════════════════════════════
 CSS = """
 <style>
+:root{
+  --pi-bg:#101010; --pi-bg-2:#141414; --pi-soft:#0a0a0a;
+  --pi-border:#1a1a1a; --pi-text:#E8C97A; --pi-muted:#666;
+  --pi-accent:#C9A84C;
+}
+body.day-theme{
+  --pi-bg:#ffffff; --pi-bg-2:#f7f1e7; --pi-soft:#f8f6f2;
+  --pi-border:#d8ccb0; --pi-text:#5b3a08; --pi-muted:#6d5a37;
+  --pi-accent:#7a5008;
+}
+
 /* METHOD SELECTOR */
 .method-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem;margin:1rem 0}
 .method-card{
-  background:#101010;border:2px solid #1a1a1a;border-radius:14px;
+  background:var(--pi-bg);border:2px solid var(--pi-border);border-radius:14px;
   padding:1.2rem 1rem;text-align:center;cursor:pointer;
   transition:all .25s;user-select:none
 }
-.method-card:hover{border-color:#C9A84C55;background:#141414}
-.method-card.active{border-color:#C9A84C;background:#1a1500;box-shadow:0 0 20px rgba(201,168,76,.12)}
+.method-card:hover{border-color:color-mix(in srgb,var(--pi-accent) 45%, transparent);background:var(--pi-bg-2)}
+.method-card.active{
+  border-color:var(--pi-accent);
+  background:color-mix(in srgb,var(--pi-accent) 12%, var(--pi-bg));
+  box-shadow:0 0 20px color-mix(in srgb,var(--pi-accent) 18%, transparent);
+}
 .method-icon{font-size:2.2rem;margin-bottom:.5rem}
-.method-title{font-size:.9rem;font-weight:700;color:#E8C97A;margin-bottom:.2rem}
+.method-title{font-size:.9rem;font-weight:700;color:var(--pi-text);margin-bottom:.2rem}
 .method-badge{
   display:inline-block;font-size:.65rem;font-weight:700;
   padding:.15rem .55rem;border-radius:10px;margin-top:.3rem
@@ -51,7 +66,7 @@ CSS = """
 .badge-free{background:rgba(0,230,118,.12);color:#69f0ae;border:1px solid rgba(0,230,118,.2)}
 .badge-paid{background:rgba(229,57,53,.1);color:#ef9a9a;border:1px solid rgba(229,57,53,.2)}
 .badge-always{background:rgba(201,168,76,.12);color:#C9A84C;border:1px solid rgba(201,168,76,.2)}
-.method-desc{font-size:.75rem;color:#444;margin-top:.4rem;line-height:1.5}
+.method-desc{font-size:.75rem;color:var(--pi-muted);margin-top:.4rem;line-height:1.5}
 
 /* ITEMS GRID */
 .items-grid{
@@ -60,19 +75,19 @@ CSS = """
   gap:.8rem;margin:1rem 0
 }
 .item-cell{
-  background:#101010;border:1px solid #1a1a1a;border-radius:12px;
+  background:var(--pi-bg);border:1px solid var(--pi-border);border-radius:12px;
   overflow:hidden;transition:border-color .2s
 }
-.item-cell:hover{border-color:#C9A84C55}
-.item-cell.has-img{border-color:#C9A84C33}
+.item-cell:hover{border-color:color-mix(in srgb,var(--pi-accent) 45%, transparent)}
+.item-cell.has-img{border-color:color-mix(in srgb,var(--pi-accent) 30%, transparent)}
 .cell-img{width:100%;height:110px;object-fit:cover}
 .cell-emoji{width:100%;height:110px;display:flex;align-items:center;
-  justify-content:center;font-size:2.8rem;background:#0a0a0a}
+  justify-content:center;font-size:2.8rem;background:var(--pi-soft)}
 .cell-body{padding:.55rem .6rem}
-.cell-name{font-size:.78rem;font-weight:700;color:#E8C97A;
+.cell-name{font-size:.78rem;font-weight:700;color:var(--pi-text);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cell-price{font-size:.82rem;color:#C9A84C;font-weight:900;margin-top:.1rem}
-.cell-badge{font-size:.6rem;color:#333;margin-top:.2rem}
+.cell-price{font-size:.82rem;color:var(--pi-accent);font-weight:900;margin-top:.1rem}
+.cell-badge{font-size:.6rem;color:var(--pi-muted);margin-top:.2rem}
 
 /* STATUS LINE */
 .status-line{
@@ -87,16 +102,16 @@ CSS = """
 
 /* UPLOAD ZONE */
 .upload-zone{
-  border:2px dashed #2a2a2a;border-radius:14px;
-  padding:2rem;text-align:center;background:#0a0a0a;
+  border:2px dashed var(--pi-border);border-radius:14px;
+  padding:2rem;text-align:center;background:var(--pi-soft);
   transition:border-color .2s
 }
-.upload-zone:hover{border-color:#C9A84C55}
+.upload-zone:hover{border-color:color-mix(in srgb,var(--pi-accent) 45%, transparent)}
 
 /* PROGRESS */
-.prg-out{background:#111;border-radius:6px;height:6px;overflow:hidden;margin:.5rem 0}
+.prg-out{background:var(--pi-bg-2);border-radius:6px;height:6px;overflow:hidden;margin:.5rem 0}
 .prg-in{height:100%;border-radius:6px;
-  background:linear-gradient(90deg,#C9A84C,#E8C97A);transition:width .3s}
+  background:linear-gradient(90deg,var(--pi-accent),color-mix(in srgb,var(--pi-accent) 70%, #fff));transition:width .3s}
 </style>
 """
 
@@ -298,7 +313,7 @@ def page_images(restaurants: list):
 
     col_emergency, col_status = st.columns([2, 3])
     with col_emergency:
-        if st.button("⚡ تحديث المينيو الآن", use_container_width=True,
+        if st.button("⚡ تحديث المينيو الآن", width="stretch",
                      key="emergency_refresh", type="primary"):
             with st.spinner("⏳ جاري مسح الـ cache وإجبار التحديث..."):
                 try:
@@ -332,7 +347,7 @@ def page_images(restaurants: list):
     def method_card_html(mid, icon, title, badge_cls, badge_txt, desc, available, active):
         border_cls = "active" if active else ""
         lock       = "" if available else ' style="opacity:.4;cursor:not-allowed"'
-        unavail    = "" if available else "<br><small style='color:#555'>⛔ Key غير محدد</small>"
+        unavail    = "" if available else "<br><small style='color:var(--pi-muted)'>⛔ Key غير محدد</small>"
         return f"""
         <div class="method-card {border_cls}" id="mc_{mid}" onclick="selectMethod('{mid}')" {lock}>
           <div class="method-icon">{icon}</div>
@@ -416,12 +431,12 @@ def page_images(restaurants: list):
     }
     info = method_info[selected_method]
     st.markdown(f"""
-    <div style="background:#0a0a0a;border:1px solid {info['color']}33;border-right:3px solid {info['color']};
+    <div style="background:var(--pi-soft);border:1px solid {info['color']}33;border-right:3px solid {info['color']};
          border-radius:10px;padding:.8rem 1.1rem;margin:.5rem 0 1.2rem;display:flex;gap:1rem;align-items:center">
       <span style="font-size:1.8rem">{info['icon']}</span>
       <div>
         <div style="color:{info['color']};font-weight:700;font-size:.9rem">{info['title']}</div>
-        <div style="color:#555;font-size:.78rem;margin-top:.15rem">{info['details']}</div>
+        <div style="color:var(--pi-muted);font-size:.78rem;margin-top:.15rem">{info['details']}</div>
         {f'<div style="color:#ef9a9a;font-size:.72rem;margin-top:.1rem">💰 {info["warning"]}</div>' if info['warning'] else ''}
       </div>
     </div>
@@ -468,11 +483,11 @@ def page_images(restaurants: list):
             with src_cols[i]:
                 status = "متصل ✅" if srcs[src] else "Key غير محدد ⚠️"
                 st.markdown(f"""
-                <div style="background:#101010;border:1px solid {color}33;border-radius:10px;
+                <div style="background:var(--pi-bg);border:1px solid {color}33;border-radius:10px;
                      padding:.7rem;text-align:center">
                   <div style="font-size:1.5rem">{icon}</div>
                   <div style="color:{color};font-weight:700;font-size:.85rem">{name}</div>
-                  <div style="color:#444;font-size:.7rem">{status}</div>
+                  <div style="color:var(--pi-muted);font-size:.7rem">{status}</div>
                 </div>""", unsafe_allow_html=True)
 
         if not active_sources:
@@ -513,7 +528,7 @@ def page_images(restaurants: list):
                                           help="يتحدث تلقائياً عند تغيير الأكلة — يمكنك تعديلها")
             with col_btn:
                 st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
-                search_btn = st.button("🔍 بحث", use_container_width=True, key="multi_search_btn")
+                search_btn = st.button("🔍 بحث", width="stretch", key="multi_search_btn")
 
             if search_btn or st.session_state.get("_multi_photos"):
                 if search_btn:
@@ -536,9 +551,9 @@ def page_images(restaurants: list):
                         for j, photo in enumerate(row_photos):
                             with cols[j]:
                                 src_color = {"Pexels":"#69f0ae","Pixabay":"#80d8ff","Unsplash":"#C9A84C"}.get(photo["source"],"#888")
-                                st.image(photo["thumb"], use_container_width=True)
+                                st.image(photo["thumb"], width="stretch")
                                 st.markdown(f'<div style="font-size:.65rem;color:{src_color};text-align:center;margin-top:.2rem">{photo["source"]}</div>', unsafe_allow_html=True)
-                                if st.button(f"✅ اختر", key=f"pick_photo_{row_start+j}", use_container_width=True):
+                                if st.button(f"✅ اختر", key=f"pick_photo_{row_start+j}", width="stretch"):
                                     # حفظ الصورة في الشيت
                                     target = {"name": current_item, "image_url": photo["url"], "image_credit": photo["credit"]}
                                     updated = update_images_in_sheet(sheet_id, final_tab, [target], rid=restaurant_id)
@@ -590,7 +605,7 @@ def page_images(restaurants: list):
                 )
             with col_btn:
                 st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
-                gen_btn = st.button("🎨 توليد صورة", use_container_width=True, key="poll_gen_btn")
+                gen_btn = st.button("🎨 توليد صورة", width="stretch", key="poll_gen_btn")
 
             if gen_btn:
                 st.session_state.pop("_poll_photos", None)
@@ -599,23 +614,26 @@ def page_images(restaurants: list):
                 if gen_btn:
                     with st.spinner(f"🎨 يولد صورة لـ '{search_q}'... قد يستغرق 60 ثانية"):
                         photos = fetch_pollinations(search_q, count=1)
+                        if not photos:
+                            st.warning("⚠️ Pollinations غير متاح الآن — سيتم جلب بديل تلقائي من المصادر المجانية")
+                            photos = fetch_multi_source_photos(search_q, per_source=2)[:4]
                         st.session_state["_poll_photos"] = photos
                         st.session_state["_poll_item"]   = sel_obj
                 else:
                     photos = st.session_state.get("_poll_photos", [])
 
                 if not photos:
-                    st.error("❌ فشل التوليد — حاول مرة أخرى")
+                    st.error("❌ فشل التوليد وجلب البدائل — حاول مرة أخرى أو جرّب وصفاً مختلفاً")
                 else:
                     st.markdown(f"### 🎨 الصورة المولّدة لـ {sel_item}")
                     for idx, photo in enumerate(photos):
                         # عرض الصورة من bytes إذا متوفرة وإلا من URL
                         img_src = photo.get("bytes") or photo.get("url")
-                        st.image(img_src, use_container_width=True)
-                        if st.button("✅ اختر هذه الصورة", key=f"poll_pick_{idx}", use_container_width=True):
+                        st.image(img_src, width="stretch")
+                        if st.button("✅ اختر هذه الصورة", key=f"poll_pick_{idx}", width="stretch"):
                             target = dict(st.session_state["_poll_item"])
                             target["image_url"]    = photo["url"]
-                            target["image_credit"] = photo["credit"]
+                            target["image_credit"] = photo.get("credit","Auto fallback image")
                             updated = update_images_in_sheet(sheet_id, final_tab, [target], rid=restaurant_id)
                             if updated:
                                 st.success(f"✅ تم حفظ الصورة لـ {sel_item}!")
@@ -638,7 +656,7 @@ def page_images(restaurants: list):
 
         # تخصيص كلمات البحث
         with st.expander("🔍 تخصيص كلمات البحث (اختياري)"):
-            st.markdown('<div style="color:#555;font-size:.78rem;margin-bottom:.5rem">يمكنك تغيير كلمة البحث لكل أكلة لنتائج أفضل</div>', unsafe_allow_html=True)
+            st.markdown('<div style="color:var(--pi-muted);font-size:.78rem;margin-bottom:.5rem">يمكنك تغيير كلمة البحث لكل أكلة لنتائج أفضل</div>', unsafe_allow_html=True)
             search_overrides = {}
             if items_from_sheet:
                 for item in items_from_sheet[:10]:
@@ -649,7 +667,7 @@ def page_images(restaurants: list):
                         override  = st.text_input(f"`{nm}`", value=default_q, key=f"sh_{nm}")
                         search_overrides[nm] = override
 
-        if items_from_sheet and st.button("🚀 جلب صور Unsplash", use_container_width=True):
+        if items_from_sheet and st.button("🚀 جلب صور Unsplash", width="stretch"):
             targets = [i for i in items_from_sheet
                       if not only_missing or not i.get("image_url","")]
             if not targets:
@@ -711,7 +729,7 @@ def page_images(restaurants: list):
 
         # Prompt مخصص per item
         with st.expander("✏️ Prompts مخصصة لأكلات محددة (اختياري)"):
-            st.markdown('<div style="color:#555;font-size:.78rem;margin-bottom:.5rem">اتركه فارغاً لتوليد تلقائي</div>', unsafe_allow_html=True)
+            st.markdown('<div style="color:var(--pi-muted);font-size:.78rem;margin-bottom:.5rem">اتركه فارغاً لتوليد تلقائي</div>', unsafe_allow_html=True)
             custom_prompts = {}
             if items_from_sheet:
                 for item in items_from_sheet[:8]:
@@ -730,7 +748,7 @@ def page_images(restaurants: list):
             💰 الأكلات التي تحتاج صوراً: <b>{targets_count}</b> — التكلفة التقديرية: <b>~${cost_est:.2f}</b>
             </div>""", unsafe_allow_html=True)
 
-        if items_from_sheet and st.button("🤖 توليد صور AI", use_container_width=True):
+        if items_from_sheet and st.button("🤖 توليد صور AI", width="stretch"):
             targets = [i for i in items_from_sheet
                       if not only_missing_d or not i.get("image_url","")]
             if not targets:
@@ -767,8 +785,8 @@ def page_images(restaurants: list):
     elif selected_method == "manual":
         st.markdown("#### 📸 رفع صورك الخاصة")
         st.markdown("""
-        <div style="background:#0a0a0a;border:1px solid #1a1a1a;border-radius:10px;
-             padding:.8rem 1.1rem;font-size:.8rem;color:#555;margin-bottom:1rem">
+        <div style="background:var(--pi-soft);border:1px solid var(--pi-border);border-radius:10px;
+             padding:.8rem 1.1rem;font-size:.8rem;color:var(--pi-muted);margin-bottom:1rem">
         <b style="color:#29b6f6">كيف يشتغل:</b><br>
         1. اختر الأكلة من القائمة المنسدلة<br>
         2. ارفع صورتها (JPG/PNG)<br>
@@ -794,9 +812,9 @@ def page_images(restaurants: list):
             )
         with col2:
             if uploaded:
-                st.image(uploaded, caption="معاينة", use_container_width=True)
+                st.image(uploaded, caption="معاينة", width="stretch")
 
-        if uploaded and sel_item and st.button("💾 حفظ الصورة في الشيت", use_container_width=True):
+        if uploaded and sel_item and st.button("💾 حفظ الصورة في الشيت", width="stretch"):
             with st.spinner("⏳ جاري المعالجة..."):
                 result = process_manual_upload(uploaded, sel_item)
 
@@ -823,7 +841,7 @@ def page_images(restaurants: list):
         st.markdown("---")
         st.markdown("#### 📦 رفع جماعي (اختياري)")
         st.markdown("""
-        <div style="color:#555;font-size:.78rem;margin-bottom:.8rem">
+        <div style="color:var(--pi-muted);font-size:.78rem;margin-bottom:.8rem">
         ارفع صوراً متعددة دفعة واحدة — <b>اسم الملف</b> يجب أن يطابق اسم الأكلة في الشيت
         <br>مثال: <code>طاجين دجاج.jpg</code>، <code>كسكس مغربي.png</code>
         </div>
@@ -836,7 +854,7 @@ def page_images(restaurants: list):
             key="bulk_upload"
         )
 
-        if bulk_files and st.button("📦 حفظ الجميع", use_container_width=True):
+        if bulk_files and st.button("📦 حفظ الجميع", width="stretch"):
             pb       = st.progress(0)
             stat     = st.empty()
             uploaded_items = []
@@ -919,7 +937,7 @@ def page_images(restaurants: list):
 
         c_save, c_cancel = st.columns(2)
         with c_save:
-            if st.button(f"✅ حفظ {with_img} صورة في الشيت", use_container_width=True, type="primary"):
+            if st.button(f"✅ حفظ {with_img} صورة في الشيت", width="stretch", type="primary"):
                 with st.spinner("💾 جاري التحديث..."):
                     updated = update_images_in_sheet(pending_sid, pending_tab, pending, rid=restaurant_id)
                 st.success(f"🎉 تم تحديث **{updated}** أكلة في Google Sheet")
@@ -932,7 +950,7 @@ def page_images(restaurants: list):
                     st.session_state.pop(k, None)
                 st.rerun()
         with c_cancel:
-            if st.button("🗑️ إلغاء", use_container_width=True):
+            if st.button("🗑️ إلغاء", width="stretch"):
                 for k in ["pending_items","pending_sheet_id","pending_tab"]:
                     st.session_state.pop(k, None)
                 st.rerun()
