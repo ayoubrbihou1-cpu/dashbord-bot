@@ -105,19 +105,27 @@ def fetch_pollinations(name: str, count: int = 1) -> list:
     for i in range(count):
         try:
             seed = 42 + (i * 13)
-            # ✅ URL واحد فقط — image.pollinations.ai هو الـ endpoint الرسمي
-            img_url = (
-                f"{POLLINATIONS_BASE}/{encoded}"
-                f"?width=768&height=768&seed={seed}&model=flux&nologo=true"
-            )
+
+            # ✅ بدون مفتاح: لا nologo ولا model=flux — هذه تحتاج حساب مدفوع وترجع 401
+            # مع مفتاح: نضيف nologo=true و model=flux للجودة العالية
+            if POLLINATIONS_KEY:
+                params = f"?width=768&height=768&seed={seed}&model=flux&nologo=true&token={POLLINATIONS_KEY}"
+            else:
+                params = f"?width=768&height=768&seed={seed}&enhance=true"
+
+            img_url = f"{POLLINATIONS_BASE}/{encoded}{params}"
 
             if i > 0:
                 time.sleep(2)
 
-            resp = requests.get(img_url, timeout=60)
+            headers = {}
+            if POLLINATIONS_KEY:
+                headers["Authorization"] = f"Bearer {POLLINATIONS_KEY}"
+
+            resp = requests.get(img_url, headers=headers, timeout=90)
             ct = resp.headers.get("content-type", "")
 
-            if resp.status_code == 200 and ct.startswith("image"):
+            if resp.status_code == 200 and "image" in ct:
                 import base64 as _b64
                 img_data = _b64.b64encode(resp.content).decode()
                 results.append({
