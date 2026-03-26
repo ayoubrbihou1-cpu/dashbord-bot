@@ -612,10 +612,10 @@ def page_images(restaurants: list):
 
             if gen_btn or st.session_state.get("_poll_photos"):
                 if gen_btn:
-                    with st.spinner(f"🎨 يولد صورة لـ '{search_q}'... قد يستغرق 60 ثانية"):
+                    with st.spinner(f"🎨 يولد صورة لـ '{search_q}'... قد يستغرق 30-60 ثانية"):
                         photos = fetch_pollinations(search_q, count=1)
                         if not photos:
-                            st.warning("⚠️ Pollinations غير متاح الآن — سيتم جلب بديل تلقائي من المصادر المجانية")
+                            st.warning("⚠️ Pollinations لم يستجب — يتم جلب بديل من المصادر المجانية")
                             photos = fetch_multi_source_photos(search_q, per_source=2)[:4]
                         st.session_state["_poll_photos"] = photos
                         st.session_state["_poll_item"]   = sel_obj
@@ -627,19 +627,40 @@ def page_images(restaurants: list):
                 else:
                     st.markdown(f"### 🎨 الصورة المولّدة لـ {sel_item}")
                     for idx, photo in enumerate(photos):
-                        # عرض الصورة من bytes إذا متوفرة وإلا من URL
-                        img_src = photo.get("bytes") or photo.get("url")
-                        st.image(img_src, width="stretch")
+                        # ✅ عرض الصورة: bytes إذا متوفرة → b64 data URL → URL مباشر
+                        img_bytes = photo.get("bytes")
+                        img_b64   = photo.get("b64", "")
+                        img_url_direct = photo.get("url", "")
+
+                        if img_bytes and len(img_bytes) > 1000:
+                            st.image(img_bytes, width="stretch")
+                        elif img_b64:
+                            st.image(f"data:image/jpeg;base64,{img_b64}", width="stretch")
+                        elif img_url_direct:
+                            st.image(img_url_direct, width="stretch")
+                        else:
+                            st.warning("⚠️ لا يمكن عرض الصورة")
+                            continue
+
                         if st.button("✅ اختر هذه الصورة", key=f"poll_pick_{idx}", width="stretch"):
                             target = dict(st.session_state["_poll_item"])
-                            target["image_url"]    = photo["url"]
-                            target["image_credit"] = photo.get("credit","Auto fallback image")
+                            # ✅ حفظ صورة base64 data URL إذا لم يكن الـ URL خارجياً موثوقاً
+                            if img_b64:
+                                save_url = f"data:image/jpeg;base64,{img_b64}"
+                            else:
+                                save_url = img_url_direct
+                            target["image_url"]    = save_url
+                            target["image_credit"] = photo.get("credit", "AI Generated — Pollinations.ai")
                             updated = update_images_in_sheet(sheet_id, final_tab, [target], rid=restaurant_id)
                             if updated:
                                 st.success(f"✅ تم حفظ الصورة لـ {sel_item}!")
+                                if restaurant_id:
+                                    _refresh_menu_cache(restaurant_id)
                                 st.session_state.pop("_poll_photos", None)
                                 st.session_state.pop("_poll_prev_item", None)
                                 st.rerun()
+                            else:
+                                st.error("❌ لم يتم الحفظ — تأكد من اسم الأكلة")
 
     # ─────────────────────────────────────────────────────
     # PANEL A: UNSPLASH
