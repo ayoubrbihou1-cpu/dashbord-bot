@@ -130,35 +130,34 @@ def fetch_pollinations(name: str, count: int = 1) -> list:
             seed = 42 + (i * 13)
             nologo = "true" if POLLINATIONS_KEY else "false"
 
-            # جرب الـ endpoint الجديد أولاً
-            url_new = f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}"
-            url_old = f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}"
+            # جرب عدة صيغ لأن Pollinations يتغير كثيراً بين الإصدارات
+            url_candidates = [
+                f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}",
+                f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}&nologo={nologo}",
+                f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}",
+                f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}",
+                f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}&nologo={nologo}",
+                f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}",
+            ]
 
             if i > 0:
                 time.sleep(3)
 
             img_url = None
-            # جرب الجديد
-            try:
-                resp = _try_pollinations(url_new)
-                if resp and resp.status_code == 200 and resp.headers.get("content-type","").startswith("image"):
-                    img_url = url_new
-                else:
-                    status = getattr(resp, "status_code", "no-response")
-                    log.warning(f"New endpoint failed {status}, trying old...")
-            except Exception:
-                pass
-
-            # إذا فشل الجديد → جرب القديم
-            if not img_url:
+            for idx, candidate in enumerate(url_candidates):
                 try:
-                    resp2 = _try_pollinations(url_old)
-                    if resp2 and resp2.status_code == 200 and resp2.headers.get("content-type","").startswith("image"):
-                        img_url = url_old
-                    else:
-                        log.warning(f"Pollinations both endpoints failed for {name}")
-                except Exception as e2:
-                    log.warning(f"Pollinations old endpoint error for {name}: {e2}")
+                    resp = _try_pollinations(candidate)
+                    if resp and resp.status_code == 200 and resp.headers.get("content-type","").startswith("image"):
+                        img_url = candidate
+                        break
+                    status = getattr(resp, "status_code", "no-response")
+                    if idx == 0:
+                        log.warning(f"New endpoint failed {status}, trying fallbacks...")
+                except Exception as e_try:
+                    log.warning(f"Pollinations candidate error for {name}: {e_try}")
+
+            if not img_url:
+                log.warning(f"Pollinations all endpoint variants failed for {name}")
 
             if img_url:
                 # نحمّل الصورة كـ base64 لضمان العرض الصحيح في Streamlit

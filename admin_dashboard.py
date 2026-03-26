@@ -352,6 +352,18 @@ body.day-theme [data-baseweb="select"] [class*="option"]:hover
 {background:#f2ead9!important;color:#241a08!important}
 body.day-theme [data-baseweb="menu-item"]
 {color:var(--text)!important}
+/* إصلاح أي صناديق بستايل داكن مكتوب inline داخل الصفحات */
+body.day-theme div[style*="background:#0a0a0a"],
+body.day-theme div[style*="background:#101010"],
+body.day-theme div[style*="background:#111"],
+body.day-theme div[style*="background:#141414"]
+{background:var(--card)!important;color:var(--text)!important;border-color:var(--border)!important}
+body.day-theme div[style*="color:#555"],
+body.day-theme div[style*="color:#444"],
+body.day-theme span[style*="color:#555"],
+body.day-theme span[style*="color:#444"],
+body.day-theme small[style*="color:#555"]
+{color:var(--text2)!important}
 /* تابات واضحة في النهار */
 body.day-theme [data-baseweb="tab"]
 {color:var(--text2)!important}
