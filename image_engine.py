@@ -64,22 +64,19 @@ def get_food_emoji(name: str, category: str = "") -> str:
 # ══════════════════════════════════════════════════════════════════
 
 POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY", "")
-# الـ endpoint الجديد من 2025
-POLLINATIONS_URL_NEW = "https://gen.pollinations.ai/image"
-POLLINATIONS_URL_OLD = "https://image.pollinations.ai/prompt"
+# ✅ الـ endpoint الصحيح لـ Pollinations في 2025
+# image.pollinations.ai/prompt/{prompt} هو الوحيد الذي يعمل بشكل موثوق
+POLLINATIONS_URL = "https://image.pollinations.ai/prompt"
 
 def fetch_pollinations(name: str, count: int = 1) -> list:
     """
-    يولد صورة AI واحدة لأكلة معينة باستخدام Pollinations
-    count: عدد الصور (افتراضي 1 لتوفير الـ pollen)
+    يولد صورة AI لأكلة معينة باستخدام Pollinations
+    count: عدد الصور (افتراضي 1)
     """
     results = []
 
-    # prompt احترافي خاص بالأكل المغربي
-    # نضيف كلمات تجعل الصورة أقرب للحقيقة
     name_lower = name.lower()
 
-    # تحديد نوع الطبق لإضافة تفاصيل دقيقة
     if any(w in name_lower for w in ["tajine", "tagine", "طاجين"]):
         style = "moroccan clay tagine pot with conical lid, traditional moroccan spices, preserved lemon, olives, tender meat"
     elif any(w in name_lower for w in ["couscous", "كسكس"]):
@@ -104,93 +101,94 @@ def fetch_pollinations(name: str, count: int = 1) -> list:
         "shot on dark stone background, restaurant quality, appetizing, "
         "high resolution, natural warm lighting, close up shot, no text, no watermark"
     )
-    encoded = requests.utils.quote(base_prompt)
 
-    headers = {}
+    # ✅ استخدام urllib.parse.quote بدلاً من requests.utils.quote
+    from urllib.parse import quote as _quote
+    encoded = _quote(base_prompt, safe="")
+
+    # ✅ headers بسيطة — لا Authorization إلا عند وجود مفتاح صريح
+    headers = {"User-Agent": "Mozilla/5.0"}
     if POLLINATIONS_KEY:
         headers["Authorization"] = f"Bearer {POLLINATIONS_KEY}"
-
-    def _try_pollinations(url: str) -> Optional[requests.Response]:
-        """
-        يحاول الطلب مع الـ Authorization (إن وجد).
-        إذا رجع 401 يتم إعادة المحاولة بدون Authorization لأن بعض endpoints
-        تعمل كضيوف ولا تقبل الهيدر مع مفاتيح غير متوافقة.
-        """
-        try:
-            resp = requests.get(url, headers=headers, timeout=90)
-            if resp.status_code == 401 and headers:
-                log.warning("Pollinations returned 401 with auth header, retrying without auth...")
-                resp = requests.get(url, timeout=90)
-            return resp
-        except Exception:
-            return None
 
     for i in range(count):
         try:
             seed = 42 + (i * 13)
             nologo = "true" if POLLINATIONS_KEY else "false"
 
-            # جرب عدة صيغ لأن Pollinations يتغير كثيراً بين الإصدارات
+            # ✅ endpoint واحد صحيح مع fallback بدون model
+            # الـ API الجديد لـ Pollinations يقبل: /prompt/{text}?width=&height=&seed=&model=&nologo=
             url_candidates = [
-                f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}",
-                f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}&nologo={nologo}",
-                f"{POLLINATIONS_URL_NEW}/{encoded}?width=768&height=768&seed={seed}",
-                f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}",
-                f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}&nologo={nologo}",
-                f"{POLLINATIONS_URL_OLD}/{encoded}?width=768&height=768&seed={seed}",
+                f"{POLLINATIONS_URL}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}&enhance=true",
+                f"{POLLINATIONS_URL}/{encoded}?width=768&height=768&seed={seed}&model=flux&nologo={nologo}",
+                f"{POLLINATIONS_URL}/{encoded}?width=768&height=768&seed={seed}&nologo={nologo}",
+                f"{POLLINATIONS_URL}/{encoded}?width=512&height=512&seed={seed}",
             ]
 
             if i > 0:
                 time.sleep(3)
 
             img_url = None
+            resp_ok = None
+
             for idx, candidate in enumerate(url_candidates):
                 try:
-                    resp = _try_pollinations(candidate)
-                    if resp and resp.status_code == 200 and resp.headers.get("content-type","").startswith("image"):
-                        img_url = candidate
+                    # ✅ timeout معقول — Pollinations يأخذ 15-45 ثانية
+                    resp = requests.get(candidate, headers=headers, timeout=60, allow_redirects=True)
+
+                    # ✅ تحقق من content-type بدقة
+                    ct = resp.headers.get("content-type", "")
+                    if resp.status_code == 200 and ct.startswith("image/"):
+                        img_url  = candidate
+                        resp_ok  = resp
+                        log.info(f"✅ Pollinations OK: endpoint #{idx} — {resp.headers.get('content-length','?')} bytes")
                         break
-                    status = getattr(resp, "status_code", "no-response")
-                    if idx == 0:
-                        log.warning(f"New endpoint failed {status}, trying fallbacks...")
+                    else:
+                        log.warning(f"Pollinations endpoint #{idx} → HTTP {resp.status_code} ct={ct[:40]}")
+
+                except requests.exceptions.Timeout:
+                    log.warning(f"Pollinations timeout on endpoint #{idx}")
+                    continue
                 except Exception as e_try:
-                    log.warning(f"Pollinations candidate error for {name}: {e_try}")
+                    log.warning(f"Pollinations candidate #{idx} error: {e_try}")
+                    continue
 
-            if not img_url:
-                log.warning(f"Pollinations all endpoint variants failed for {name}")
+            if not img_url or resp_ok is None:
+                log.warning(f"Pollinations: all endpoints failed for '{name}'")
+                continue
 
-            if img_url:
-                # نحمّل الصورة كـ base64 لضمان العرض الصحيح في Streamlit
-                try:
-                    img_resp = _try_pollinations(img_url)
-                    if img_resp and img_resp.status_code == 200:
-                        import base64 as _b64
-                        img_data = _b64.b64encode(img_resp.content).decode()
-                        results.append({
-                            "url": img_url,
-                            "thumb": img_url,
-                            "bytes": img_resp.content,
-                            "b64": img_data,
-                            "credit": "AI Generated — Pollinations",
-                            "method": "pollinations",
-                            "seed": seed
-                        })
-                except Exception as e_img:
-                    log.warning(f"Failed to download image: {e_img}")
+            # ✅ تحويل الصورة لـ base64
+            try:
+                img_bytes = resp_ok.content
+                if len(img_bytes) < 1000:
+                    # استجابة صغيرة جداً = خطأ مخفي
+                    log.warning(f"Pollinations returned suspiciously small response: {len(img_bytes)} bytes")
+                    continue
+                import base64 as _b64
+                img_data = _b64.b64encode(img_bytes).decode()
+                results.append({
+                    "url":    img_url,
+                    "thumb":  img_url,
+                    "bytes":  img_bytes,
+                    "b64":    img_data,
+                    "credit": "AI Generated — Pollinations.ai",
+                    "method": "pollinations",
+                    "seed":   seed
+                })
+                log.info(f"✅ Pollinations image ready: {len(img_bytes)//1024}KB")
+            except Exception as e_img:
+                log.warning(f"Pollinations base64 error: {e_img}")
 
         except Exception as e:
-            log.warning(f"Pollinations error for {name}: {e}")
+            log.warning(f"Pollinations outer error for '{name}': {e}")
             continue
 
     return results
 
 
 def pollinations_available() -> tuple:
-    """يتحقق من إمكانية استخدام Pollinations"""
-    if POLLINATIONS_KEY:
-        return True, "✅ متصل بمفتاح"
-    # يعمل بدون مفتاح أيضاً لكن أبطأ
-    return True, "✅ يعمل بدون مفتاح (أبطأ)"
+    """يتحقق من إمكانية استخدام Pollinations — لا يحتاج مفتاح"""
+    return True, "✅ يعمل مجاناً (بدون مفتاح)"
 
 
 def _arabic_to_search(name: str) -> str:
