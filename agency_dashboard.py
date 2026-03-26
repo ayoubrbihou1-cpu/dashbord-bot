@@ -114,7 +114,7 @@ def pg_login():
     with col:
         agency_id = st.text_input("🔑 رمز الوكالة (Agency ID)", placeholder="مثال: FES001").strip().upper()
         password  = st.text_input("🔒 كلمة المرور", type="password", placeholder="••••••••")
-        if st.button("🚀 دخول", use_container_width=True, type="primary"):
+        if st.button("🚀 دخول", width="stretch", type="primary"):
             if not agency_id or not password:
                 st.error("أدخل رمز الوكالة وكلمة المرور")
                 return
@@ -281,7 +281,7 @@ def pg_add_restaurant(agency: dict):
     with c4:
         slug_input = st.text_input("🔗 Slug (رابط نظيف)", placeholder="مثال: nakhil (بالإنجليزية)")
 
-    if st.button("🚀 إنشاء المطعم", use_container_width=True, type="primary"):
+    if st.button("🚀 إنشاء المطعم", width="stretch", type="primary"):
         if not name.strip():
             st.error("❌ أدخل اسم المطعم"); return
         if not sheet_id.strip():
@@ -382,7 +382,7 @@ def pg_pdf(agency: dict):
         style = st.selectbox("الطابع", ["luxury","modern","classic"],
                               index=["luxury","modern","classic"].index(sel_rest.get("style","luxury")))
 
-    if st.button("🖨️ توليد PDF", use_container_width=True, type="primary"):
+    if st.button("🖨️ توليد PDF", width="stretch", type="primary"):
         with st.spinner("⏳ جاري توليد PDF..."):
             r = requests.post(
                 f"{ROUTER_URL}/generate_pdf",
@@ -401,7 +401,7 @@ def pg_pdf(agency: dict):
                     data     = r.content,
                     file_name= f"qr_{sel_rest.get('name',sel_rid)}.pdf",
                     mime     = "application/pdf",
-                    use_container_width=True
+                    width="stretch"
                 )
                 st.success("✅ PDF جاهز!")
             else:
@@ -454,7 +454,7 @@ def pg_images(agency: dict):
     with tab1:
         st.info("أدخل اسم الأكلة → سيبحث عن صورة مناسبة تلقائياً")
         dish_name = st.text_input("اسم الأكلة", placeholder="طاجين دجاج")
-        if st.button("🔍 بحث عن صورة", use_container_width=True):
+        if st.button("🔍 بحث عن صورة", width="stretch"):
             if dish_name:
                 with st.spinner("⏳ جاري البحث..."):
                     r = requests.get(
@@ -474,7 +474,7 @@ def pg_images(agency: dict):
     with tab2:
         st.info("ارفع صورة المينيو → سيستخرج الأكلات والأسعار تلقائياً ويضيفها للـ Sheet")
         uploaded = st.file_uploader("📸 صورة المينيو", type=["jpg","jpeg","png","webp"])
-        if uploaded and st.button("🤖 تحليل وإضافة للـ Sheet", use_container_width=True):
+        if uploaded and st.button("🤖 تحليل وإضافة للـ Sheet", width="stretch"):
             with st.spinner("⏳ جاري التحليل بـ Gemini Vision..."):
                 img_b64 = base64.b64encode(uploaded.read()).decode()
                 r = requests.post(
@@ -560,7 +560,7 @@ def pg_menu(agency: dict):
         n_en    = st.text_input("🇬🇧 الاسم بالإنجليزية", key="ag_add_en")
         n_img   = st.text_input("🖼️ رابط الصورة", key="ag_add_img", placeholder="https://...")
 
-    if st.button("➕ إضافة للقائمة", use_container_width=True, type="primary", key="ag_btn_add"):
+    if st.button("➕ إضافة للقائمة", width="stretch", type="primary", key="ag_btn_add"):
         if not n_name.strip():
             st.error("❌ الاسم مطلوب"); return
         if n_price <= 0:
@@ -601,7 +601,7 @@ def pg_reports(agency: dict):
 
     period = st.radio("الفترة", ["يومي","أسبوعي","شهري"], horizontal=True)
 
-    if st.button("📊 إنشاء التقرير وإرساله PDF", use_container_width=True, type="primary"):
+    if st.button("📊 إنشاء التقرير وإرساله PDF", width="stretch", type="primary"):
         if sel_rid == "الكل":
             targets = list(rest_names.keys())
         else:
@@ -785,12 +785,12 @@ def main():
             ("🆘 الدعم",         "🆘 الدعم"),
         ]
         for label, key in nav:
-            if st.button(label, key=f"nav_{key}", use_container_width=True):
+            if st.button(label, key=f"nav_{key}", width="stretch"):
                 st.session_state["page"] = key
                 st.rerun()
 
         st.markdown("---")
-        if st.button("🚪 خروج", use_container_width=True):
+        if st.button("🚪 خروج", width="stretch"):
             st.session_state["logged_in"] = False
             st.session_state["agency"] = {}
             st.rerun()

@@ -179,7 +179,7 @@ def page_agencies():
                         )
                     with u2:
                         st.markdown("<br>", unsafe_allow_html=True)
-                        if st.button("💾 حفظ", key=f"upg_{aid}", use_container_width=True, type="primary"):
+                        if st.button("💾 حفظ", key=f"upg_{aid}", width="stretch", type="primary"):
                             ok = _sb_patch("agencies", f"agency_id=eq.{aid}",
                                            {"plan": new_plan, "max_restaurants": int(new_max)})
                             if not ok:
@@ -195,7 +195,7 @@ def page_agencies():
                         st.markdown("<br>", unsafe_allow_html=True)
                         new_status = "suspended" if ag.get("status") == "active" else "active"
                         btn_lbl    = "🔴 تعليق" if ag.get("status") == "active" else "✅ تفعيل"
-                        if st.button(btn_lbl, key=f"tog_{aid}", use_container_width=True):
+                        if st.button(btn_lbl, key=f"tog_{aid}", width="stretch"):
                             _sb_patch("agencies", f"agency_id=eq.{aid}", {"status": new_status})
                             st.rerun()
 
@@ -247,7 +247,7 @@ def page_agencies():
             else:
                 st.error(f"❌ {msg.get('detail', msg.get('error','خطأ'))}")
 
-        if st.button("✅ إنشاء الوكالة", use_container_width=True, type="primary"):
+        if st.button("✅ إنشاء الوكالة", width="stretch", type="primary"):
             if not agency_id or not agency_name:
                 st.error("❌ رمز الوكالة والاسم مطلوبان")
             else:
