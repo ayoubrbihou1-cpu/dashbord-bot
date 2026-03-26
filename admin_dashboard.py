@@ -136,6 +136,7 @@ body.day-theme{
   --text:#1a150a; --text2:#5a4820; --text3:#9a8a60;
   --border:#ccc4a8; --border2:#ddd5bc;
   --gold:#7a5008; --gold2:#a07030; --gold-dim:#e8d8a0;
+  --btn-day:#7a5008; --btn-day-hover:#5f3d05; --btn-day-text:#ffffff;
   --card:#ffffff; --card-border:#ccc4a8;
   --input-bg:#ffffff; --input-text:#1a150a; --input-border:#c8b890;
   --btn-sidebar:linear-gradient(135deg,#7a5008,#5a3800);
@@ -334,10 +335,23 @@ body.day-theme input, body.day-theme textarea, body.day-theme select
 {color:var(--input-text)!important;background:var(--input-bg)!important}
 /* ضمان وضوح الأزرار في النهار */
 body.day-theme .stButton>button
-{color:var(--gold)!important}
+{color:var(--btn-day-text)!important;background:var(--btn-day)!important;
+ border:1px solid var(--btn-day)!important}
+body.day-theme .stButton>button:hover
+{background:var(--btn-day-hover)!important;border-color:var(--btn-day-hover)!important;
+ color:#fff!important;filter:none!important}
 body.day-theme section[data-testid="stSidebar"] .stButton>button
-{color:var(--gold)!important;background:var(--gold-dim)!important;
- border-color:var(--border)!important}
+{color:var(--btn-day-text)!important;background:var(--btn-day)!important;
+ border-color:var(--btn-day)!important}
+body.day-theme [data-testid="stButton"]>button[kind="secondary"],
+body.day-theme .stButton>button[kind="secondary"]
+{background:#fff!important;color:var(--text)!important;border:1px solid var(--border)!important}
+body.day-theme [data-baseweb="select"] [class*="option"]
+{color:var(--text)!important;background:#fff!important}
+body.day-theme [data-baseweb="select"] [class*="option"]:hover
+{background:#f2ead9!important;color:#241a08!important}
+body.day-theme [data-baseweb="menu-item"]
+{color:var(--text)!important}
 /* تابات واضحة في النهار */
 body.day-theme [data-baseweb="tab"]
 {color:var(--text2)!important}
@@ -360,7 +374,7 @@ def auth():
     col = st.columns([1,1.1,1])[1]
     with col:
         p = st.text_input("🔑 كلمة المرور", type="password")
-        if st.button("دخول 🚀", use_container_width=True):
+        if st.button("دخول 🚀", width="stretch"):
             if p == ADMIN_PASSWORD:
                 st.session_state.ok = True; st.rerun()
             else:
@@ -813,7 +827,7 @@ def pg_add(rs):
 
     st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
 
-    if st.button("🚀 إنشاء المطعم — كل شيء أوتوماتيكي!", use_container_width=True):
+    if st.button("🚀 إنشاء المطعم — كل شيء أوتوماتيكي!", width="stretch"):
         errs = []
         if not rname.strip():    errs.append("اسم المطعم مطلوب")
         if not rsheetid.strip(): errs.append("Sheet ID مطلوب")
@@ -1019,20 +1033,20 @@ def _show_cards_and_pdf():
 
     qc1,qc2 = st.columns(2)
     with qc1:
-        st.image(mb, caption="📱 QR المينيو — للطلب", use_container_width=True)
+        st.image(mb, caption="📱 QR المينيو — للطلب", width="stretch")
         st.download_button("⬇️ تحميل QR المينيو", mb,
             f"Menu_QR_{rname}.png","image/png",
-            use_container_width=True, key="dl_menu_qr")
+            width="stretch", key="dl_menu_qr")
     with qc2:
-        st.image(wb, caption="📶 QR WiFi — اتصال تلقائي", use_container_width=True)
+        st.image(wb, caption="📶 QR WiFi — اتصال تلقائي", width="stretch")
         st.download_button("⬇️ تحميل QR WiFi", wb,
             f"WiFi_QR_{rname}.png","image/png",
-            use_container_width=True, key="dl_wifi_qr")
+            width="stretch", key="dl_wifi_qr")
 
     st.markdown('<div class="gdiv"></div>', unsafe_allow_html=True)
 
     if st.button(f"📄 توليد PDF كامل ({rtables} طاولة = {rtables*2} صفحة)",
-                 use_container_width=True, key="btn_gen_pdf"):
+                 width="stretch", key="btn_gen_pdf"):
         with st.spinner(f"⏳ {rtables*2} صفحة..."):
             try:
                 from pdf_generator import generate_table_tents_pdf
@@ -1070,7 +1084,7 @@ def _show_cards_and_pdf():
             st.session_state["last_pdf_bytes"],
             f"Tents_{st.session_state.get('last_pdf_name',rname)}.pdf",
             "application/pdf",
-            use_container_width=True, key="dl_pdf_final")
+            width="stretch", key="dl_pdf_final")
 
 # ══════════════════════════════════════════════════════════
 # صفحة: بطاقات PDF
@@ -1129,7 +1143,7 @@ def pg_pdf(rs):
     import random as _rand
     _pdf_query = _rand.choice(VENUE_QUERIES_PDF.get(pdf_venue, [r.get("name","food")]))
 
-    if st.button("👁️ معاينة", use_container_width=True, key="btn_preview"):
+    if st.button("👁️ معاينة", width="stretch", key="btn_preview"):
         with st.spinner("🎨..."):
             try:
                 _prev_slug = r.get("slug","").strip()
@@ -1154,10 +1168,10 @@ def pg_pdf(rs):
 
     if st.session_state.get("prev_m"):
         ca,cb = st.columns(2)
-        ca.image(st.session_state["prev_m"], caption=f"📱 QR المينيو T{pv}", use_container_width=True)
-        cb.image(st.session_state["prev_w"], caption=f"📶 QR WiFi T{pv}", use_container_width=True)
+        ca.image(st.session_state["prev_m"], caption=f"📱 QR المينيو T{pv}", width="stretch")
+        cb.image(st.session_state["prev_w"], caption=f"📶 QR WiFi T{pv}", width="stretch")
 
-    if st.button("📄 توليد PDF كامل", use_container_width=True, key="btn_pdf_pg"):
+    if st.button("📄 توليد PDF كامل", width="stretch", key="btn_pdf_pg"):
         with st.spinner(f"⏳ {n*2} صفحة..."):
             try:
                 from pdf_generator import generate_table_tents_pdf
@@ -1193,7 +1207,7 @@ def pg_pdf(rs):
         st.download_button("⬇️ تحميل PDF",
             st.session_state["pg_pdf"],
             f"Tents_{st.session_state.get('pg_pdf_nm','')}.pdf",
-            "application/pdf", use_container_width=True, key="dl_pg_pdf")
+            "application/pdf", width="stretch", key="dl_pg_pdf")
 
 # ══════════════════════════════════════════════════════════
 # صفحة: إدارة
@@ -1353,7 +1367,7 @@ def pg_manage(rs):
                 delivery_color = "🟢 مفعّل" if delivery_on else "🔴 غير مفعّل"
                 st.markdown(f"<div style='font-size:.8rem;color:#888;margin-bottom:.3rem'>التوصيل: {delivery_color}</div>", unsafe_allow_html=True)
 
-                if st.button(delivery_label, key=f"del_tog_{uid}", use_container_width=True,
+                if st.button(delivery_label, key=f"del_tog_{uid}", width="stretch",
                              type="primary" if not delivery_on else "secondary"):
                     new_bool = not delivery_on
                     new_val  = "true" if new_bool else "false"
@@ -1422,7 +1436,7 @@ def pg_manage(rs):
                     key=f"slug_{uid}", label_visibility="collapsed"
                 )
             with col_sl2:
-                if st.button("💾 حفظ", key=f"save_slug_{uid}", use_container_width=True):
+                if st.button("💾 حفظ", key=f"save_slug_{uid}", width="stretch"):
                     clean_slug = new_slug.strip().lower().replace(" ","-")
                     if clean_slug != current_slug:
                         try:
@@ -1475,7 +1489,7 @@ def pg_manage(rs):
                     label_visibility="collapsed"
                 )
             with col_dom2:
-                if st.button("💾 حفظ", key=f"save_dom_{uid}", use_container_width=True):
+                if st.button("💾 حفظ", key=f"save_dom_{uid}", width="stretch"):
                     if new_domain != current_domain:
                         try:
                             import gspread as _gsp_d
@@ -1650,7 +1664,7 @@ def pg_plans(rs):
                     color = "#2ecc71" if f.startswith("✅") else "#e74c3c"
                     st.markdown(f"<div style='font-size:.75rem;color:{color}'>{f}</div>", unsafe_allow_html=True)
 
-            if st.button(f"💾 حفظ الباقة", key=f"save_plan_{rid}", use_container_width=True,
+            if st.button(f"💾 حفظ الباقة", key=f"save_plan_{rid}", width="stretch",
                          type="primary"):
                 try:
                     import requests as _rqp
@@ -1676,7 +1690,7 @@ def pg_plans(rs):
                 except Exception as e:
                     st.error(f"❌ {e}")
 
-            if st.button(f"📱 أرسل إشعار للمطعم", key=f"notif_{rid}", use_container_width=True):
+            if st.button(f"📱 أرسل إشعار للمطعم", key=f"notif_{rid}", width="stretch"):
                 chat_id = r.get("telegram_chat_id","")
                 if chat_id:
                     try:
@@ -2024,17 +2038,17 @@ section[data-testid="stSidebar"] label
         </style>""", unsafe_allow_html=True)
 
         for label, key in nav_items:
-            if st.button(label, key=f"nav_{key}", use_container_width=True):
+            if st.button(label, key=f"nav_{key}", width="stretch"):
                 st.session_state["page"] = key
                 st.rerun()
 
         page = st.session_state.get("page", "🏠 Dashboard")
         st.markdown("---")
         mode_label = "☀️ وضع النهار" if st.session_state.dark_mode else "🌙 وضع الليل"
-        if st.button(mode_label, use_container_width=True, key="btn_theme"):
+        if st.button(mode_label, width="stretch", key="btn_theme"):
             st.session_state.dark_mode = not st.session_state.dark_mode
             st.rerun()
-        if st.button("🚪 خروج", use_container_width=True, key="btn_logout"):
+        if st.button("🚪 خروج", width="stretch", key="btn_logout"):
             st.session_state.ok = False; st.rerun()
 
     if   page == "🏠 Dashboard":      pg_dashboard(rs)

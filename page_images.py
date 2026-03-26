@@ -298,7 +298,7 @@ def page_images(restaurants: list):
 
     col_emergency, col_status = st.columns([2, 3])
     with col_emergency:
-        if st.button("⚡ تحديث المينيو الآن", use_container_width=True,
+        if st.button("⚡ تحديث المينيو الآن", width="stretch",
                      key="emergency_refresh", type="primary"):
             with st.spinner("⏳ جاري مسح الـ cache وإجبار التحديث..."):
                 try:
@@ -513,7 +513,7 @@ def page_images(restaurants: list):
                                           help="يتحدث تلقائياً عند تغيير الأكلة — يمكنك تعديلها")
             with col_btn:
                 st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
-                search_btn = st.button("🔍 بحث", use_container_width=True, key="multi_search_btn")
+                search_btn = st.button("🔍 بحث", width="stretch", key="multi_search_btn")
 
             if search_btn or st.session_state.get("_multi_photos"):
                 if search_btn:
@@ -536,9 +536,9 @@ def page_images(restaurants: list):
                         for j, photo in enumerate(row_photos):
                             with cols[j]:
                                 src_color = {"Pexels":"#69f0ae","Pixabay":"#80d8ff","Unsplash":"#C9A84C"}.get(photo["source"],"#888")
-                                st.image(photo["thumb"], use_container_width=True)
+                                st.image(photo["thumb"], width="stretch")
                                 st.markdown(f'<div style="font-size:.65rem;color:{src_color};text-align:center;margin-top:.2rem">{photo["source"]}</div>', unsafe_allow_html=True)
-                                if st.button(f"✅ اختر", key=f"pick_photo_{row_start+j}", use_container_width=True):
+                                if st.button(f"✅ اختر", key=f"pick_photo_{row_start+j}", width="stretch"):
                                     # حفظ الصورة في الشيت
                                     target = {"name": current_item, "image_url": photo["url"], "image_credit": photo["credit"]}
                                     updated = update_images_in_sheet(sheet_id, final_tab, [target], rid=restaurant_id)
@@ -590,7 +590,7 @@ def page_images(restaurants: list):
                 )
             with col_btn:
                 st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
-                gen_btn = st.button("🎨 توليد صورة", use_container_width=True, key="poll_gen_btn")
+                gen_btn = st.button("🎨 توليد صورة", width="stretch", key="poll_gen_btn")
 
             if gen_btn:
                 st.session_state.pop("_poll_photos", None)
@@ -611,8 +611,8 @@ def page_images(restaurants: list):
                     for idx, photo in enumerate(photos):
                         # عرض الصورة من bytes إذا متوفرة وإلا من URL
                         img_src = photo.get("bytes") or photo.get("url")
-                        st.image(img_src, use_container_width=True)
-                        if st.button("✅ اختر هذه الصورة", key=f"poll_pick_{idx}", use_container_width=True):
+                        st.image(img_src, width="stretch")
+                        if st.button("✅ اختر هذه الصورة", key=f"poll_pick_{idx}", width="stretch"):
                             target = dict(st.session_state["_poll_item"])
                             target["image_url"]    = photo["url"]
                             target["image_credit"] = photo["credit"]
@@ -649,7 +649,7 @@ def page_images(restaurants: list):
                         override  = st.text_input(f"`{nm}`", value=default_q, key=f"sh_{nm}")
                         search_overrides[nm] = override
 
-        if items_from_sheet and st.button("🚀 جلب صور Unsplash", use_container_width=True):
+        if items_from_sheet and st.button("🚀 جلب صور Unsplash", width="stretch"):
             targets = [i for i in items_from_sheet
                       if not only_missing or not i.get("image_url","")]
             if not targets:
@@ -730,7 +730,7 @@ def page_images(restaurants: list):
             💰 الأكلات التي تحتاج صوراً: <b>{targets_count}</b> — التكلفة التقديرية: <b>~${cost_est:.2f}</b>
             </div>""", unsafe_allow_html=True)
 
-        if items_from_sheet and st.button("🤖 توليد صور AI", use_container_width=True):
+        if items_from_sheet and st.button("🤖 توليد صور AI", width="stretch"):
             targets = [i for i in items_from_sheet
                       if not only_missing_d or not i.get("image_url","")]
             if not targets:
@@ -794,9 +794,9 @@ def page_images(restaurants: list):
             )
         with col2:
             if uploaded:
-                st.image(uploaded, caption="معاينة", use_container_width=True)
+                st.image(uploaded, caption="معاينة", width="stretch")
 
-        if uploaded and sel_item and st.button("💾 حفظ الصورة في الشيت", use_container_width=True):
+        if uploaded and sel_item and st.button("💾 حفظ الصورة في الشيت", width="stretch"):
             with st.spinner("⏳ جاري المعالجة..."):
                 result = process_manual_upload(uploaded, sel_item)
 
@@ -836,7 +836,7 @@ def page_images(restaurants: list):
             key="bulk_upload"
         )
 
-        if bulk_files and st.button("📦 حفظ الجميع", use_container_width=True):
+        if bulk_files and st.button("📦 حفظ الجميع", width="stretch"):
             pb       = st.progress(0)
             stat     = st.empty()
             uploaded_items = []
@@ -919,7 +919,7 @@ def page_images(restaurants: list):
 
         c_save, c_cancel = st.columns(2)
         with c_save:
-            if st.button(f"✅ حفظ {with_img} صورة في الشيت", use_container_width=True, type="primary"):
+            if st.button(f"✅ حفظ {with_img} صورة في الشيت", width="stretch", type="primary"):
                 with st.spinner("💾 جاري التحديث..."):
                     updated = update_images_in_sheet(pending_sid, pending_tab, pending, rid=restaurant_id)
                 st.success(f"🎉 تم تحديث **{updated}** أكلة في Google Sheet")
@@ -932,7 +932,7 @@ def page_images(restaurants: list):
                     st.session_state.pop(k, None)
                 st.rerun()
         with c_cancel:
-            if st.button("🗑️ إلغاء", use_container_width=True):
+            if st.button("🗑️ إلغاء", width="stretch"):
                 for k in ["pending_items","pending_sheet_id","pending_tab"]:
                     st.session_state.pop(k, None)
                 st.rerun()
