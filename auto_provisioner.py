@@ -86,6 +86,8 @@ MASTER_HEADERS = [
     "waiters_chat_id",    # chat_id مجموعة النوادل (dine_in جاهز)
     "delivery_chat_id",   # chat_id مجموعة التوصيل
     "sa_json",            # Service Account JSON الخاص بهذا المطعم
+    "open_time",          # وقت فتح المطعم HH:MM
+    "close_time",         # وقت إغلاق المطعم HH:MM
 ]
 
 def _fmt_header(spread, ws, color):
