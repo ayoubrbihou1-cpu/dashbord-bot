@@ -1545,6 +1545,87 @@ def pg_manage(rs):
                              key=f"tog_{uid}"):
                     st.info("ميزة قريباً")
 
+            # ══ أوقات العمل ══
+            st.markdown("---")
+            current_open  = r.get("open_time",  "09:00").strip() or "09:00"
+            current_close = r.get("close_time", "23:00").strip() or "23:00"
+            st.markdown("**🕐 أوقات العمل:**")
+            st.caption(f"الحالي: 🟢 فتح {current_open} — 🔴 إغلاق {current_close}  |  إذا كان الإغلاق أصغر من الفتح فهو بعد منتصف الليل")
+            col_wh1, col_wh2, col_wh3 = st.columns([2, 2, 1])
+            with col_wh1:
+                new_open = st.text_input(
+                    "🟢 وقت الفتح", value=current_open,
+                    placeholder="HH:MM — مثال: 09:00",
+                    key=f"open_{uid}"
+                )
+            with col_wh2:
+                new_close = st.text_input(
+                    "🔴 وقت الإغلاق", value=current_close,
+                    placeholder="HH:MM — مثال: 23:00 أو 02:00",
+                    key=f"close_{uid}"
+                )
+            with col_wh3:
+                st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
+                if st.button("💾 حفظ", key=f"save_wh_{uid}", width="stretch"):
+                    _open_v  = new_open.strip()  or "09:00"
+                    _close_v = new_close.strip() or "23:00"
+                    import re as _re
+                    _time_ok = lambda t: bool(_re.match(r'^\d{2}:\d{2}$', t))
+                    if not _time_ok(_open_v) or not _time_ok(_close_v):
+                        st.error("❌ الصيغة يجب تكون HH:MM — مثال: 09:00")
+                    elif _open_v == current_open and _close_v == current_close:
+                        st.info("لم تتغير الأوقات")
+                    else:
+                        try:
+                            # 1) حفظ في Supabase
+                            _ok_wh = _sb_patch(
+                                "restaurants",
+                                f"restaurant_id=eq.{rid}",
+                                {"open_time": _open_v, "close_time": _close_v}
+                            )
+                            # 2) حفظ في Google Sheets
+                            try:
+                                import gspread as _gsp_wh
+                                from google.oauth2.service_account import Credentials as _Cr_wh
+                                import json as _jj_wh
+                                _SA_wh  = os.getenv("GOOGLE_SA_JSON_CONTENT", "")
+                                _MSI_wh = os.getenv("MASTER_SHEET_ID", "")
+                                if _SA_wh and _MSI_wh:
+                                    _cr_wh = _Cr_wh.from_service_account_info(
+                                        _jj_wh.loads(_SA_wh),
+                                        scopes=["https://www.googleapis.com/auth/spreadsheets"])
+                                    _cl_wh = _gsp_wh.authorize(_cr_wh)
+                                    _ws_wh = _cl_wh.open_by_key(_MSI_wh).worksheet("Master_DB")
+                                    _hd_wh = _ws_wh.row_values(1)
+                                    for _col_name in ["open_time", "close_time"]:
+                                        if _col_name not in _hd_wh:
+                                            _ws_wh.update_cell(1, len(_hd_wh) + 1, _col_name)
+                                            _hd_wh.append(_col_name)
+                                    _oc_wh = _hd_wh.index("open_time")  + 1
+                                    _cc_wh = _hd_wh.index("close_time") + 1
+                                    _rc_wh = _hd_wh.index("restaurant_id") if "restaurant_id" in _hd_wh else 0
+                                    for _i_wh, _row_wh in enumerate(_ws_wh.get_all_values()[1:], start=2):
+                                        if len(_row_wh) > _rc_wh and str(_row_wh[_rc_wh]).strip() == rid:
+                                            _ws_wh.update_cell(_i_wh, _oc_wh, _open_v)
+                                            _ws_wh.update_cell(_i_wh, _cc_wh, _close_v)
+                                            break
+                            except: pass
+                            # 3) مسح cache
+                            try:
+                                requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
+                                              headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
+                                requests.post(f"{ROUTER_URL}/cache/refresh",
+                                              headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
+                            except: pass
+                            st.cache_data.clear()
+                            if _ok_wh:
+                                st.success(f"✅ تم الحفظ: فتح {_open_v} — إغلاق {_close_v}")
+                            else:
+                                st.warning("⚠️ تم الحفظ محلياً — تحقق من Supabase")
+                            st.rerun()
+                        except Exception as _e_wh:
+                            st.error(f"❌ خطأ: {_e_wh}")
+
 # ══════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════
