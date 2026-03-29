@@ -704,6 +704,16 @@ def pg_add(rs):
         with c2:
             rtables = st.number_input("🪑 عدد الطاولات", 1, 100, 10)
             rlogo   = st.text_input("🖼️ رابط اللوجو (اختياري)", placeholder="https://...")
+            # ✅ أوقات العمل — جديد
+            st.markdown('<div style="color:#C9A84C;font-size:.85rem;font-weight:700;margin:.6rem 0 .3rem">🕐 أوقات العمل</div>', unsafe_allow_html=True)
+            _wh1, _wh2 = st.columns(2)
+            with _wh1:
+                ropen_time  = st.text_input("🟢 وقت الفتح",   value="09:00",
+                    placeholder="HH:MM", help="مثال: 10:00", key="add_open_time")
+            with _wh2:
+                rclose_time = st.text_input("🔴 وقت الإغلاق", value="23:00",
+                    placeholder="HH:MM", help="مثال: 02:00 (بعد منتصف الليل)", key="add_close_time")
+            st.caption("⚠️ إغلاق بعد منتصف الليل؟ اكتب الوقت كما هو — مثال: 02:00")
             st.markdown("""<div class="res warn" style="font-size:.78rem;padding:.6rem .9rem">
             📨 <b>Telegram:</b> رابط تلقائي يُولد بعد الإنشاء<br>
             📧 <b>Gmail:</b> يرسل تلقائياً إذا أضفت GMAIL_USER في المتغيرات
@@ -875,7 +885,9 @@ def pg_add(rs):
             delivery_active=rdelivery,
             sa_json=rsa_json.strip() if rsa_json.strip() else "",
             slug=_clean_slug,
-            cashier_password=rcashier_pass.strip() if rcashier_pass.strip() else "")
+            cashier_password=rcashier_pass.strip() if rcashier_pass.strip() else "",
+            open_time=ropen_time.strip() or "09:00",
+            close_time=rclose_time.strip() or "23:00")
 
         done = len([s for s in result.steps if "✅" in s])
         show(min(done, len(steps_lbl)-1), result.steps)
@@ -1303,6 +1315,8 @@ def pg_manage(rs):
                 **🔑 كلمة سر الكوزينة:** `{r.get('kitchen_password','⚠️ غير محددة')}`
                 **💰 كلمة سر الكاسيير:** `{r.get('cashier_password','') or '⚠️ غير محددة'}`
 
+                **🕐 أوقات العمل:** 🟢 {r.get('open_time','09:00')} → 🔴 {r.get('close_time','23:00')}
+
                 **🛵 التوصيل:** {'✅ مفعّل' if str(r.get('delivery_active','')).lower()=='true' else '❌ غير مفعّل'}
                 """)
             with c2:
@@ -1570,7 +1584,7 @@ def pg_manage(rs):
                     _open_v  = new_open.strip()  or "09:00"
                     _close_v = new_close.strip() or "23:00"
                     import re as _re
-                    _time_ok = lambda t: bool(_re.match(r'^\d{2}:\d{2}$', t))
+                    _time_ok = lambda t: bool(_re.match(r"^\d{2}:\d{2}$", t))
                     if not _time_ok(_open_v) or not _time_ok(_close_v):
                         st.error("❌ الصيغة يجب تكون HH:MM — مثال: 09:00")
                     elif _open_v == current_open and _close_v == current_close:
