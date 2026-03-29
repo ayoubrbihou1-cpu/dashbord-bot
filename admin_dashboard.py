@@ -1591,13 +1591,11 @@ def pg_manage(rs):
                         st.info("لم تتغير الأوقات")
                     else:
                         try:
-                            # 1) حفظ في Supabase
                             _ok_wh = _sb_patch(
                                 "restaurants",
                                 f"restaurant_id=eq.{rid}",
                                 {"open_time": _open_v, "close_time": _close_v}
                             )
-                            # 2) حفظ في Google Sheets
                             try:
                                 import gspread as _gsp_wh
                                 from google.oauth2.service_account import Credentials as _Cr_wh
@@ -1624,7 +1622,6 @@ def pg_manage(rs):
                                             _ws_wh.update_cell(_i_wh, _cc_wh, _close_v)
                                             break
                             except: pass
-                            # 3) مسح cache
                             try:
                                 requests.post(f"{ROUTER_URL}/cache/refresh/{rid}",
                                               headers={"X-Admin-Key": ADMIN_PASSWORD}, timeout=8)
