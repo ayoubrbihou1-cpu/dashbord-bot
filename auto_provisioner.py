@@ -484,7 +484,8 @@ def provision_restaurant(
     num_tables=10, logo_url="", owner_email="", telegram_chat_id="",
     bg_type="minimal", socials=None, kitchen_password="",
     delivery_active=False, sa_json="", slug="",
-    cashier_password=""
+    cashier_password="",
+    open_time="09:00", close_time="23:00"
 ):
     res = ProvisionResult()
     steps = []
@@ -554,6 +555,8 @@ def provision_restaurant(
                 "sa_json":         sa_json.strip() if sa_json else "",
                 "status":          "active" if telegram_chat_id else "pending_telegram",
                 "plan":            "basic",
+                "open_time":       open_time or "09:00",
+                "close_time":      close_time or "23:00",
             }
             _h = {
                 "apikey": _sb_key,
@@ -600,6 +603,8 @@ def provision_restaurant(
         "delivery_chat_id": "",
         "sa_json":          sa_json.strip() if sa_json else "",
         "slug":             _slug_clean,
+        "open_time":        open_time or "09:00",
+        "close_time":       close_time or "23:00",
     })
     if not saved and not _saved_supabase:
         res.error = "فشل الحفظ في Supabase وGoogle Sheets"
